@@ -46,7 +46,7 @@ use crate::{
     },
 };
 use kaspa_consensus_core::{
-    acceptance_data::AcceptanceData,
+    acceptance_data::{AcceptanceData, MergesetBlockAcceptanceData, BlockAcceptanceData},
     block::{BlockTemplate, MutableBlock},
     blockstatus::BlockStatus::{self, StatusDisqualifiedFromChain, StatusUTXOValid},
     coinbase::MinerData,
@@ -58,7 +58,7 @@ use kaspa_consensus_core::{
         utxo_diff::UtxoDiff,
         utxo_view::{UtxoView, UtxoViewComposition},
     },
-    BlockHashSet,
+    BlockHashSet, BlockHashMap,
 };
 use kaspa_consensus_notify::{
     notification::{
@@ -336,13 +336,14 @@ impl VirtualStateProcessor {
                     let header = self.headers_store.get_header(current).unwrap();
                     let mergeset_data = self.ghostdag_store.get_data(current).unwrap();
                     let pov_daa_score = header.daa_score;
+                    let pov_blue_score = header.blue_score;
 
                     let selected_parent_multiset_hash = self.utxo_multisets_store.get(selected_parent).unwrap();
                     let selected_parent_utxo_view = (&virtual_read.utxo_set).compose(&accumulated_diff);
 
                     let mut ctx = UtxoProcessingContext::new(mergeset_data.into(), selected_parent_multiset_hash);
 
-                    self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
+                    self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score, pov_blue_score);
                     let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
 
                     if let Err(rule_error) = res {
@@ -403,12 +404,15 @@ impl VirtualStateProcessor {
                 // TODO: As an optimization, calculate the chain path as part of the loop on the chain iterator above.
                 let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_selected, new_selected);
                 // TODO: Fetch acceptance data only if there's a subscriber for the below notification.
-                let added_chain_blocks_acceptance_data =
-                    chain_path.added.iter().copied().map(|added| self.acceptance_data_store.get(added).unwrap()).collect_vec();
+                let added_chain_blocks_acceptance_data: BlockAcceptanceData =
+                    chain_path.added.iter().copied().map(|added| (added, self.acceptance_data_store.get(added).unwrap())).collect();
+                let removed_chain_blocks_acceptance_data: BlockAcceptanceData =
+                    chain_path.removed.iter().copied().map(|removed| (removed, self.acceptance_data_store.get(removed).unwrap())).collect();
                 let _ = self.notification_root().notify(Notification::VirtualChainChanged(VirtualChainChangedNotification::new(
                     chain_path.added.into(),
                     chain_path.removed.into(),
                     Arc::new(added_chain_blocks_acceptance_data),
+                    Arc::new(removed_chain_blocks_acceptance_data),
                 )));
             }
             BlockStatus::StatusDisqualifiedFromChain => {
@@ -449,7 +453,7 @@ impl VirtualStateProcessor {
         let virtual_past_median_time = self.past_median_time_manager.calc_past_median_time(&virtual_ghostdag_data)?.0;
 
         // Calc virtual UTXO state relative to selected parent
-        self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, virtual_daa_score);
+        self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, virtual_daa_score, virtual_ghostdag_data.blue_score);
 
         // Update the accumulated diff
         accumulated_diff.with_diff_in_place(&ctx.mergeset_diff).unwrap();

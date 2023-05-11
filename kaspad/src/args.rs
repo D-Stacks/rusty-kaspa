@@ -10,6 +10,7 @@ pub struct Defaults {
     pub async_threads: usize,
     pub wrpc_serializer_tasks: usize,
     pub utxoindex: bool,
+    pub txindex: bool,
     pub reset_db: bool,
     pub outbound_target: usize,
     pub inbound_limit: usize,
@@ -27,6 +28,7 @@ impl Default for Defaults {
             async_threads: num_cpus::get() / 2,
             wrpc_serializer_tasks: num_cpus::get() / 2,
             utxoindex: false,
+            txindex: false,
             reset_db: false,
             outbound_target: 8,
             inbound_limit: 128,
@@ -50,6 +52,7 @@ pub struct Args {
     pub connect: Option<String>,
     pub listen: Option<String>,
     pub utxoindex: bool,
+    pub txindex: bool,
     pub reset_db: bool,
     pub outbound_target: usize,
     pub inbound_limit: usize,
@@ -148,6 +151,7 @@ pub fn cli(defaults: &Defaults) -> Command {
         )
         .arg(arg!(--"reset-db" "Reset database before starting node. It's needed when switching between subnetworks."))
         .arg(arg!(--utxoindex "Enable the UTXO index"))
+        .arg(arg!(--txindex "Enable the TX index"))
         .arg(arg!(--testnet "Use the test network"))
         .arg(arg!(--devnet "Use the development test network"))
         .arg(arg!(--simnet "Use the simulation test network"))
@@ -170,6 +174,7 @@ impl Args {
             inbound_limit: m.get_one::<usize>("maxinpeers").cloned().unwrap_or(defaults.inbound_limit),
             reset_db: m.get_one::<bool>("reset-db").cloned().unwrap_or(defaults.reset_db),
             utxoindex: m.get_one::<bool>("utxoindex").cloned().unwrap_or(defaults.utxoindex),
+            txindex: m.get_one::<bool>("txindex").cloned().unwrap_or(defaults.utxoindex),
             testnet: m.get_one::<bool>("testnet").cloned().unwrap_or(defaults.testnet),
             devnet: m.get_one::<bool>("devnet").cloned().unwrap_or(defaults.devnet),
             simnet: m.get_one::<bool>("simnet").cloned().unwrap_or(defaults.simnet),
@@ -178,6 +183,7 @@ impl Args {
 
     pub fn apply_to_config(&self, config: &mut Config) {
         config.utxoindex = self.utxoindex;
+        config.txindex = self.txindex;
     }
 }
 
@@ -252,6 +258,7 @@ impl Args {
       --maxutxocachesize=                   Max size of loaded UTXO into ram from the disk in bytes (default:
                                             5000000000)
       --utxoindex                           Enable the UTXO index
+      --txindex                             Enable the TX index
       --archival                            Run as an archival node: don't delete old block data when moving the
                                             pruning point (Warning: heavy disk usage)'
       --protocol-version=                   Use non default p2p protocol version (default: 5)

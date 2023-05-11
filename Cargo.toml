@@ -22,6 +22,7 @@ members = [
     "indexes/core",
     "indexes/processor",
     "indexes/utxoindex",
+    "indexes/txindex",
     "rpc/core",
     "rpc/service",
     "rpc/grpc/core",
@@ -62,6 +63,7 @@ kaspa-p2p-flows = { path = "protocol/flows" }
 kaspa-p2p-lib = { path = "protocol/p2p" }
 kaspa-testing-integration = { path = "testing/integration" }
 kaspa-utxoindex = { path = "indexes/utxoindex" }
+kaspa-txindex = { path = "indexes/txindex" }
 kaspa-rpc-service = { version = "0.1.0", path = "rpc/service" }
 
 # published

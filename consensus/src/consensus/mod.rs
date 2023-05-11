@@ -19,7 +19,7 @@ use crate::{
             daa::DbDaaStore,
             depth::DbDepthStore,
             ghostdag::{DbGhostdagStore, GhostdagStoreReader},
-            headers::{DbHeadersStore, HeaderStoreReader},
+            headers::{DbHeadersStore, HeaderStoreReader, CompactHeaderData},
             headers_selected_tip::{DbHeadersSelectedTipStore, HeadersSelectedTipStoreReader},
             past_pruning_points::{DbPastPruningPointsStore, PastPruningPointsStoreReader},
             pruning::{DbPruningStore, PruningStoreReader},
@@ -693,7 +693,7 @@ impl ConsensusApi for Consensus {
         }
     }
 
-    fn get_sink(&self) -> Hash {
+    fn get_sink(&self) -> Hash { 
         self.virtual_processor.virtual_stores.read().state.get().unwrap().ghostdag_data.selected_parent
     }
 

@@ -13,18 +13,20 @@ use kaspa_notify::{
 };
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utxoindex::api::DynUtxoIndexApi;
+use kaspa_txindex::api::DynTxIndexApi;
 use std::sync::Arc;
 
 const INDEX_SERVICE: &str = IDENT;
 
 pub struct IndexService {
     utxoindex: DynUtxoIndexApi,
+    txindex: DynTxIndexApi,
     notifier: Arc<IndexNotifier>,
     shutdown: SingleTrigger,
 }
 
 impl IndexService {
-    pub fn new(consensus_notifier: &Arc<ConsensusNotifier>, utxoindex: DynUtxoIndexApi) -> Self {
+    pub fn new(consensus_notifier: &Arc<ConsensusNotifier>, utxoindex: DynUtxoIndexApi, txindex: DynTxIndexApi) -> Self {
         // Prepare consensus-notify objects
         let consensus_notify_channel = Channel::<ConsensusNotification>::default();
         let consensus_notify_listener_id =
@@ -44,7 +46,7 @@ impl IndexService {
             .try_start_notify(consensus_notify_listener_id, Scope::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideScope {}))
             .expect("the subscription always succeeds");
 
-        Self { utxoindex, notifier, shutdown: SingleTrigger::default() }
+        Self { utxoindex, txindex, notifier, shutdown: SingleTrigger::default() }
     }
 
     pub fn notifier(&self) -> Arc<IndexNotifier> {

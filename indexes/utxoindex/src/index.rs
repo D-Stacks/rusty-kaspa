@@ -2,11 +2,11 @@ use crate::{
     api::UtxoIndexApi,
     errors::{UtxoIndexError, UtxoIndexResult},
     model::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
-    stores::store_manager::Store,
+    stores::store_manager::UtxoIndexStore,
     update_container::UtxoIndexChanges,
     IDENT,
 };
-use kaspa_consensus_core::{tx::ScriptPublicKeys, utxo::utxo_diff::UtxoDiff, BlockHashSet};
+use kaspa_consensus_core::{tx::{ScriptPublicKeys, TransactionOutpoint}, utxo::utxo_diff::UtxoDiff, BlockHashSet};
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use kaspa_core::{info, trace};
 use kaspa_database::prelude::{StoreError, StoreResult, DB};
@@ -16,22 +16,23 @@ use parking_lot::RwLock;
 use std::{
     fmt::Debug,
     sync::{Arc, Weak},
+    collections::HashSet
 };
 
-const RESYNC_CHUNK_SIZE: usize = 2048; //Increased from 1k (used in go-kaspad), for quicker resets, while still having a low memory footprint.
+const RESYNC_CHUNK_SIZE: usize = usize::pow(2, 11); // 2048 utxos per chunk - Increased from 1k (used in go-kaspad), for quicker resets, while still having a low memory footprint.
 
 /// UtxoIndex indexes [`CompactUtxoEntryCollections`] by [`ScriptPublicKey`], commits them to its owns store, and emits changes.
 /// Note: The UtxoIndex struct by itself is not thread save, only correct usage of the supplied RwLock via `new` makes it so.
 /// please follow guidelines found in the comments under `utxoindex::core::api::UtxoIndexApi` for proper thread safety.
 pub struct UtxoIndex {
     consensus_manager: Arc<ConsensusManager>,
-    store: Store,
+    store: UtxoIndexStore,
 }
 
 impl UtxoIndex {
     /// Creates a new [`UtxoIndex`] within a [`RwLock`]
     pub fn new(consensus_manager: Arc<ConsensusManager>, db: Arc<DB>) -> UtxoIndexResult<Arc<RwLock<Self>>> {
-        let mut utxoindex = Self { consensus_manager: consensus_manager.clone(), store: Store::new(db) };
+        let mut utxoindex = Self { consensus_manager: consensus_manager.clone(), store: UtxoIndexStore::new(db) };
         if !utxoindex.is_synced()? {
             utxoindex.resync()?;
         }
@@ -43,31 +44,30 @@ impl UtxoIndex {
 
 impl UtxoIndexApi for UtxoIndex {
     /// Retrieve circulating supply from the utxoindex db.
-    fn get_circulating_supply(&self) -> StoreResult<u64> {
+    fn get_circulating_supply(&self) -> UtxoIndexResult<u64> {
         trace!("[{0}] retrieving circulating supply", IDENT);
 
-        self.store.get_circulating_supply()
+        Ok(self.store.get_circulating_supply()?)
     }
 
     /// Retrieve utxos by script public keys from the utxoindex db.
-    fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey> {
+    fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> UtxoIndexResult<UtxoSetByScriptPublicKey> {
         trace!("[{0}] retrieving utxos from {1} script public keys", IDENT, script_public_keys.len());
 
-        self.store.get_utxos_by_script_public_key(&script_public_keys)
+        Ok(self.store.get_utxos_by_script_public_key(&script_public_keys)?)
     }
 
     /// Retrieve the stored tips of the utxoindex.
-    fn get_utxo_index_tips(&self) -> StoreResult<Arc<BlockHashSet>> {
+    fn get_utxo_index_tips(&self) -> UtxoIndexResult<Arc<BlockHashSet>> {
         trace!("[{0}] retrieving tips", IDENT);
 
-        self.store.get_tips()
+        Ok(self.store.get_tips()?)
     }
 
     /// Updates the [UtxoIndex] via the virtual state supplied:
     /// 1) Saves updated utxo differences, virtual parent hashes and circulating supply to the database.
     /// 2) returns an event about utxoindex changes.
     fn update(&mut self, utxo_diff: Arc<UtxoDiff>, tips: Arc<Vec<Hash>>) -> UtxoIndexResult<UtxoChanges> {
-        trace!("[{0}] updating...", IDENT);
         trace!("[{0}] adding {1} utxos", IDENT, utxo_diff.add.len());
         trace!("[{0}] removing {1} utxos", IDENT, utxo_diff.remove.len());
 
@@ -116,7 +116,7 @@ impl UtxoIndexApi for UtxoIndex {
                     trace!("[{0}] sync status is {1}", IDENT, false);
                     Ok(false)
                 }
-                other_store_errors => Err(UtxoIndexError::StoreAccessError(other_store_errors)),
+                other_store_errors => Err(UtxoIndexError::StoreAccessError(other_store_errors))?,
             },
         }
     }
@@ -174,8 +174,8 @@ impl UtxoIndexApi for UtxoIndex {
     }
 
     // This can have a big memory footprint, so it should be used only for tests.
-    fn get_all_outpoints(&self) -> StoreResult<std::collections::HashSet<kaspa_consensus_core::tx::TransactionOutpoint>> {
-        self.store.get_all_outpoints()
+    fn get_all_outpoints(&self) -> UtxoIndexResult<HashSet<TransactionOutpoint>> {
+        Ok(self.store.get_all_outpoints()?)
     }
 }
 

@@ -9,6 +9,7 @@ use rocksdb::WriteBatch;
 
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn has(&self, hash: Hash) -> Result<bool, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -34,10 +35,6 @@ impl DbBlockTransactionsStore {
         Self::new(Arc::clone(&self.db), cache_size)
     }
 
-    pub fn has(&self, hash: Hash) -> Result<bool, StoreError> {
-        self.access.has(hash)
-    }
-
     pub fn insert_batch(&self, batch: &mut WriteBatch, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
         if self.access.has(hash)? {
             return Err(StoreError::KeyAlreadyExists(hash.to_string()));
@@ -50,6 +47,10 @@ impl DbBlockTransactionsStore {
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
         self.access.read(hash)
+    }
+
+    fn has(&self, hash: Hash) -> Result<bool, StoreError> {
+        self.access.has(hash)
     }
 }
 

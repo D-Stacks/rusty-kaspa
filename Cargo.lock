@@ -1734,6 +1734,7 @@ dependencies = [
  "kaspa-hashes",
  "kaspa-index-core",
  "kaspa-notify",
+ "kaspa-txindex",
  "kaspa-utils",
  "kaspa-utxoindex",
  "log",
@@ -2004,6 +2005,28 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "kaspa-txindex"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "futures",
+ "kaspa-consensus",
+ "kaspa-consensus-core",
+ "kaspa-consensusmanager",
+ "kaspa-core",
+ "kaspa-database",
+ "kaspa-hashes",
+ "kaspa-index-core",
+ "kaspa-utils",
+ "log",
+ "parking_lot",
+ "rand 0.8.5",
+ "rocksdb",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

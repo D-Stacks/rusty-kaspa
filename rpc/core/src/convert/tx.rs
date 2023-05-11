@@ -51,7 +51,7 @@ impl From<&TransactionInput> for RpcTransactionInput {
 impl From<&MergesetBlockAcceptanceData> for RpcAcceptedTransactionIds {
     fn from(item: &MergesetBlockAcceptanceData) -> Self {
         Self {
-            accepting_block_hash: item.block_hash,
+            accepting_block_hash: item.merged_block_hash,
             accepted_transaction_ids: item.accepted_transactions.iter().map(|tx| tx.transaction_id).collect(),
         }
     }

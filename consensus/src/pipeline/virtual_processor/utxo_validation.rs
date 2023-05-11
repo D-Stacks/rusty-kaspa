@@ -8,7 +8,7 @@ use crate::{
     processes::transaction_validator::errors::{TxResult, TxRuleError},
 };
 use kaspa_consensus_core::{
-    acceptance_data::{AcceptedTxEntry, MergesetBlockAcceptanceData},
+    acceptance_data::MergesetBlockAcceptanceData,
     coinbase::*,
     hashing,
     header::Header,
@@ -64,6 +64,7 @@ impl VirtualStateProcessor {
         ctx: &mut UtxoProcessingContext,
         selected_parent_utxo_view: &V,
         pov_daa_score: u64,
+        pov_blue_score: u64,
     ) {
         let selected_parent_transactions = self.block_transactions_store.get(ctx.selected_parent()).unwrap();
         let validated_coinbase = ValidatedTransaction::new_coinbase(&selected_parent_transactions[0]);
@@ -95,10 +96,11 @@ impl VirtualStateProcessor {
             }
 
             ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
-                block_hash: merged_block,
+                merged_block_hash: merged_block,
+                accepted_blue_score: pov_blue_score,
                 accepted_transactions: validated_transactions
                     .into_iter()
-                    .map(|(tx, tx_idx)| AcceptedTxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
+                    .map(|(tx, tx_idx)| Tr { transaction_id: tx.id(), transaction_index: tx_idx })
                     .collect(),
             });
 

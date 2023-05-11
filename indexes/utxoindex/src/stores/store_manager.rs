@@ -18,18 +18,18 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct Store {
+pub struct UtxoIndexStore {
     utxoindex_tips_store: DbUtxoIndexTipsStore,
     circulating_supply_store: DbCirculatingSupplyStore,
     utxos_by_script_public_key_store: DbUtxoSetByScriptPublicKeyStore,
 }
 
-impl Store {
-    pub fn new(db: Arc<DB>) -> Self {
+impl UtxoIndexStore {
+    pub fn new(utxoindex_db: Arc<DB>) -> Self {
         Self {
-            utxoindex_tips_store: DbUtxoIndexTipsStore::new(db.clone()),
-            circulating_supply_store: DbCirculatingSupplyStore::new(db.clone()),
-            utxos_by_script_public_key_store: DbUtxoSetByScriptPublicKeyStore::new(db, 0),
+            utxoindex_tips_store: DbUtxoIndexTipsStore::new(utxoindex_db.clone()),
+            circulating_supply_store: DbCirculatingSupplyStore::new(utxoindex_db.clone()),
+            utxos_by_script_public_key_store: DbUtxoSetByScriptPublicKeyStore::new(utxoindex_db, 0),
         }
     }
 

@@ -452,3 +452,9 @@ mod tests {
         assert_eq!(spk, spk2);
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionLocator {
+    pub transaction_id: TransactionId,
+    pub transaction_index: TransactionIndexType,
+}

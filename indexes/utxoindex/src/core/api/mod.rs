@@ -18,20 +18,20 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     /// Retrieve circulating supply from the utxoindex db.
     ///
     /// Note: Use a read lock when accessing this method
-    fn get_circulating_supply(&self) -> StoreResult<u64>;
+    fn get_circulating_supply(&self) -> UtxoIndexResult<u64>;
 
     /// Retrieve utxos by script public keys supply from the utxoindex db.
     ///
     /// Note: Use a read lock when accessing this method
-    fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey>;
+    fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> UtxoIndexResult<UtxoSetByScriptPublicKey>;
 
     // This can have a big memory footprint, so it should be used only for tests.
-    fn get_all_outpoints(&self) -> StoreResult<HashSet<TransactionOutpoint>>;
+    fn get_all_outpoints(&self) -> UtxoIndexResult<HashSet<TransactionOutpoint>>;
 
     /// Retrieve the stored tips of the utxoindex (used for testing purposes).
     ///
     /// Note: Use a read lock when accessing this method
-    fn get_utxo_index_tips(&self) -> StoreResult<Arc<BlockHashSet>>;
+    fn get_utxo_index_tips(&self) -> UtxoIndexResult<Arc<BlockHashSet>>;
 
     /// Checks if the utxoindex's db is synced with consensus.
     ///

@@ -49,6 +49,13 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    /// TODO: Get earliest pp after which all blocks on the node are stored,
+    /// 
+    /// right now, only gets last pp (does not do what it says).
+    fn get_start_pruning_point(&self) -> ConsensusResult<Hash> {
+        unimplemented!()
+    }
+
     fn get_virtual_daa_score(&self) -> u64 {
         unimplemented!()
     }

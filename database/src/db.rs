@@ -24,3 +24,8 @@ pub fn delete_db(db_dir: PathBuf) {
     let path = db_dir.to_str().unwrap();
     DB::destroy(&options, path).expect("DB is expected to be deletable");
 }
+
+/// Deletes an existing DB if it exists
+pub fn delete_prefix(prefix: &[u8]) {
+
+}

@@ -11,7 +11,7 @@ pub const STORE_PREFIX: &[u8] = b"txindex-sink";
 
 /// Reader API for `SinkStore`.
 pub trait TxIndexSinkStoreReader {
-    fn get(&self) -> StoreResult<Hash>;
+    fn get(&self) -> StoreResult<Option<Hash>>;
 }
 
 pub trait TxIndexSinkStore: TxIndexSinkStoreReader {

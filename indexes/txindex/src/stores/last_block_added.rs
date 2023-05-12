@@ -6,12 +6,12 @@ use kaspa_database::prelude::{CachedDbItem, DirectDbWriter};
 use kaspa_hashes::Hash;
 
 //Use this store to check sync and resync from last_block_added. 
-pub const STORE_PREFIX: &[u8] = b"txindex-last-block-added";
+pub const STORE_NAME: &[u8] = b"txindex-last-block-added";
 
 
 /// Reader API for `LastBlockAddedStore`.
 pub trait TxIndexLastBlockAddedStoreReader {
-    fn get(&self) -> StoreResult<Hash>;
+    fn get(&self) -> StoreResult<Option<Hash>>;
 }
 
 pub trait TxIndexLastBlockAddedStore: TxIndexLastBlockAddedStoreReader {

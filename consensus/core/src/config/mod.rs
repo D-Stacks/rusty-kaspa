@@ -34,15 +34,28 @@ pub struct Config {
     /// Enable the TX index
     pub txindex: bool,
 
+    /// Enable RPC commands which affect the state of the node
+    pub unsafe_rpc: bool,
+
     /// Allow the node to accept blocks from RPC while not synced
-    /// (this flag is mainly used for testing)
-    // TODO: add and handle a matching kaspad command argument
-    pub allow_submit_block_when_not_synced: bool,
+    /// (required when initiating a new network from genesis)
+    pub enable_unsynced_mining: bool,
+
+    pub user_agent_comments: Vec<String>,
 }
 
 impl Config {
     pub fn new(params: Params) -> Self {
-        Self { params, perf: PERF_PARAMS, process_genesis: true, utxoindex: false, txindex: false, allow_submit_block_when_not_synced: false }
+        Self {
+            params,
+            perf: PERF_PARAMS,
+            process_genesis: true,
+            utxoindex: false, 
+            txindex: false,
+            unsafe_rpc: false,
+            enable_unsynced_mining: false,
+            user_agent_comments: Default::default(),
+        }
     }
 
     pub fn to_builder(&self) -> ConfigBuilder {

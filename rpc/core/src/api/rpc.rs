@@ -4,9 +4,12 @@
 //! All data provided by the RCP server can be trusted by the client
 //! No data submitted by the client to the server can be trusted
 
-use crate::{model::*, RpcResult};
+use crate::{model::*, notify::connection::ChannelConnection, RpcResult};
 use async_trait::async_trait;
-use kaspa_notify::{connection::Connection, listener::ListenerId, scope::Scope, subscription::Command};
+use kaspa_notify::{listener::ListenerId, scope::Scope, subscription::Command};
+use std::sync::Arc;
+
+pub const MAX_SAFE_WINDOW_SIZE: u32 = 10_000;
 
 /// Client RPC Api
 ///
@@ -14,10 +17,7 @@ use kaspa_notify::{connection::Connection, listener::ListenerId, scope::Scope, s
 ///
 /// For each RPC call a matching readily implemented function taking detailed parameters is also provided.
 #[async_trait]
-pub trait RpcApi<C>: Sync + Send
-where
-    C: Connection,
-{
+pub trait RpcApi: Sync + Send {
     ///
     async fn ping(&self) -> RpcResult<()> {
         self.ping_call(PingRequest {}).await?;
@@ -97,7 +97,7 @@ where
     /// Adds a peer to the node's outgoing connection list.
     ///
     /// This will, in most cases, result in the node connecting to said peer.
-    async fn add_peer(&self, peer_address: RpcPeerAddress, is_permanent: bool) -> RpcResult<()> {
+    async fn add_peer(&self, peer_address: RpcContextualPeerAddress, is_permanent: bool) -> RpcResult<()> {
         self.add_peer_call(AddPeerRequest::new(peer_address, is_permanent)).await?;
         Ok(())
     }
@@ -215,15 +215,15 @@ where
     async fn get_sink_blue_score_call(&self, request: GetSinkBlueScoreRequest) -> RpcResult<GetSinkBlueScoreResponse>;
 
     /// Bans the given ip.
-    async fn ban(&self, address: RpcPeerAddress) -> RpcResult<()> {
-        self.ban_call(BanRequest::new(address)).await?;
+    async fn ban(&self, ip: RpcIpAddress) -> RpcResult<()> {
+        self.ban_call(BanRequest::new(ip)).await?;
         Ok(())
     }
     async fn ban_call(&self, request: BanRequest) -> RpcResult<BanResponse>;
 
     /// Unbans the given ip.
-    async fn unban(&self, address: RpcPeerAddress) -> RpcResult<()> {
-        self.unban_call(UnbanRequest::new(address)).await?;
+    async fn unban(&self, ip: RpcIpAddress) -> RpcResult<()> {
+        self.unban_call(UnbanRequest::new(ip)).await?;
         Ok(())
     }
     async fn unban_call(&self, request: UnbanRequest) -> RpcResult<UnbanResponse>;
@@ -235,7 +235,7 @@ where
     }
 
     ///
-    async fn estimate_network_hashes_per_second(&self, window_size: u32, start_hash: RpcHash) -> RpcResult<u64> {
+    async fn estimate_network_hashes_per_second(&self, window_size: u32, start_hash: Option<RpcHash>) -> RpcResult<u64> {
         Ok(self
             .estimate_network_hashes_per_second_call(EstimateNetworkHashesPerSecondRequest::new(window_size, start_hash))
             .await?
@@ -277,7 +277,7 @@ where
     // Notification API
 
     /// Register a new listener and returns an id identifying it.
-    fn register_new_listener(&self, connection: C) -> ListenerId;
+    fn register_new_listener(&self, connection: ChannelConnection) -> ListenerId;
 
     /// Unregister an existing listener.
     ///
@@ -299,3 +299,5 @@ where
         }
     }
 }
+
+pub type DynRpcService = Arc<dyn RpcApi>;

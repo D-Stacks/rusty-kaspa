@@ -21,6 +21,8 @@ pub struct Defaults {
     pub testnet: bool,
     pub devnet: bool,
     pub simnet: bool,
+    pub archival: bool,
+    pub sanity: bool,
 }
 
 impl Default for Defaults {
@@ -41,6 +43,8 @@ impl Default for Defaults {
             testnet: false,
             devnet: false,
             simnet: false,
+            archival: false,
+            sanity: false,
         }
     }
 }
@@ -71,6 +75,8 @@ pub struct Args {
     pub testnet: bool,
     pub devnet: bool,
     pub simnet: bool,
+    pub archival: bool,
+    pub sanity: bool,
 }
 
 pub fn cli(defaults: &Defaults) -> Command {
@@ -171,12 +177,14 @@ pub fn cli(defaults: &Defaults) -> Command {
                 .help("Max number of inbound peers (default: 128)."),
         )
         .arg(arg!(--"reset-db" "Reset database before starting node. It's needed when switching between subnetworks."))
-        .arg(arg!(--"enable_unsynced_mining" "Allow the node to accept blocks from RPC while not synced (this flag is mainly used for testing)"))
+        .arg(arg!(--"enable-unsynced-mining" "Allow the node to accept blocks from RPC while not synced (this flag is mainly used for testing)"))
         .arg(arg!(--utxoindex "Enable the UTXO index"))
         .arg(arg!(--txindex "Enable the TX index"))
         .arg(arg!(--testnet "Use the test network"))
         .arg(arg!(--devnet "Use the development test network"))
         .arg(arg!(--simnet "Use the simulation test network"))
+        .arg(arg!(--archival "Run as an archival node: avoids deleting old block data when moving the pruning point (Warning: heavy disk usage)"))
+        .arg(arg!(--sanity "Enable various sanity checks which might be compute-intensive (mostly performed during pruning)"))
         .arg(
             Arg::new("user_agent_comments")
                 .long("uacomment")
@@ -206,12 +214,14 @@ impl Args {
             outbound_target: m.get_one::<usize>("outpeers").cloned().unwrap_or(defaults.outbound_target),
             inbound_limit: m.get_one::<usize>("maxinpeers").cloned().unwrap_or(defaults.inbound_limit),
             reset_db: m.get_one::<bool>("reset-db").cloned().unwrap_or(defaults.reset_db),
-            enable_unsynced_mining: m.get_one::<bool>("enable_unsynced_mining").cloned().unwrap_or(defaults.enable_unsynced_mining),
+            enable_unsynced_mining: m.get_one::<bool>("enable-unsynced-mining").cloned().unwrap_or(defaults.enable_unsynced_mining),
             utxoindex: m.get_one::<bool>("utxoindex").cloned().unwrap_or(defaults.utxoindex),
             txindex: m.get_one::<bool>("txindex").cloned().unwrap_or(defaults.utxoindex),
             testnet: m.get_one::<bool>("testnet").cloned().unwrap_or(defaults.testnet),
             devnet: m.get_one::<bool>("devnet").cloned().unwrap_or(defaults.devnet),
             simnet: m.get_one::<bool>("simnet").cloned().unwrap_or(defaults.simnet),
+            archival: m.get_one::<bool>("archival").cloned().unwrap_or(defaults.archival),
+            sanity: m.get_one::<bool>("sanity").cloned().unwrap_or(defaults.sanity),
             user_agent_comments: m.get_many::<String>("user_agent_comments").unwrap_or_default().cloned().collect(),
         }
     }
@@ -221,6 +231,9 @@ impl Args {
         config.txindex = self.txindex;
         config.unsafe_rpc = self.unsafe_rpc;
         config.enable_unsynced_mining = self.enable_unsynced_mining;
+        config.is_archival = self.archival;
+        // TODO: change to `config.enable_sanity_checks = self.sanity` when we reach stable versions
+        config.enable_sanity_checks = true;
         config.user_agent_comments = self.user_agent_comments.clone();
     }
 }
@@ -300,7 +313,7 @@ impl Args {
       --archival                            Run as an archival node: don't delete old block data when moving the
                                             pruning point (Warning: heavy disk usage)'
       --protocol-version=                   Use non default p2p protocol version (default: 5)
-      --enable_unsynced_mining              Allow the node to accept blocks from RPC while not synced
+      --enable-unsynced-mining              Allow the node to accept blocks from RPC while not synced
                                             (required when initiating a new network from genesis)
       --testnet                             Use the test network
       --simnet                              Use the simulation test network

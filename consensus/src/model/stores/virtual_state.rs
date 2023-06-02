@@ -13,6 +13,7 @@ use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 
 use super::ghostdag::GhostdagData;
+use super::utxo_set::DbUtxoSetStore;
 
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct VirtualState {
@@ -68,6 +69,20 @@ impl VirtualState {
             mergeset_rewards: BlockHashMap::new(),
             mergeset_non_daa: BlockHashSet::from_iter(std::iter::once(genesis.hash)),
         }
+    }
+}
+
+const VIRTUAL_UTXO_SET: &[u8] = b"virtual-utxo-set";
+
+/// Used in order to group virtual related stores under a single lock
+pub struct VirtualStores {
+    pub state: DbVirtualStateStore,
+    pub utxo_set: DbUtxoSetStore,
+}
+
+impl VirtualStores {
+    pub fn new(db: Arc<DB>, utxoset_cache_size: u64) -> Self {
+        Self { state: DbVirtualStateStore::new(db.clone()), utxo_set: DbUtxoSetStore::new(db, utxoset_cache_size, VIRTUAL_UTXO_SET) }
     }
 }
 

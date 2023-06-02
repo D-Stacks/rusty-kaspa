@@ -11,16 +11,18 @@ kaspa-hashes.workspace = true
 kaspa-muhash.workspace = true
 kaspa-merkle.workspace = true
 kaspa-math.workspace = true
-indexmap.workspace = true
+kaspa-addresses.workspace = true
+kaspa-txscript-errors.workspace = true
+
 thiserror.workspace = true
+indexmap.workspace = true
 serde.workspace = true
 faster-hex.workspace = true
 smallvec.workspace = true
 borsh.workspace = true
-secp256k1 = { version = "0.24", features = ["global-context", "rand-std"] }
 futures-util.workspace = true
 itertools.workspace = true
 cfg-if.workspace = true
-kaspa-addresses.workspace = true
 getrandom.workspace = true
-kaspa-txscript-errors.workspace = true
+
+secp256k1 = { version = "0.24", features = ["global-context", "rand-std"] }

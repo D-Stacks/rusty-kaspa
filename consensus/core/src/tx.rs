@@ -454,7 +454,7 @@ mod tests {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransactionLocator {
+pub struct TransactionOccurrence {
     pub transaction_id: TransactionId,
     pub transaction_index: TransactionIndexType,
 }

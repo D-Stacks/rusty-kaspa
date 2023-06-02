@@ -1,4 +1,5 @@
-use std::io;
+use std::{io, string::FromUtf8Error};
+use kaspa_consensus_core::errors::consensus::ConsensusError;
 use thiserror::Error;
 
 use crate::IDENT;
@@ -13,8 +14,17 @@ pub enum TxIndexError {
     #[error("[{IDENT}]: {0}")]
     DBResetError(#[from] io::Error),
 
-    #[error("[{IDENT}]: Cannot process by both inclusion and acceptance, choose one only")]
-    ConflictingProcessingMechanics,
+    #[error("[{IDENT}]: {0}")]
+    ByteStringLUtf8ConversionError(#[from] FromUtf8Error),
+
+    #[error("[{IDENT}]: Trying to read from uninitialized store: `{0}`")]
+    DBReadingFromUninitializedStoreError(String),
+
+    #[error("[{IDENT}]: {0}")]
+    ConsensusQueryError(#[from] ConsensusError),
+
+    #[error("[{IDENT}]: {0}")]
+    NoProcessingPurposeError(String),
 }
 
 /// Results originating from the [`UtxoIndex`].

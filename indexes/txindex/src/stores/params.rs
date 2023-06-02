@@ -7,9 +7,7 @@ use kaspa_hashes::Hash;
 
 use crate::model::params::TxIndexParams;
 
-// This Store is required for is_synced, in order to register changes in params between runs, to initiate resyncing with new parameters. 
-
-// TODO (when scoped configs are implemented): Save config directly. 
+// This Store is required for is_synced, in order to register changes in params between runs, so resyncing can occur with new parameters. 
 
 /// Reader API for `TxIndexParams`.
 pub trait TxIndexParamsStoreReader {

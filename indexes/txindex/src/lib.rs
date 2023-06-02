@@ -9,7 +9,7 @@ const IDENT: &str = "txindex";
 
 #[cfg(test)]
 mod tests {
-    use crate::{core::*, model::transaction_offsets::{TransactionEntry, TransactionOffset}};
+    use crate::{core::*, model::transaction_entries::{TransactionEntry, TransactionOffset}};
     use kaspa_consensus::test_helpers::generate_random_hash;
     use kaspa_core::info;
 

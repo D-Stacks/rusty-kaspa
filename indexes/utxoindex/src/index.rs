@@ -3,7 +3,7 @@ use crate::{
     errors::{UtxoIndexError, UtxoIndexResult},
     model::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
     stores::store_manager::UtxoIndexStore,
-    update_container::UtxoIndexChanges,
+    reindexer::utxo_changes::UtxoIndexChanges,
     IDENT,
 };
 use kaspa_consensus_core::{tx::{ScriptPublicKeys, TransactionOutpoint}, utxo::utxo_diff::UtxoDiff, BlockHashSet};

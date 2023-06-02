@@ -2,11 +2,15 @@ use std::{fmt::Debug, sync::Arc};
 use kaspa_consensus_core::tx::{Transaction, TransactionId};
 use parking_lot::RwLock;
 
-use crate::{model::{transaction_offsets::{TransactionOffset, TransactionOffsets}, merge_acceptance::TransactionAcceptance}, errors::TxIndexResult};
+use crate::{model::{transaction_entries::{TransactionOffset, TransactionOffsets}, merge_acceptance::TransactionAcceptance}, errors::TxIndexResult};
 
 pub trait TxIndexApi: Send + Sync + Debug {
     
     fn is_synced(self) -> TxIndexResult<bool>;
+
+    fn is_inclusion_synced(&self) -> TxIndexResult<bool>;
+
+    fn is_acceptance_synced(&self) -> TxIndexResult<bool>;
 
     fn get_transaction_offsets(
         self, 
@@ -56,7 +60,7 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     fn update_acceptance_data(&mut self) -> TxIndexResult<()>;
 
-    fn resync(&mut self) -> TxIndexResult<()>;
+    fn resync(&mut self, from_scratch: bool) -> TxIndexResult<()>;
 }
 
 pub type DynTxIndexApi = Option<Arc<RwLock<dyn TxIndexApi>>>;

@@ -104,13 +104,12 @@ where
     {
         let iter_clone = iter.clone();
         self.cache.insert_many(iter);
-        for (key, data) in iter_clone {
+        for (key, data) in iter {
             let bin_data = bincode::serialize(&data)?;
             writer.put(DbKey::new(&self.prefix, key.clone()), bin_data)?;
         }
         Ok(())
     }
-
     /// Write directly from an iterator and do not cache any data. NOTE: this action also clears the cache
     pub fn write_many_without_cache(
         &self,

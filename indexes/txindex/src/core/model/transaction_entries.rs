@@ -1,7 +1,10 @@
-use kaspa_consensus_core::{tx::TransactionIndexType, BlockHashMap, HashMapCustomHasher};
+use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, HashMapCustomHasher};
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
-use std::vec::Vec;
+use std::{vec::Vec, collections::HashMap};
+
+pub type TransactionIdsByBlockHash = BlockHashMap<TransactionId>;
+pub type TransactionEntriesById= HashMap<TransactionId, TransactionEntry>;
 
 
 pub struct TransactionEntry {
@@ -15,5 +18,6 @@ pub struct TransactionOffset {
     pub including_block: Hash,
     pub transaction_index: TransactionIndexType,
 }
+
 
 pub type TransactionOffsets = BlockHashMap<Vec<TransactionIndexType>>;

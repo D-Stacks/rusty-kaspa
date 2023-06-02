@@ -17,7 +17,7 @@ pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
     fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError>;
 }
 
-const STORE_PREFIX: &[u8] = b"block-transactions";
+pub const STORE_PREFIX: &[u8] = b"block-transactions";
 
 /// A DB + cache implementation of `BlockTransactionsStore` trait, with concurrency support.
 #[derive(Clone)]

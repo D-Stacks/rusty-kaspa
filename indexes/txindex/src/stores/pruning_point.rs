@@ -16,6 +16,7 @@ pub trait TxIndexPruningStoreReader {
 
 pub trait TxIndexPruningStore: TxIndexPruningStoreReader {
     fn set(&mut self, pruning_point: Hash) -> StoreResult<()>;
+    fn remove(&mut self) -> StoreResult<()>;
 }
 
 /// A DB + cache implementation of `PruningStore` trait, with concurrent readers support.
@@ -46,5 +47,9 @@ impl TxIndexPruningStoreReader for DbTxIndexPruningStore {
 impl TxIndexPruningStore for DbTxIndexPruningStore {
     fn set(&mut self, pruning_point: Hash) -> StoreResult<()> {
         self.access.write(DirectDbWriter::new(&self.db), &pruning_point)
+    }
+
+    fn remove(&mut self) -> StoreResult<()> {
+        self.access.remove(DirectDbWriter::new(&self.db))
     }
 }

@@ -2,11 +2,15 @@ use crate::{
     api::UtxoIndexApi,
     errors::{UtxoIndexError, UtxoIndexResult},
     model::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
-    stores::store_manager::UtxoIndexStore,
     reindexer::utxo_changes::UtxoIndexChanges,
+    stores::store_manager::UtxoIndexStore,
     IDENT,
 };
-use kaspa_consensus_core::{tx::{ScriptPublicKeys, TransactionOutpoint}, utxo::utxo_diff::UtxoDiff, BlockHashSet};
+use kaspa_consensus_core::{
+    tx::{ScriptPublicKeys, TransactionOutpoint},
+    utxo::utxo_diff::UtxoDiff,
+    BlockHashSet,
+};
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use kaspa_core::{info, trace};
 use kaspa_database::prelude::{StoreError, StoreResult, DB};
@@ -14,9 +18,9 @@ use kaspa_hashes::Hash;
 use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;
 use std::{
+    collections::HashSet,
     fmt::Debug,
     sync::{Arc, Weak},
-    collections::HashSet
 };
 
 const RESYNC_CHUNK_SIZE: usize = usize::pow(2, 11); // 2048 utxos per chunk - Increased from 1k (used in go-kaspad), for quicker resets, while still having a low memory footprint.

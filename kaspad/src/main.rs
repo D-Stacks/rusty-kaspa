@@ -36,8 +36,8 @@ use args::{Args, Defaults};
 // ~~~
 
 use kaspa_consensus::config::ConfigBuilder;
-use kaspa_utxoindex::UtxoIndex;
 use kaspa_txindex::TXIndex;
+use kaspa_utxoindex::UtxoIndex;
 
 use async_channel::unbounded;
 use kaspa_core::{info, trace};
@@ -135,7 +135,11 @@ fn get_app_dir() -> PathBuf {
     return get_home_dir().join(".rusty-kaspa");
 }
 
-fn build_utxoindex(consensus_manager: Arc<ConsensusManager>, notify_service: Arc<NotifyService>, utxoindex_db_dir: PathBuf) -> Arc<RwLock<UtxoIndex>> {
+fn build_utxoindex(
+    consensus_manager: Arc<ConsensusManager>,
+    notify_service: Arc<NotifyService>,
+    utxoindex_db_dir: PathBuf,
+) -> Arc<RwLock<UtxoIndex>> {
     info!("Building the utxoindex");
     info!("Utxoindex Data directory: {}", utxoindex_db_dir.display());
     fs::create_dir_all(utxoindex_db_dir.as_path()).unwrap();
@@ -144,7 +148,12 @@ fn build_utxoindex(consensus_manager: Arc<ConsensusManager>, notify_service: Arc
     UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap()
 }
 
-fn build_txindex(config: Arc<Config>, consensus_manager: Arc<ConsensusManager>, notify_service: Arc<NotifyService>, txindex_db_dir: PathBuf) -> Arc<RwLock<RawRwLock, TxIndex>>{
+fn build_txindex(
+    config: Arc<Config>,
+    consensus_manager: Arc<ConsensusManager>,
+    notify_service: Arc<NotifyService>,
+    txindex_db_dir: PathBuf,
+) -> Arc<RwLock<RawRwLock, TxIndex>> {
     warn!("TxIndex is in beta");
     todo!()
 }
@@ -262,25 +271,18 @@ pub fn main() {
     let txindex_consensus_db = kaspa_database::prelude::open_db(consensus_db_dir, false, 1); //We expect consensus db to be not missing
 
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv));
-    
-    let index_service: Option<Arc<IndexService>> = { 
-        let utxoindex: Option<Arc<RwLock<UtxoIndex>>> = if args.utxoindex {
-            Some(build_utxoindex(consensus_manager, notify_service, utxoindex_db_dir))
-        } else {
-            None
-        };
-        let txindex: Option<Arc<RwLock<TxIndex>>> = if args.txindex {
-            Some(build_txindex(config, consensus_manager, notify_service, txindex_db_dir))
-        } else {
-            None
-        };
+
+    let index_service: Option<Arc<IndexService>> = {
+        let utxoindex: Option<Arc<RwLock<UtxoIndex>>> =
+            if args.utxoindex { Some(build_utxoindex(consensus_manager, notify_service, utxoindex_db_dir)) } else { None };
+        let txindex: Option<Arc<RwLock<TxIndex>>> =
+            if args.txindex { Some(build_txindex(config, consensus_manager, notify_service, txindex_db_dir)) } else { None };
         if utxoindex.is_some() || txindex.is_some() {
             Some(Arc::new(IndexService::new(&notify_service.notifier(), utxoindex, txindex)))
         } else {
             None
         }
     };
-    
 
     let address_manager = AddressManager::new(meta_db);
     let mining_manager = Arc::new(MiningManager::new(config.target_time_per_block, false, config.max_block_mass, None));

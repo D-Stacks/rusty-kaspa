@@ -54,7 +54,7 @@ impl Config {
             process_genesis: true,
             is_archival: false,
             enable_sanity_checks: false,
-            utxoindex: false, 
+            utxoindex: false,
             txindex: false,
             unsafe_rpc: false,
             enable_unsynced_mining: false,

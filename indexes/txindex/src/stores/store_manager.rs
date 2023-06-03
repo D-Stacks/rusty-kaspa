@@ -164,7 +164,7 @@ impl TxIndexStore {
 
     pub fn get_sink(
         self,
-    ) -> TxIndexResult<Option<TxIndexParams>> {
+    ) -> TxIndexResult<Option<Hash>> {
         trace!("[{0}] retrieving sink", IDENT);
 
         match self.txindex_stores.sink.unwrap_or(

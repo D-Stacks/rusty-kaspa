@@ -400,18 +400,28 @@ impl ConsensusApi for Consensus {
         SyncInfo::default()
     }
 
+    /// Gets the earliest referenced block hash with full header and block data.
+    fn get_dag_source(&self) -> Hash {
+        // we use history root for archival, and pruning point for none archival.
+        if self.config.is_archival {
+            let history_root = self.pruning_point_store.read().history_root().expect("expected the history root");
+        } else {
+            let pruning_point = self.pruning_point_store.read().pruning_point().expect("expected the history root");
+        }
+    }
+
     fn is_nearly_synced(&self) -> bool {
         // See comment within `config.is_nearly_synced`
         self.config.is_nearly_synced(self.get_sink_timestamp())
     }
 
-    fn get_virtual_chain_from_block(&self, hash: Hash) -> ConsensusResult<ChainPath> {
-        // Calculate chain changes between the given hash and the
+    fn get_virtual_chain_from_block(&self, start_hash: Hash, end_hash: Hash) -> ConsensusResult<ChainPath> {
+        // Calculate chain changes between the given start and the
         // sink. Note that we explicitly don't
         // do the calculation against the virtual itself so that we
         // won't later need to remove it from the result.
         self.validate_block_exists(hash)?;
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, self.get_sink()))
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, end_hash))
     }
 
     fn get_virtual_parents(&self) -> BlockHashSet {

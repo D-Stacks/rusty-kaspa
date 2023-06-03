@@ -22,7 +22,7 @@ impl<TKey: Clone + std::hash::Hash + Eq + Send + Sync, TData: Clone + Send + Syn
     pub fn contains_key(&self, key: &TKey) -> bool {
         self.map.read().contains_key(key)
     }
-    
+
     pub fn insert(&self, key: TKey, data: TData) {
         if self.size == 0 {
             return;

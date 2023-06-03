@@ -11,9 +11,9 @@ use kaspa_notify::{
     events::{EventSwitches, EventType},
     scope::{PruningPointUtxoSetOverrideScope, Scope, UtxosChangedScope},
 };
+use kaspa_txindex::api::DynTxIndexApi;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utxoindex::api::DynUtxoIndexApi;
-use kaspa_txindex::api::DynTxIndexApi;
 use std::sync::Arc;
 
 const INDEX_SERVICE: &str = IDENT;

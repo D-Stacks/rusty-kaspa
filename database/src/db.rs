@@ -26,6 +26,4 @@ pub fn delete_db(db_dir: PathBuf) {
 }
 
 /// Deletes an existing DB if it exists
-pub fn delete_prefix(prefix: &[u8]) {
-
-}
+pub fn delete_prefix(prefix: &[u8]) {}

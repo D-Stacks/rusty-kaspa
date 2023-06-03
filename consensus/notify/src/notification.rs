@@ -110,11 +110,11 @@ impl VirtualChainChangedNotification {
         added_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
         removed_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
     ) -> Self {
-        Self { 
-            added_chain_block_hashes, 
-            removed_chain_block_hashes, 
-            added_chain_blocks_acceptance_data, 
-            removed_chain_blocks_acceptance_data
+        Self {
+            added_chain_block_hashes,
+            removed_chain_block_hashes,
+            added_chain_blocks_acceptance_data,
+            removed_chain_blocks_acceptance_data,
         }
     }
 }

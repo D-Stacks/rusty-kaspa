@@ -1,7 +1,7 @@
 pub mod core; //all things visible to the outside
 mod index;
-mod stores;
 mod reindexer;
+mod stores;
 
 #[cfg(test)]
 mod testutils;

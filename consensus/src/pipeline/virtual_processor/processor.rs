@@ -44,7 +44,7 @@ use crate::{
     },
 };
 use kaspa_consensus_core::{
-    acceptance_data::{AcceptanceData, MergesetBlockAcceptanceData, BlockAcceptanceData},
+    acceptance_data::{AcceptanceData, BlockAcceptanceData, MergesetBlockAcceptanceData},
     block::{BlockTemplate, MutableBlock},
     blockstatus::BlockStatus::{StatusDisqualifiedFromChain, StatusUTXOValid},
     coinbase::MinerData,
@@ -56,7 +56,7 @@ use kaspa_consensus_core::{
         utxo_diff::UtxoDiff,
         utxo_view::{UtxoView, UtxoViewComposition},
     },
-    BlockHashSet, BlockHashMap,
+    BlockHashMap, BlockHashSet,
 };
 use kaspa_consensus_notify::{
     notification::{

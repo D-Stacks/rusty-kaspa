@@ -404,7 +404,7 @@ impl HeaderProcessor {
             // Hint reachability about the new tip.
             reachability::hint_virtual_selected_parent(&mut staging, ctx.hash).unwrap();
             hst_write.set_batch(&mut batch, SortableBlock::new(ctx.hash, header.blue_work)).unwrap();
-            let mut chain_path = self.dag_traversal_manager.calculate_chain_path(prev_hst.hash, ghostdag_data[0].selected_parent);
+            let mut chain_path = self.dag_traversal_manager.calculate_chain_path(prev_hst.hash, ghostdag_data[0].selected_parent, u64::MAX);
             chain_path.added.push(ctx.hash);
             sc_write.apply_changes(&mut batch, chain_path).unwrap();
         }

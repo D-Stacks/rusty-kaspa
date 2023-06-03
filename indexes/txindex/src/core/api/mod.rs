@@ -60,7 +60,7 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     fn update_acceptance_data(&mut self) -> TxIndexResult<()>;
 
-    fn resync(&mut self, from_scratch: bool) -> TxIndexResult<()>;
+    fn resync(&mut self) -> TxIndexResult<()>;
 }
 
 pub type DynTxIndexApi = Option<Arc<RwLock<dyn TxIndexApi>>>;

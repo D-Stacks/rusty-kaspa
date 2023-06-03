@@ -1,65 +1,39 @@
+use kaspa_consensus_core::{block::Block, BlockHashMap, HashMapCustomHasher};
 
-use kaspa_consensus_core::{tx::TransactionId, acceptance_data::BlockAcceptanceData};
-use kaspa_hashes::{Hash, ZERO_HASH};
-use crate::{core::model, model::{transaction_entries::{TransactionEntry, TransactionEntriesByBlockHash, TransactionOffset, TransactionEntriesById, TransactionAcceptanceData}, params::TxIndexParams}};
-
-/// A struct holding all acceptance data changes to the txindex with on-the-fly conversions and processing.
-pub struct AcceptanceDataReindexer {
-    pub to_add_transaction_entries: TransactionEntriesById,
-    pub to_remove_transaction_ids: Vec<TransactionId>,
-    pub sink: Hash,
-    pub process_acceptance: bool,
-    pub process_offsets: bool,
+pub struct TxIndexReindexer {
+    params: Arc<TxIndexParams>,
+    to_add_transaction_entries: TransactionEntriesById,
+    to_remove_transaction_entries: TransactionEntriesById,
+    sink: Option<Hash>,
+    history_root: Option<Hash>,
+    last_block_added: Option<Hash>
 }
 
-impl AcceptanceDataReindexer {
-    
-    pub fn new(&self,
-        process_acceptance: bool,
-        process_offsets: bool,
-    ) -> Self {
-        Self { 
-            to_add_transaction_entries: vec![],
-            to_remove_transaction_ids: vec![],
-            sink: ZERO_HASH, 
-            process_acceptance,
-            process_offsets,
+impl TxIndexReindexer {
+    fn new(params: Arc<TxIndexParams>) -> Self {
+        Self {
+            params,
+            to_add_transaction_entries: TransactionEntriesById::new(),
+            to_remove_transaction_entries: TransactionEntriesById::new(),
+            sink: None,
+            history_root: None,
+            last_block_added: None,
         }
     }
 
-    pub fn add(&mut self, 
-        to_add_acceptance_data: BlockAcceptanceData, 
-        to_remove_acceptance_data: Option<BlockAcceptanceData>,
-    ) {
+    fn add_block(&mut self, block: Block) {
         self.to_add_transaction_entries.append(
-            block_acceptance_to_transaction_entries_by_id(
-                to_add_acceptance_data,
-                self.process_acceptance,
-                self.process_offsets,
-            )
+            block_to_transaction_entries_by_id(block, move |transaction_id| { !self.to_add_transaction_entries.has(transaction_id) })
         );
-        self.to_remove_transaction_ids = if let Some(to_remove_acceptance_data) = to_remove_acceptance_data {
-            block_acceptance_to_transaction_ids(
-                to_remove_acceptance_data, 
-                |transaction_id: TransactionId| !self.to_add_transaction_entries.contains_key(t)
-            )
-        } else {
-            vec![]
-        };
-        self.sink = to_add_acceptance_data.last().expect("expected new acceptance data").0;
-
+        self.last_block_added = Some(to_add_block.hash());
     }
 
-    pub fn to_add_has(&self, transaction_id: TransactionId) -> bool {
-        self.to_add_transaction_entries.contains_key(&transaction_id)
+    fn add_block_acceptance_data(&mut self, block_acceptance: BlockAcceptanceData) {
+        self.to_add_transaction_entries.append(
+            block_to_transaction_entries_by_id(block)
+        );
+        self.sink = Some(block_acceptance.get(block_acceptance.len()).0);
     }
-
-    pub fn clear(&mut self) {
-        self.to_add_transaction_entries = vec![];
-        self.to_remove_transaction_ids = vec![];
-        self.sink = ZERO_HASH;
-    }
-
 }
 
 fn block_acceptance_to_transaction_entries_by_id(
@@ -122,5 +96,23 @@ where
                 }
             })
      })
+    }).collect()
+}
+
+fn block_to_transaction_entries_by_id(block: Block) -> TransactionEntriesById {
+    block.transactions
+    .into_iter()
+    .enumerate()
+    .map(move |(i, transaction)|  {
+        (
+        transaction.id(),
+        TransactionEntry {
+            offset: Some(TransactionOffset {
+                including_block: block.hash(),
+                transaction_index: i,
+            }),
+            accepting_block: None, // block added notifications should never over acceptance data. 
+        }
+        )
     }).collect()
 }

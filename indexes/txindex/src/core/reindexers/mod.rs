@@ -1,5 +1,3 @@
-pub mod acceptance_data;
-pub mod block_added;
+pub mod reindexer;
 
-pub use acceptance_data::*;
-pub use block_added::*;
+pub use::reindexer::*;

@@ -9,7 +9,7 @@ pub type TransactionEntriesById= HashMap<TransactionId, TransactionEntry>;
 
 pub struct TransactionEntry {
     pub offset: Option<TransactionOffset>,
-    pub accepting_block: Option<Hash>
+    pub accepting_block: Option<Hash>,
 }
 
 /// Holds the reference to a transaction for a block transaction store. 

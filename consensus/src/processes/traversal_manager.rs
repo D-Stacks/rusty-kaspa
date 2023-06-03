@@ -150,10 +150,10 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: ReachabilityStoreRead
         false
     }
 
-    pub fn calculate_chain_path(&self, from: Hash, to: Hash) -> ChainPath {
+    pub fn calculate_chain_path(&self, from: Hash, to: Hash, chunk_size: u64) -> ChainPath {
         let mut removed = Vec::new();
         let mut common_ancestor = from;
-        for current in self.reachability_service.default_backward_chain_iterator(from) {
+        for current in self.reachability_service.default_backward_chain_iterator(from).take(chunk_size) {
             if !self.reachability_service.is_chain_ancestor_of(current, to) {
                 removed.push(current);
             } else {
@@ -162,7 +162,7 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: ReachabilityStoreRead
             }
         }
         // It is more intuitive to use forward iterator here, but going downwards the selected chain is faster.
-        let mut added = self.reachability_service.backward_chain_iterator(to, common_ancestor, false).collect_vec();
+        let mut added = self.reachability_service.backward_chain_iterator(to, common_ancestor, false).collect_vec().take(chunk_size - removed.len());
         added.reverse();
         ChainPath { added, removed }
     }

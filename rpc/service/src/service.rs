@@ -411,7 +411,7 @@ impl RpcApi for RpcCoreService {
     ) -> RpcResult<GetVirtualChainFromBlockResponse> {
         let consensus = self.consensus_manager.consensus();
         let session = consensus.session().await;
-        let virtual_chain = session.get_virtual_chain_from_block(request.start_hash)?;
+        let virtual_chain = session.get_virtual_chain_from_block(request.start_hash, session.get_sink(), u64::MAX)?;
         let accepted_transaction_ids = if request.include_accepted_transaction_ids {
             self.consensus_converter.get_virtual_chain_accepted_transaction_ids(session.deref(), &virtual_chain)?
         } else {

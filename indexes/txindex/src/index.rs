@@ -1,12 +1,26 @@
-use kaspa_consensus_core::{config::Config, block::Block, BlockHashMap, acceptance_data::{MergesetBlockAcceptanceData, BlockAcceptanceData}, tx::{TransactionId, TransactionIndexType, TransactionReference, Transaction, COINBASE_TRANSACTION_INDEX}, HashMapCustomHasher};
-use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
+use kaspa_consensus_core::{
+    config::Config, 
+    block::Block, 
+    BlockHashMap, 
+    acceptance_data::{
+        MergesetBlockAcceptanceData, 
+        BlockAcceptanceData}, 
+        tx::{
+            TransactionId, 
+            TransactionIndexType, 
+            TransactionReference, 
+            Transaction, 
+            COINBASE_TRANSACTION_INDEX
+        }, HashMapCustomHasher, BlockHashSet};
+use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler, ConsensusSession};
 use kaspa_core::trace;
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
+use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;
 use std::{
     fmt::Debug,
-    sync::{Arc, Weak}, cmp::min, collections::{hash_map::Entry, HashMap}, hash::Hash,
+    sync::{Arc, Weak}, cmp::min, collections::{hash_map::{Entry, VacantEntry, OccupiedEntry}, HashMap}, hash::Hash, iter::Zip,
 };
 
 use crate::{
@@ -19,11 +33,10 @@ use crate::{
     reindexers::{AcceptanceDataReindexer, BlockAddedReindexer}
 };
 
-
-enum TerminalEndPoint {
-    Sink,
-    Tips,
-    HistoryRoot
+pub struct SyncStaus {
+    is_acceptance_synced: bool,
+    is_inclustion_synced: bool,
+    is_reindex_configuration_synced: bool, 
 }
 
 /// 256 blocks per chunk - this corresponds to ~ 62976 txs under current blocksize max load. 
@@ -49,6 +62,8 @@ impl TxIndex {
         consensus_db: Arc<DB>,
         params: TxIndexParams,
     ) -> TxIndexResult<Arc<RwLock<Self>>> {
+        
+        assert!(config.merge_depth < MAX_RESYNC_CHUNK_SIZE); //
         
         let mut txindex = Self { 
             config,
@@ -177,181 +192,150 @@ impl TxIndexApi for TxIndex {
     }
 
 
-    fn populate_to_terminal(&mut self, 
-        start_sink: Option<Hash>,
-        end_sink: Option<Hash>, 
-        start_last_block_added: Option<Hash>,
-        end_tips: Option<Vec<Hash>>
-    ) -> TxIndexResult<()> {
-        // 0) Get access to the consensus session
-        let consensus = self.consensus_manager.consensus();
-        let session = futures::executor::block_on(consensus.session());
-    }
-
-    fn populate_from_source(&mut self) -> TxIndexResult<()> {
-        // 0) Get access to the consensus session
-        let consensus = self.consensus_manager.consensus();
-        let session = futures::executor::block_on(consensus.session());
-        let consensus_source = session.get_dag_source();
-        let txindex_source = self.store.get_pruning_point();
-        
+    fn resync_from_history_root() {
         // 1) if sources are the same exit as populated
         if consensus_source == txindex_source {
             return Ok(())
         }
 
+        let consensus_history_root = session.get_dag_source();
+        let txindex_history_root = self.store.get_pruning_point();
+
+        if consensus_history_root == txindex_history_root {
+            return Ok(())
+        }
+
         // 2) set starting point:
         let start_hash = consensus_source;
-
-        // 3) define appropriate closure
-        let processing_closure = match ( self.params.process_via_acceptance_data(), self.params.process_via_block_added() ) {
-            (true, true) =>  move |start_hash: Hash, end_hash: Hash| {
-                while start_hash != txindex_source {
-                    self.acceptance_data_reindexer.clear();
-                    self.block_added_reindexer.clear();
-                    let (hashes_between, start_hash) = session.get_hashes_between(consensus_source, txindex_source, MAX_RESYNC_CHUNK_SIZE)?;                
-                    for hash in hashes_between {
-                        if session.is_chain_block(hash)? {
-                            acceptance_data = session.get_block_acceptance_data(hash)?;
-                            self.acceptance_data_reindexer.add(
-                                BlockAcceptanceData::from((hash, acceptance_data)), 
-                                None
-                            );
-                            self.store.add_transaction_entries(
-                                self.acceptance_data_reindexer.to_add_transaction_entries, 
-                                true, 
-                                true
-                            )
-                        } else {
-                            let to_add_block = session.get_block(hash);
-                            self.block_added_reindexer.add(to_add_block);
-                            self.store.add_transaction_entries(
-                                self.block_added_reindexer.to_add_transaction_entries, 
-                                false, 
-                                true
-                            )
-                        }
-                    }
-                }
+        
+        if session.is_chain_block(start_hash)? {
+            let block_acceptance = BlockAcceptanceData::from(( hash, session.get_block_acceptance_data(hash)))?;
+            self.acceptance_data_reindexer.add(block_acceptance, None);
+            self.store.add_transaction_entries(
+                self.block_added_reindexer.to_add_transaction_entries, 
+                true, 
+                true,
+            );
             self.acceptance_data_reindexer.clear();
+        } else {
+            let block = session.get_block(hash)?;
+            self.block_added_reindexer.add(block);
+            self.store.add_transaction_entries(
+                self.block_added_reindexer.to_add_transaction_entries, 
+                false, 
+                true
+            );
             self.block_added_reindexer.clear();
-            },
-            (true, false) => move |start_hash: Hash, end_hash:Hash| while start_hash != end_hash {
-                self.block_added_reindexer.clear();
-                let (hashes_between, start_hash) = session.get_blocks(start_hash)?;                
-                for hash in hashes_between {
-                    let to_add_block = session.get_block(hash);
-                    self.block_added_reindexer.add(to_add_block);
-                    self.store.add_transaction_entries(
-                        self.block_added_reindexer.to_add_transaction_entries, 
-                        false, 
-                        true
-                    )
-                    }
-                },
-            (false, true) => move |start_hash, end_hash| while start_hash != end_hash {
-                self.block_added_reindexer.clear();
-                let (hashes_between, start_hash) = session.get_hashes_between(consensus_source, txindex_source, MAX_RESYNC_CHUNK_SIZE)?;                
-                for hash in hashes_between {
-                    let to_add_block = session.get_block(hash);
-                    self.block_added_reindexer.add(to_add_block);
-                    self.store.add_transaction_entries(
-                        self.block_added_reindexer.to_add_transaction_entries, 
-                        false, 
-                        true
-                    )
-                    }
-                }
         };
-        let resync_acceptance_and_inclusion = move |start_hash: Hash, end_hash| {
-            while start_hash != txindex_source {
-                self.acceptance_data_reindexer.clear();
-                self.block_added_reindexer.clear();
-                let (hashes_between, start_hash) = session.get_hashes_between(consensus_source, txindex_source, MAX_RESYNC_CHUNK_SIZE)?;                
-                for hash in hashes_between {
-                    if session.is_chain_block(hash)? {
-                        acceptance_data = session.get_block_acceptance_data(hash)?;
-                        self.acceptance_data_reindexer.add(
-                            BlockAcceptanceData::from((hash, acceptance_data)), 
-                            None
-                        );
-                        self.store.add_transaction_entries(
-                            self.acceptance_data_reindexer.to_add_transaction_entries, 
-                            true, 
-                            true
-                        )
-                    } else {
-                        let to_add_block = session.get_block(hash);
-                        self.block_added_reindexer.add(to_add_block);
-                        self.store.add_transaction_entries(
-                            self.block_added_reindexer.to_add_transaction_entries, 
-                            false, 
-                            true
-                        )
-                    }
-                }
-            }
+    
+    while start_hash != txindex_source {
         self.acceptance_data_reindexer.clear();
         self.block_added_reindexer.clear();
-        };
-        // resync 
-        // in this case sync in tandem:
-        if self.params.process_via_acceptance_data() && self.params.process_via_block_added() {
+        
+        if self.params.process_via_inclusion() {
+            let (hashes_between, end_hash) = session
+            .get_hashes_between(
+                start_hash, end_hash, MAX_RESYNC_CHUNK_SIZE
+            )?;
+        } else {
+            end
+        }
+        
+        if self.params.process_via_acceptance() {
+            let chain_blocks = session
+            .get_virtual_chain_from_block(
+                start_hash, end_hash
+            )?.added;
             
-    } else if self.params.process_via_block_added() {
-        while start_hash != txindex_source {
-            self.block_added_reindexer.clear();
-            let (hashes_between, start_hash) = session.get_hashes_between(consensus_source, txindex_source, MAX_RESYNC_CHUNK_SIZE)?;                
-            for hash in hashes_between {
-                let to_add_block = session.get_block(hash);
-                self.block_added_reindexer.add(to_add_block);
-                self.store.add_transaction_entries(
-                    self.block_added_reindexer.to_add_transaction_entries, 
-                    false, 
-                    true
+            let block_acceptance_data = chain_blocks
+            .iter()
+            .zip(
+                session
+                .get_blocks_acceptance_data(
+                    chain_blocks.as_slice()
+                )?
+                .into_iter()
+                .map( move |acceptance_data| {
+                    acceptance_data.unwrap_or_clone()
+                }
                 )
+            ).collect::<BlockAcceptanceData>();
+        }
+
+        self.block_added_reindexer.add(block_acceptance_data);
+
+        for hash in hashes_between {
+            if !block_acceptance_data.has(hash) {
+                self.block_added_reindexer.add(session.get_block(hash))
                 }
             }
-            self.block_added_reindexer.clear();
-    } else if self.params.process_via_acceptance_data() {
-        let hashes_between = session.get_virtual_chain_from_block(consensus_source, txindex_source, MAX_RESYNC_CHUNK_SIZE)?;                
-    } else {
-        Err(TxIndexError::NoProcessingPurposeError(
-            "Not Processing via block added nor acceptance".to_string()
-        ))
+        }
+    self.store.add_transaction_entries(
+        self.block_added_reindexer.to_add_transaction_entries, 
+        false,
+        true
+    );
+    self.block_added_reindexer.clear();
+    self.store.add_transaction_entries(
+        self.acceptance_data_reindexer.to_add_transaction_entries, 
+        true,
+        true
+    );
+    self.acceptance_data_reindexer.clear();
     }
+
+    fn resync_to_terminal(session: ConsensusSession) {
+        todo!()
+    }
+
+    fn resync_to_sink(session: ConsensusSession) {
+        todo!()
+    }
+
+    fn get_sync_status(&self) -> TxIndexResult<SyncStaus> {
+        todo!()
+    }
+
+    fn resync(&mut self) -> TxIndexResult<()> {
     
-    Ok(())
+        // TODO: Resyncing can probably be greatly optimized:
+        // - this should be done if high tps causes extensive sync times:
+        // 1) sync from txindex last_block_added / sink to the consensuses dag terminal
+        // 2) sync from consensus history_root to txindex pruning point
+        // 3) re-indexing the available segment by param diff compared to the last run
+        // 4) if the txindex syncs both via acceptance and block added, these can be done in tandem, with one pass.
+        
+        self.store.delete_all()?;
 
-    }
-
-
-
-    fn resync_to_tips(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
-        // 0) Get access to the consensus session
         let consensus = self.consensus_manager.consensus();
         let session = futures::executor::block_on(consensus.session());
+
+        let consensus_source = session.get_dag_source();
+        
+        
+
+        if self.params.process_via_acceptance_data() {
+
+        }
+
+        if self.params.process_via_block_added() {
+            let start_hash = consensus_source;
+            let tips: BlockHashSet = session.get_tips().collect();
+                while !tips.has(start_hash) { 
+                    let (to_process_hashes, end_hash) = session.get_hashes_between(start_hash, session.get_sink(), MAX_RESYNC_CHUNK_SIZE)?;
+                    to_process_hashes.insert(0, start_hash); // prepend, since this gets skipped in `session.get_hashes_between`
+                    self.block_added_reindexer.add(session.get_block(hash)?)
+                }
+                self.store.add_transaction_entries(
+                    self.block_added_reindexer.to_add_transaction_entries, 
+                    !self.params.process_via_acceptance_data(), //if we process by acceptance we do not overwrite it. 
+                    true
+                )?;
+                self.block_added_reindexer.clear();
+                start_hash = end_hash;
+        };
+
     }
-
-    fn reindex_segment(&mut self,
-        start_hash: Hash,
-        end_hash: Hash, 
-        remove_offsets: bool,
-        remove_acceptance: bool,
-        remove_offsets_via_inclusion: bool
-    ) -> TxIndexResult<()> {
-    }
-
-    fn clean(&mut self, remove_acceptance: bool, remove_accepted_offsets: bool, remove_none_accepted_offsets: bool) -> TxIndexResult<()> TxIndexResult<()> {
-
-    }
-
-    fn resync(&mut self, from_scratch: bool) ->TxIndexResult<()> {
-
-    }
-  
-    }
-
 }
 
 impl Debug for TxIndex {

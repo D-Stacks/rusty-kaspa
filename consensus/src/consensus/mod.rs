@@ -44,7 +44,7 @@ use kaspa_consensus_core::{
     errors::{
         coinbase::CoinbaseResult,
         consensus::{ConsensusError, ConsensusResult},
-        tx::TxResult,
+        tx::TxResult, traversal::TraversalError,
     },
     errors::{difficulty::DifficultyError, pruning::PruningImportError},
     header::Header,
@@ -415,13 +415,16 @@ impl ConsensusApi for Consensus {
         self.config.is_nearly_synced(self.get_sink_timestamp())
     }
 
-    fn get_virtual_chain_from_block(&self, start_hash: Hash, end_hash: Hash) -> ConsensusResult<ChainPath> {
+    fn get_virtual_chain_from_block(&self, start_hash: Hash, end_hash: Hash, chunk_size: u64) -> ConsensusResult<ChainPath> {
         // Calculate chain changes between the given start and the
         // sink. Note that we explicitly don't
         // do the calculation against the virtual itself so that we
         // won't later need to remove it from the result.
-        self.validate_block_exists(hash)?;
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, end_hash))
+        self.validate_block_exists(start_hash)?;
+        if !self.is_chain_block(end_hash)? {
+            return Err(ConsensusError::TraversalError(TraversalError::NoneChainBlockHash(end_hash)))
+        }
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, end_hash, chunk_size))
     }
 
     fn get_virtual_parents(&self) -> BlockHashSet {

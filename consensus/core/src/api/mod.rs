@@ -89,7 +89,10 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_virtual_chain_from_block(&self, hash: Hash) -> ConsensusResult<ChainPath> {
+    /// gets the virtual chain path from the `start_hash` to either the `end_hash`, or until the `chunk_size` threshold is reached (whichever happens first)
+    /// 
+    /// Note: It is expected that the `end_hash` is a chain block  
+    fn get_virtual_chain_from_block(&self, start_hash: Hash, end_hash: Hash, chunk_size: u64) -> ConsensusResult<ChainPath> {
         unimplemented!()
     }
 

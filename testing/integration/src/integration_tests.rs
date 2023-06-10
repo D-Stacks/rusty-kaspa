@@ -1282,7 +1282,7 @@ async fn bounded_merge_depth_test() {
 }
 
 #[tokio::test]
-#[ignore = "test-codecov-change"] 
+#[ignore = "test-codecov-change"]
 async fn difficulty_test() {
     async fn add_block(consensus: &TestConsensus, block_time: Option<u64>, parents: Vec<Hash>) -> Header {
         let selected_parent = consensus.ghostdag_manager().find_selected_parent(parents.iter().copied());

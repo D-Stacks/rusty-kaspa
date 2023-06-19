@@ -152,11 +152,11 @@ pub mod perf {
     }
 
     pub const PERF_PARAMS: PerfParams = PerfParams {
-        headers_cache_size: BASELINE_HEADER_DATA_CACHE_SIZE,
-        header_data_cache_size: BASELINE_HEADER_DATA_CACHE_SIZE,
-        block_data_cache_size: BASELINE_BLOCK_DATA_CACHE_SIZE,
-        utxo_set_cache_size: BASELINE_UTXOSET_CACHE_SIZE,
-        block_window_cache_size: BASELINE_BLOCK_WINDOW_CACHE_SIZE,
+        headers_cache_size: 0,
+        header_data_cache_size: 0,
+        block_data_cache_size: 0,
+        utxo_set_cache_size: 0,
+        block_window_cache_size: 0,
         block_processors_num_threads: 0,
         virtual_processor_num_threads: 0,
     };

@@ -74,21 +74,8 @@ impl ConsensusStorage {
         let params = &config.params;
         let perf_params = &config.perf;
 
-        let pruning_size_for_caches = 0; //params.pruning_depth + params.finality_depth;
-
-        // Calculate cache sizes which are related to pruning depth
-        let daa_excluded_cache_size =0;
-        let statuses_cache_size = 0;
-        let relations_cache_size =  0;
-        let reachability_relations_cache_size = 0;
-        let reachability_cache_size = 0;
-        let ghostdag_cache_size = 0;
-
-        // Add stochastic noise to cache sizes to avoid predictable and equal sizes across all network nodes
-        let noise = |size| size + 0;
-
         // Headers
-        let statuses_store = Arc::new(RwLock::new(DbStatusesStore::new(db.clone(), noise(statuses_cache_size))));
+        let statuses_store = Arc::new(RwLock::new(DbStatusesStore::new(db.clone(), 0)));
         let relations_stores = Arc::new(RwLock::new(
             (0..=params.max_block_level)
                 .map(|level| {

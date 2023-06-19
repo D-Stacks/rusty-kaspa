@@ -74,11 +74,11 @@ impl ConsensusStorage {
         let params = &config.params;
         let perf_params = &config.perf;
 
-        let pruning_size_for_caches = params.pruning_depth + params.finality_depth;
+        let pruning_size_for_caches = 0; //params.pruning_depth + params.finality_depth;
 
         // Calculate cache sizes which are related to pruning depth
         let daa_excluded_cache_size =
-            perf::bounded_cache_size(params.pruning_depth, 100_000_000u64, size_of::<Hash>() + size_of::<BlockHashSet>()); // required only above the pruning point; 100MB budget; expected empty sets
+            perf::bounded_cache_size(0, 100_000_000u64, size_of::<Hash>() + size_of::<BlockHashSet>()); // required only above the pruning point; 100MB budget; expected empty sets
         let statuses_cache_size =
             perf::bounded_cache_size(pruning_size_for_caches, 100_000_000u64, size_of::<Hash>() + size_of::<BlockStatus>());
         let relations_cache_size = perf::bounded_cache_size(
@@ -103,19 +103,19 @@ impl ConsensusStorage {
         );
 
         // Add stochastic noise to cache sizes to avoid predictable and equal sizes across all network nodes
-        let noise = |size| size + rand::thread_rng().gen_range(0..16);
+        let noise = |size| size + rand::thread_rng().gen_range(0..0);
 
         // Headers
         let statuses_store = Arc::new(RwLock::new(DbStatusesStore::new(db.clone(), noise(statuses_cache_size))));
         let relations_stores = Arc::new(RwLock::new(
             (0..=params.max_block_level)
                 .map(|level| {
-                    let cache_size = max(relations_cache_size.checked_shr(level as u32).unwrap_or(0), 2 * params.pruning_proof_m);
-                    DbRelationsStore::new(db.clone(), level, noise(cache_size))
+                    let cache_size = 0; //max(relations_cache_size.checked_shr(level as u32).unwrap_or(0), 2 * params.pruning_proof_m);
+                    DbRelationsStore::new(db.clone(), level, 0)//noise(cache_size))
                 })
                 .collect_vec(),
         ));
-        let reachability_store = Arc::new(RwLock::new(DbReachabilityStore::new(db.clone(), noise(reachability_cache_size))));
+        let reachability_store = Arc::new(RwLock::new(DbReachabilityStore::new(db.clone(), 0)));
 
         let reachability_relations_store = Arc::new(RwLock::new(DbRelationsStore::with_prefix(
             db.clone(),

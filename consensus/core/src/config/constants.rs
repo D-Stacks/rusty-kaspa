@@ -112,10 +112,10 @@ pub mod perf {
     /// algorithm to encounter for blocks out of the selected chain.
     pub const DEFAULT_REINDEX_SLACK: u64 = 1 << 12;
 
-    const BASELINE_HEADER_DATA_CACHE_SIZE: u64 = 10_000;
-    const BASELINE_BLOCK_DATA_CACHE_SIZE: u64 = 200;
-    const BASELINE_BLOCK_WINDOW_CACHE_SIZE: u64 = 2000;
-    const BASELINE_UTXOSET_CACHE_SIZE: u64 = 10_000;
+    const BASELINE_HEADER_DATA_CACHE_SIZE: u64 = 0;
+    const BASELINE_BLOCK_DATA_CACHE_SIZE: u64 = 0;
+    const BASELINE_BLOCK_WINDOW_CACHE_SIZE: u64 = 0;
+    const BASELINE_UTXOSET_CACHE_SIZE: u64 = 0;
 
     #[derive(Clone, Debug)]
     pub struct PerfParams {

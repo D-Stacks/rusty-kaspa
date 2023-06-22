@@ -4,6 +4,7 @@ use kaspa_consensus_core::{
     subnets::SUBNETWORK_ID_COINBASE, tx::Transaction,
 };
 use kaspa_consensus_notify::{notification::Notification, root::ConsensusNotificationRoot};
+use kaspa_consensusmanager::{ConsensusFactory, ConsensusInstance, DynConsensusCtl};
 use kaspa_core::{core::Core, service::Service};
 use kaspa_database::utils::{create_temp_db, DbLifetime};
 use kaspa_hashes::Hash;
@@ -12,6 +13,7 @@ use parking_lot::RwLock;
 use std::future::Future;
 use std::{sync::Arc, thread::JoinHandle};
 
+use crate::processes::window::WindowManager;
 use crate::{
     config::Config,
     constants::TX_VERSION,
@@ -28,7 +30,7 @@ use crate::{
     test_helpers::header_from_precomputed_hash,
 };
 
-use super::services::{DbDagTraversalManager, DbGhostdagManager, DbPastMedianTimeManager};
+use super::services::{DbDagTraversalManager, DbGhostdagManager, DbWindowManager};
 use super::Consensus;
 
 pub struct TestConsensus {
@@ -91,16 +93,10 @@ impl TestConsensus {
             .services
             .pruning_point_manager
             .expected_header_pruning_point(ghostdag_data.to_compact(), self.consensus.pruning_point_store.read().get().unwrap());
-        let window =
-            self.consensus.services.dag_traversal_manager.block_window(&ghostdag_data, self.params.difficulty_window_size).unwrap();
-        let (daa_score, _) = self
-            .consensus
-            .services
-            .difficulty_manager
-            .calc_daa_score_and_non_daa_mergeset_blocks(&mut window.iter().map(|item| item.0.hash), &ghostdag_data);
-        header.bits = self.consensus.services.difficulty_manager.calculate_difficulty_bits(&window);
-        header.daa_score = daa_score;
-        header.timestamp = self.consensus.services.past_median_time_manager.calc_past_median_time(&ghostdag_data).unwrap().0 + 1;
+        let daa_window = self.consensus.services.window_manager.block_daa_window(&ghostdag_data).unwrap();
+        header.bits = self.consensus.services.window_manager.calculate_difficulty_bits(&ghostdag_data, &daa_window);
+        header.daa_score = daa_window.daa_score;
+        header.timestamp = self.consensus.services.window_manager.calc_past_median_time(&ghostdag_data).unwrap().0 + 1;
         header.blue_score = ghostdag_data.blue_score;
         header.blue_work = ghostdag_data.blue_work;
 
@@ -142,6 +138,10 @@ impl TestConsensus {
         self.consensus.shutdown(wait_handles)
     }
 
+    pub fn window_manager(&self) -> &DbWindowManager {
+        &self.consensus.services.window_manager
+    }
+
     pub fn dag_traversal_manager(&self) -> &DbDagTraversalManager {
         &self.consensus.services.dag_traversal_manager
     }
@@ -178,10 +178,6 @@ impl TestConsensus {
         &self.consensus.virtual_processor
     }
 
-    pub fn past_median_time_manager(&self) -> &DbPastMedianTimeManager {
-        &self.consensus.services.past_median_time_manager
-    }
-
     pub fn ghostdag_manager(&self) -> &DbGhostdagManager {
         &self.consensus.services.ghostdag_primary_manager
     }
@@ -206,5 +202,31 @@ impl Service for TestConsensus {
 
     fn stop(self: Arc<TestConsensus>) {
         self.consensus.signal_exit()
+    }
+}
+
+/// A factory which always returns the same consensus instance. Does not support the staging API.
+pub struct TestConsensusFactory {
+    tc: Arc<TestConsensus>,
+}
+
+impl TestConsensusFactory {
+    pub fn new(tc: Arc<TestConsensus>) -> Self {
+        Self { tc }
+    }
+}
+
+impl ConsensusFactory for TestConsensusFactory {
+    fn new_active_consensus(&self) -> (ConsensusInstance, DynConsensusCtl) {
+        let ci = ConsensusInstance::new(self.tc.session_lock(), self.tc.consensus_clone());
+        (ci, self.tc.consensus_clone() as DynConsensusCtl)
+    }
+
+    fn new_staging_consensus(&self) -> (ConsensusInstance, DynConsensusCtl) {
+        unimplemented!()
+    }
+
+    fn close(&self) {
+        self.tc.notification_root().close();
     }
 }

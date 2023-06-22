@@ -33,11 +33,13 @@ use crate::{
         virtual_processor::{errors::PruningImportResult, VirtualStateProcessor},
         ProcessingCounters,
     },
+    processes::window::{WindowManager, WindowType},
 };
 use kaspa_consensus_core::{
     acceptance_data::AcceptanceData,
     api::{BlockValidationFuture, ConsensusApi},
     block::{Block, BlockTemplate},
+    block_count::BlockCount,
     blockhash::BlockHashExtensions,
     blockstatus::BlockStatus,
     coinbase::MinerData,
@@ -50,7 +52,6 @@ use kaspa_consensus_core::{
     header::Header,
     muhash::MuHashExtensions,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
-    sync_info::SyncInfo,
     trusted::{ExternalGhostdagData, TrustedBlock},
     tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
     BlockHashSet, ChainPath,
@@ -208,7 +209,7 @@ impl Consensus {
             services.coinbase_manager.clone(),
             services.mass_calculator.clone(),
             services.transaction_validator.clone(),
-            services.past_median_time_manager.clone(),
+            services.window_manager.clone(),
             params.max_block_mass,
             params.genesis.clone(),
             pruning_lock.clone(),
@@ -296,6 +297,10 @@ impl Consensus {
         self.statuses_store.read().get(hash).unwrap()
     }
 
+    pub fn session_lock(&self) -> SessionLock {
+        self.pruning_lock.clone()
+    }
+
     pub fn notification_root(&self) -> Arc<ConsensusNotificationRoot> {
         self.notification_root.clone()
     }
@@ -328,12 +333,12 @@ impl Consensus {
     }
 
     fn estimate_network_hashes_per_second_impl(&self, ghostdag_data: &GhostdagData, window_size: usize) -> ConsensusResult<u64> {
-        let window = match self.services.dag_traversal_manager.block_window(ghostdag_data, window_size) {
+        let window = match self.services.window_manager.block_window(ghostdag_data, WindowType::VaryingWindow(window_size)) {
             Ok(w) => w,
             Err(RuleError::InsufficientDaaWindowSize(s)) => return Err(DifficultyError::InsufficientWindowData(s).into()),
             Err(e) => panic!("unexpected error: {e}"),
         };
-        Ok(self.services.difficulty_manager.estimate_network_hashes_per_second(&window)?)
+        Ok(self.services.window_manager.estimate_network_hashes_per_second(window)?)
     }
 }
 
@@ -344,12 +349,12 @@ impl ConsensusApi for Consensus {
 
     fn validate_and_insert_block(&self, block: Block) -> BlockValidationFuture {
         let result = self.validate_and_insert_block_impl(BlockTask::Ordinary { block });
-        Box::pin(async move { result.await })
+        Box::pin(result)
     }
 
     fn validate_and_insert_trusted_block(&self, tb: TrustedBlock) -> BlockValidationFuture {
         let result = self.validate_and_insert_block_impl(BlockTask::Trusted { block: tb.block });
-        Box::pin(async move { result.await })
+        Box::pin(result)
     }
 
     fn validate_mempool_transaction_and_populate(&self, transaction: &mut MutableTransaction) -> TxResult<()> {
@@ -395,9 +400,21 @@ impl ConsensusApi for Consensus {
         self.headers_store.get_timestamp(self.get_sink()).unwrap()
     }
 
-    fn get_sync_info(&self) -> SyncInfo {
-        // TODO: actually get those numbers
-        SyncInfo::default()
+    fn get_source(&self) -> Hash {
+        if self.config.is_archival {
+            // we use the history root in archival cases.
+            return self.pruning_point_store.read().history_root().unwrap();
+        }
+        self.pruning_point_store.read().pruning_point().unwrap()
+    }
+
+    /// Estimates number of blocks and headers stored in the node
+    ///
+    /// This is an estimation based on the daa score difference between the node's `source` and `sink`'s daa score,
+    /// as such, it does not include non-daa blocks, and does not include headers stored as part of the pruning proof.  
+    fn estimate_block_count(&self) -> BlockCount {
+        let count = self.get_virtual_daa_score() - self.get_header(self.get_source()).unwrap().daa_score;
+        BlockCount { header_count: count, block_count: count }
     }
 
     /// Gets the earliest referenced block hash with full header and block data.
@@ -412,7 +429,7 @@ impl ConsensusApi for Consensus {
 
     fn is_nearly_synced(&self) -> bool {
         // See comment within `config.is_nearly_synced`
-        self.config.is_nearly_synced(self.get_sink_timestamp())
+        self.config.is_nearly_synced(self.get_sink_timestamp(), self.headers_store.get_daa_score(self.get_sink()).unwrap())
     }
 
     fn get_virtual_chain_from_block(&self, start_hash: Hash, end_hash: Hash, chunk_size: u64) -> ConsensusResult<ChainPath> {
@@ -497,7 +514,7 @@ impl ConsensusApi for Consensus {
         }
     }
 
-    fn import_pruning_point_utxo_set(&self, new_pruning_point: Hash, imported_utxo_multiset: &mut MuHash) -> PruningImportResult<()> {
+    fn import_pruning_point_utxo_set(&self, new_pruning_point: Hash, imported_utxo_multiset: MuHash) -> PruningImportResult<()> {
         self.virtual_processor.import_pruning_point_utxo_set(new_pruning_point, imported_utxo_multiset)
     }
 
@@ -653,10 +670,11 @@ impl ConsensusApi for Consensus {
         self.validate_block_exists(hash)?;
         Ok(self
             .services
-            .dag_traversal_manager
-            .block_window(&self.ghostdag_primary_store.get_data(hash).unwrap(), self.config.difficulty_window_size)
+            .window_manager
+            .block_window(&self.ghostdag_primary_store.get_data(hash).unwrap(), WindowType::SampledDifficultyWindow)
             .unwrap()
-            .into_iter()
+            .deref()
+            .iter()
             .map(|block| block.0.hash)
             .collect())
     }

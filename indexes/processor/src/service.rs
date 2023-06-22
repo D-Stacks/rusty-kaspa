@@ -4,7 +4,7 @@ use kaspa_consensus_notify::{
 };
 use kaspa_core::{
     task::service::{AsyncService, AsyncServiceError, AsyncServiceFuture},
-    trace,
+    trace, warn,
 };
 use kaspa_index_core::notifier::IndexNotifier;
 use kaspa_notify::{
@@ -13,20 +13,21 @@ use kaspa_notify::{
 };
 use kaspa_txindex::api::DynTxIndexApi;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
-use kaspa_utxoindex::api::DynUtxoIndexApi;
+use kaspa_utxoindex::api::UtxoIndexProxy;
 use std::sync::Arc;
 
 const INDEX_SERVICE: &str = IDENT;
 
 pub struct IndexService {
-    utxoindex: DynUtxoIndexApi,
     txindex: DynTxIndexApi,
+    utxoindex: Option<UtxoIndexProxy>,
     notifier: Arc<IndexNotifier>,
     shutdown: SingleTrigger,
 }
 
 impl IndexService {
-    pub fn new(consensus_notifier: &Arc<ConsensusNotifier>, utxoindex: DynUtxoIndexApi, txindex: DynTxIndexApi) -> Self {
+
+    pub fn new(consensus_notifier: &Arc<ConsensusNotifier>, utxoindex: Option<UtxoIndexProxy>, txindex: DynTxIndexApi) -> Self {
         // Prepare consensus-notify objects
         let consensus_notify_channel = Channel::<ConsensusNotification>::default();
         let consensus_notify_listener_id =
@@ -36,7 +37,7 @@ impl IndexService {
         // No subscriber is defined here because the subscription are manually created during the construction and never changed after that.
         let events: EventSwitches = [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into();
         let collector = Arc::new(Processor::new(utxoindex.clone(), consensus_notify_channel.receiver()));
-        let notifier = Arc::new(IndexNotifier::new(events, vec![collector], vec![], 1, INDEX_SERVICE));
+        let notifier = Arc::new(IndexNotifier::new(INDEX_SERVICE, events, vec![collector], vec![], 1));
 
         // Manually subscribe to index-processor related event types
         consensus_notifier
@@ -53,7 +54,7 @@ impl IndexService {
         self.notifier.clone()
     }
 
-    pub fn utxoindex(&self) -> DynUtxoIndexApi {
+    pub fn utxoindex(&self) -> Option<UtxoIndexProxy> {
         self.utxoindex.clone()
     }
 }
@@ -75,10 +76,10 @@ impl AsyncService for IndexService {
 
             // Keep the notifier running until a service shutdown signal is received
             shutdown_signal.await;
-            match self.notifier.stop().await {
+            match self.notifier.join().await {
                 Ok(_) => Ok(()),
                 Err(err) => {
-                    trace!("Error while stopping {}: {}", INDEX_SERVICE, err);
+                    warn!("Error while stopping {}: {}", INDEX_SERVICE, err);
                     Err(AsyncServiceError::Service(err.to_string()))
                 }
             }
@@ -91,9 +92,8 @@ impl AsyncService for IndexService {
     }
 
     fn stop(self: Arc<Self>) -> AsyncServiceFuture {
-        trace!("{} stopping", INDEX_SERVICE);
         Box::pin(async move {
-            trace!("{} exiting", INDEX_SERVICE);
+            trace!("{} stopped", INDEX_SERVICE);
             Ok(())
         })
     }

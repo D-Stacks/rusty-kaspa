@@ -1,6 +1,6 @@
 use kaspa_consensus_core::constants::TX_VERSION;
 
-pub(crate) const DEFAULT_MAXIMUM_TRANSACTION_COUNT: u64 = 1_000_000;
+pub(crate) const DEFAULT_MAXIMUM_TRANSACTION_COUNT: u64 = 10_000;
 
 pub(crate) const DEFAULT_TRANSACTION_EXPIRE_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const DEFAULT_TRANSACTION_EXPIRE_SCAN_INTERVAL_SECONDS: u64 = 10;

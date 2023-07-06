@@ -183,8 +183,7 @@ impl FlowContext {
     ) -> Self {
         let hub = Hub::new();
 
-        // TODO: initial experiments show that this value is good for high bps as well so for now we avoid the log
-        let orphan_resolution_range = BASELINE_ORPHAN_RESOLUTION_RANGE; //  + f64::log2(config.bps() as f64).round() as u32
+        let orphan_resolution_range = BASELINE_ORPHAN_RESOLUTION_RANGE + (config.bps() as f64).log(3.0).min(2.0) as u32;
 
         // The maximum amount of orphans allowed in the orphans pool. This number is an
         // approximation of how many orphans there can possibly be on average.
@@ -404,7 +403,12 @@ impl FlowContext {
         // TODO: call a handler function or a predefined registered service
     }
 
-    pub async fn add_transaction(
+    /// Adds the rpc-submitted transaction to the mempool and propagates it to peers.
+    ///
+    /// Transactions submitted through rpc are considered high priority. This definition does not affect the tx selection algorithm
+    /// but only changes how we manage the lifetime of the tx. A high-priority tx does not expire and is repeatedly rebroadcasted to
+    /// peers
+    pub async fn submit_rpc_transaction(
         &self,
         consensus: &ConsensusProxy,
         transaction: Transaction,
@@ -450,7 +454,6 @@ impl ConnectionInitializer for FlowContext {
         // Subnets are not currently supported
         let mut self_version_message = Version::new(None, self.node_id, network_name.clone(), None, PROTOCOL_VERSION);
         self_version_message.add_user_agent(name(), version(), &self.config.user_agent_comments);
-        // TODO: full and accurate version info
         // TODO: get number of live services
         // TODO: disable_relay_tx from config/cmd
 
@@ -465,6 +468,7 @@ impl ConnectionInitializer for FlowContext {
         if self.hub.has_peer(router.key()) {
             return Err(ProtocolError::PeerAlreadyExists(router.key()));
         }
+        // And loopback connections...
         if self.node_id == router.identity() {
             return Err(ProtocolError::LoopbackConnection(router.key()));
         }

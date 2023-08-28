@@ -83,10 +83,10 @@ impl VirtualStateProcessor {
         ) {
             // Create a composed UTXO view from the selected parent UTXO view + the mergeset UTXO diff
             let composed_view = selected_parent_utxo_view.compose(&ctx.mergeset_diff);
-
             // Validate transactions in current UTXO context
             let validated_transactions = self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score);
 
+            validated_transactions.get(0).expect("expected coinbase transaction").0.tx.
             let mut block_fee = 0u64;
             for (validated_tx, _) in validated_transactions.iter() {
                 ctx.mergeset_diff.add_transaction(validated_tx, pov_daa_score).unwrap();
@@ -97,7 +97,7 @@ impl VirtualStateProcessor {
 
             ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
                 merged_block_hash: merged_block,
-                accepted_blue_score: pov_blue_score,
+                accepted_blue_score: self.,
                 accepted_transactions: validated_transactions
                     .into_iter()
                     .map(|(tx, tx_idx)| Tr { transaction_id: tx.id(), transaction_index: tx_idx })
@@ -105,6 +105,7 @@ impl VirtualStateProcessor {
             });
 
             let coinbase_data = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload).unwrap();
+            coinbase_data.
             ctx.mergeset_rewards.insert(
                 merged_block,
                 BlockRewardData::new(coinbase_data.subsidy, block_fee, coinbase_data.miner_data.script_public_key),

@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet, I};
+use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
 
 pub use kaspa_hashes::Hash;

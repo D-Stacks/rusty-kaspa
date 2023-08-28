@@ -175,6 +175,34 @@ where
         Ok(())
     }
 
+    /// Updates entries in in db via the ssupplied `update_op`
+    /// note: This does not fill the cache with updated values. 
+    pub fn update_many<F>(
+        &self, 
+        mut writer: impl DbWriter, 
+        key_iter: &mut (impl Iterator<Item = TKey> + Clone), 
+        update_op: F,
+    ) -> Result<(), StoreError>
+    where
+        TKey: Clone + AsRef<[u8]>,
+        TData: DeserializeOwned + Serialize, // We need `DeserializeOwned` since the slice coming from `db.get_pinned` has short lifetime
+        F: Fn(&mut TData) -> TData + Clone,
+    {
+        let key_iter_clone = key_iter.clone();
+        self.cache.update_many(key_iter, update_op.clone());
+        for key in key_iter_clone {
+            let db_key = DbKey::new(&self.prefix, key);
+            if let Some(slice) = self.db.get_pinned(&db_key)? {
+                let mut data: TData = bincode::deserialize(&slice)?;
+                let bin_data = bincode::serialize(&update_op(&mut data))?;
+                writer.put(db_key, bin_data)?;
+            } else {
+                return Err(StoreError::KeyNotFound(db_key))
+            };
+        };
+        Ok(())
+    }
+
     /// A dynamic iterator that can iterate through a specific prefix / bucket, or from a certain start point.
     //TODO: loop and chain iterators for multi-prefix / bucket iterator.
     pub fn seek_iterator(

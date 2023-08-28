@@ -1,4 +1,4 @@
-use indexmap::IndexMap;
+use indexmap::{IndexMap, map::Entry};
 use parking_lot::RwLock;
 use rand::Rng;
 use std::{collections::hash_map::RandomState, hash::BuildHasher, sync::Arc};
@@ -44,6 +44,25 @@ impl<TKey: Clone + std::hash::Hash + Eq + Send + Sync, TData: Clone + Send + Syn
                 write_guard.swap_remove_index(rand::thread_rng().gen_range(0..self.size));
             }
             write_guard.insert(key, data);
+        }
+    }
+
+    pub fn update_many<F>(&self, iter: &mut impl Iterator<Item = TKey>, update_op: F) 
+    where
+        F: Fn(&mut TData) -> TData,
+    {
+        if self.size == 0 {
+            return;
+        }
+        let mut write_guard = self.map.write();
+        for key in iter {
+            match write_guard.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let updated_value = entry.get_mut();
+                    *updated_value = update_op(updated_value);
+                    }
+                Entry::Vacant(_) => continue,
+            }
         }
     }
 

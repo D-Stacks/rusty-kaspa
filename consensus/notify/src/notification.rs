@@ -1,5 +1,5 @@
 use derive_more::Display;
-use kaspa_consensus_core::{acceptance_data::BlockAcceptanceData, block::Block, utxo::utxo_diff::UtxoDiff};
+use kaspa_consensus_core::{acceptance_data::AcceptanceData, block::Block, utxo::utxo_diff::UtxoDiff};
 use kaspa_hashes::Hash;
 use kaspa_notify::{
     events::EventType,
@@ -99,22 +99,22 @@ impl BlockAddedNotification {
 pub struct VirtualChainChangedNotification {
     pub added_chain_block_hashes: Arc<Vec<Hash>>,
     pub removed_chain_block_hashes: Arc<Vec<Hash>>,
-    pub added_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
-    pub removed_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
+    pub added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
+    pub removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
 }
 
 impl VirtualChainChangedNotification {
     pub fn new(
         added_chain_block_hashes: Arc<Vec<Hash>>,
         removed_chain_block_hashes: Arc<Vec<Hash>>,
-        added_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
-        removed_chain_blocks_acceptance_data: Arc<BlockAcceptanceData>,
+        added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
+        removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
     ) -> Self {
         Self {
-            added_chain_block_hashes,
-            removed_chain_block_hashes,
             added_chain_blocks_acceptance_data,
             removed_chain_blocks_acceptance_data,
+            added_chain_block_hashes,
+            removed_chain_block_hashes,
         }
     }
 }

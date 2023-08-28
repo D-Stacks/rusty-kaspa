@@ -21,6 +21,7 @@ pub trait TransactionEntriesStoreReader {
 pub trait TransactionEntriesStore: TransactionEntriesStoreReader {
     fn remove_many(&mut self, transaction_ids: Vec<TransactionId>) -> StoreResult<()>;
     fn insert_many(&mut self, transaction_entries_by_id: TransactionEntriesById, overwrite: bool) -> StoreResult<()>;
+    fn clear_acceptance_data_many(&mut self, transaction_ids: Vec<TransactionId>);
 
     fn delete_all(&mut self) -> StoreResult<()>;
 }
@@ -74,6 +75,32 @@ impl TransactionEntriesStore for DbTransactionEntriesStore {
 
         self.access.write_many(writer, &mut transaction_entries_by_id.iter())
 
+    }
+
+    fn clear_acceptance_data_many(&mut self, transaction_ids: Vec<TransactionId>) {
+        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
+
+        let mut to_remove_acceptance = transaction_entries_by_id.iter();
+        
+        if overwrite = false {
+            to_add = to_add.filter_map(move |(transaction_id, _)|  {
+                if self.has(transaction_id) {
+                    None
+                } else {
+                    Some(transaction_id)
+                }
+            },
+            )
+        }
+
+        self.access.update_many(
+            writer, 
+            &mut transaction_entries_by_id.iter(), 
+            move |transaction_entry: &mut TransactionEntry| {
+                transaction_entry.clear_acceptance_data();
+                transaction_entry
+            }   
+        )
     }
 
     /// Removes all Offset in the cache and db, besides prefixes themselves.

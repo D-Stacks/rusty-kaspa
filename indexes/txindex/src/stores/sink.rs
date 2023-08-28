@@ -6,7 +6,7 @@ use kaspa_database::prelude::{CachedDbItem, DirectDbWriter};
 use kaspa_hashes::Hash;
 
 //Use this store to check sync and resync from last_block_added. 
-pub const STORE_PREFIX: &[u8] = b"-sink";
+pub const STORE_PREFIX: &[u8] = b"txindex-sink";
 
 
 /// Reader API for `SinkStore`.

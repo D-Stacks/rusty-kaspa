@@ -570,6 +570,12 @@ impl ConsensusApi for Consensus {
         self.services.pruning_proof_manager.get_pruning_point_proof()
     }
 
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        self.validate_block_exists(low)?;
+        self.validate_block_exists(hash)?;
+        Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
+    }
+
     fn create_headers_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
         if let Some(low) = low {
             self.validate_block_exists(low)?;

@@ -9,26 +9,26 @@ use kaspa_hashes::Hash;
 pub const STORE_PREFIX: &[u8] = b"txindex-pruning-point";
 
 
-/// Reader API for `PruningStore`.
-pub trait TxIndexPruningStoreReader {
+/// Reader API for `Source`.
+pub trait TxIndexSourceReader {
     fn get(&self) -> StoreResult<Hash>;
 }
 
-pub trait TxIndexPruningStore: TxIndexPruningStoreReader {
-    fn set(&mut self, pruning_point: Hash) -> StoreResult<()>;
+pub trait TxIndexSource: TxIndexSourceReader {
+    fn set(&mut self, source: Hash) -> StoreResult<()>;
     fn remove(&mut self) -> StoreResult<()>;
 }
 
-/// A DB + cache implementation of `PruningStore` trait, with concurrent readers support.
+/// A DB + cache implementation of `Source` trait, with concurrent readers support.
 #[derive(Clone)]
-pub struct DbTxIndexPruningStore {
+pub struct DbTxIndexSource {
     db: Arc<DB>,
     access: CachedDbItem<Hash, BlockHasher>,
 }
 
-const STORE_PREFIX: &[u8] = b"txindex-pruning-point";
+const STORE_PREFIX: &[u8] = b"txindex-source";
 
-impl DbTxIndexPruningStore {
+impl DbTxIndexSource {
     pub fn new(db: Arc<DB>) -> Self {
         Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), STORE_PREFIX.to_vec()) }
     }
@@ -38,15 +38,15 @@ impl DbTxIndexPruningStore {
     }
 }
 
-impl TxIndexPruningStoreReader for DbTxIndexPruningStore {
+impl TxIndexSourceReader for DbTxIndexSource {
     fn get(&self) -> StoreResult<Hash> {
         self.access.read()
     }
 }
 
-impl TxIndexPruningStore for DbTxIndexPruningStore {
-    fn set(&mut self, pruning_point: Hash) -> StoreResult<()> {
-        self.access.write(DirectDbWriter::new(&self.db), &pruning_point)
+impl TxIndexSource for DbTxIndexSource {
+    fn set(&mut self, source: Hash) -> StoreResult<()> {
+        self.access.write(DirectDbWriter::new(&self.db), &source)
     }
 
     fn remove(&mut self) -> StoreResult<()> {

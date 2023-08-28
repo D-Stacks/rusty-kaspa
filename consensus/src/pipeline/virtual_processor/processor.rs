@@ -283,15 +283,18 @@ impl VirtualStateProcessor {
         self.notification_root
             .notify(Notification::VirtualDaaScoreChanged(VirtualDaaScoreChangedNotification::new(new_virtual_state.daa_score)))
             .expect("expecting an open unbounded channel");
-        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink);
+        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, u64::MAX);
         // TODO: Fetch acceptance data only if there's a subscriber for the below notification.
         let added_chain_blocks_acceptance_data =
             chain_path.added.iter().copied().map(|added| self.acceptance_data_store.get(added).unwrap()).collect_vec();
+        let removed_chain_blocks_acceptance_data =
+            chain_path.removed.iter().copied().map(|removed| self.acceptance_data_store.get(removed).unwrap()).collect_vec();
         self.notification_root
             .notify(Notification::VirtualChainChanged(VirtualChainChangedNotification::new(
                 chain_path.added.into(),
                 chain_path.removed.into(),
                 Arc::new(added_chain_blocks_acceptance_data),
+                Arc::new(removed_chain_blocks_acceptance_data),
             )))
             .expect("expecting an open unbounded channel");
     }
@@ -368,7 +371,7 @@ impl VirtualStateProcessor {
                     let selected_parent_utxo_view = (&stores.utxo_set).compose(&*diff);
 
                     let mut ctx = UtxoProcessingContext::new(mergeset_data.into(), selected_parent_multiset_hash);
-
+                    
                     self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score, pov_blue_score);
                     let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
 
@@ -425,8 +428,8 @@ impl VirtualStateProcessor {
         let virtual_past_median_time = self.window_manager.calc_past_median_time(&virtual_ghostdag_data)?.0;
 
         // Calc virtual UTXO state relative to selected parent
-        self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, virtual_daa_window.daa_score);
-        self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, virtual_daa_score, virtual_ghostdag_data.blue_score);
+        // Need confirmation: is pov_blue_score correct here - TODO: Remove comment after reveiw
+        self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, virtual_daa_window.daa_score,virtual_ghostdag_data.blue_score);
 
         // Update the accumulated diff
         accumulated_diff.with_diff_in_place(&ctx.mergeset_diff).unwrap();

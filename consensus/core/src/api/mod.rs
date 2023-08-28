@@ -177,6 +177,10 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        unimplemented!()
+    }
+
     fn create_headers_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
         unimplemented!()
     }

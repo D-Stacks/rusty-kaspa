@@ -6,7 +6,7 @@ use kaspa_consensus::model::stores::{
         DbBlockTransactionsStore,
         STORE_PREFIX as BLOCK_TRANSACTIONS_STORE_PREFIX,
         
-    }, pruning::DbPruningStore, 
+    }, pruning::DbPruningStore, acceptance_data::DbAcceptanceDataStore, 
 };
 use kaspa_consensus_core::{
     tx::{Transaction, TransactionId, TransactionReference, TransactionIndexType},
@@ -22,10 +22,10 @@ use crate::{
     }, 
     stores::{
         params::{TxIndexParamsStoreReader, DbTxIndexParamsStore, TxIndexParamsStore},
-        last_block_added::{DbLastBlockAddedStore, LastBlockAddedStore, LastBlockAddedStoreReader, STORE_PREFIX as LAST_BLOCK_ADDED_STORE_PREFIX},
         sink::{DbSinkStore, SinkStore, SinkStoreReader, STORE_PREFIX as SINK_STORE_PREFIX},
-        pruning_point::{DbTxIndexPruningStore, TxIndexPruningStore, TxIndexPruningStoreReader},
+        source::{DbTxIndexSourceStore, TxIndexSourceStore, TxIndexSourceStoreReader},
         transaction_entries::{DbTransactionEntriesStore, TransactionEntriesStore, TransactionEntriesStoreReader}
+        tips::{DbTxIndexTips, TxIndexTips, },
     },
     params::TxIndexParams,
     errors::{TxIndexError, TxIndexResult}, 
@@ -35,15 +35,14 @@ use crate::{
 use super::{merge_acceptance::{DbMergeAcceptanceStore, MergeAcceptanceStoreReader, MergeAcceptanceStore}, pruning_point, transaction_entries::DbTransactionEntriesStore, last_block_added};
 
 struct ConsensusStores {
-    block_transaction_store: Option<DbBlockTransactionsStore> //required when processing transaction_offsets
+    block_transaction_store: DbBlockTransactionsStore, //required when processing transaction_offsets
 }
 
 struct TxIndexStores {
-    params: DbTxIndexParamsStore,
     pruning_point: DbTxIndexPruningStore,
     transaction_entries: DbTransactionEntriesStore,
-    sink: Option<DbSinkStore>, //required when processing accepting block hashes
-    last_block_added: Option<DbLastBlockAddedStore> //required when processing transaction_offsets
+    source: DbTxIndexSourceStore,
+    sink: DbSinkStore, //required when processing accepting block hashes
 }
 
 #[derive(Clone)]
@@ -53,29 +52,16 @@ pub struct TxIndexStore {
 }
 
 impl TxIndexStore {
-    pub fn new(txindex_db: Arc<DB>, consensus_db: Arc<DB>, txindex_params: TxIndexParams) -> Self {
+    pub fn new(txindex_db: Arc<DB>, consensus_db: Arc<DB>) -> Self {
         Self { 
             consensus_stores: ConsensusStores { 
-                block_transaction_store: if txindex_params.process_offsets_by_inclusion {
-                    Some(DbBlockTransactionsStore::new(consensus_db, 0)) //TODO: cache_size from params
-                } else {
-                    None
-                },
+                block_transaction_store: DbBlockTransactionsStore::new(consensus_db, 0), //TODO: cache_size from params
             },
             txindex_stores: TxIndexStores { 
-                params: DbTxIndexParamsStore::new(txindex_db), 
                 pruning_point: DbPruningStore::new(txindex_db), 
                 transaction_entries: DbTransactionEntriesStore::new(txindex_db, 0),
-                sink: if txindex_params.process_acceptance {
-                    Some(DbSinkStore::new(txindex_db))
-                } else {
-                    None
-                },
-                last_block_added: if txindex_params.process_offsets_by_inclusion {
-                    Some(DbLastBlockAddedStore::new(txindex_db))
-                } else {
-                    None
-                },
+                sink: DbSinkStore::new(txindex_db),
+                source: DbTxIndexSourceStore::new(),
             }
         }
     }
@@ -148,12 +134,12 @@ impl TxIndexStore {
         }
     }
 
-    pub fn get_pruning_point(
+    pub fn get_source(
         self,
-    ) -> TxIndexResult<Option<TxIndexParams>> {
+    ) -> TxIndexResult<Option<Hash>> {
         trace!("[{0}] retrieving pruning point", IDENT);
 
-        match self.txindex_stores.pruning_point.get() {
+        match self.txindex_stores.source.get() {
             Ok(item) => Ok(Some(item)),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
@@ -203,7 +189,7 @@ impl TxIndexStore {
 
     pub fn remove_transaction_entries(
         &mut self,
-        transaction_ids: Vec<TransactionId>,
+        transaction_ids: TransactionIds,
         try_reset_on_err: bool
     ) -> TxIndexResult<()> {
         trace!("[{0}] removing {1} transaction entires: {1}", IDENT, transaction_ids.len());

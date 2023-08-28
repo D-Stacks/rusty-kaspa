@@ -53,8 +53,8 @@ impl DbRelationsStore {
     }
 
     pub fn with_prefix(db: Arc<DB>, prefix: &[u8], cache_size: u64) -> Self {
-        let parents_prefix = prefix.iter().copied().chain(DatabaseStorePrefixes::RelationsParents.into_iter()).collect_vec();
-        let children_prefix = prefix.iter().copied().chain(DatabaseStorePrefixes::RelationsChildren.into_iter()).collect_vec();
+        let parents_prefix = prefix.iter().copied().chain(DatabaseStorePrefixes::RelationsParents).collect_vec();
+        let children_prefix = prefix.iter().copied().chain(DatabaseStorePrefixes::RelationsChildren).collect_vec();
         Self {
             db: Arc::clone(&db),
             parents_access: CachedDbAccess::new(Arc::clone(&db), cache_size, parents_prefix),
@@ -149,7 +149,7 @@ impl RelationsStore for StagingRelationsStore<'_> {
     type DefaultWriter = MemoryWriter;
 
     fn default_writer(&self) -> Self::DefaultWriter {
-        MemoryWriter::default()
+        MemoryWriter
     }
 
     fn set_parents(&mut self, _writer: impl DbWriter, hash: Hash, parents: BlockHashes) -> Result<(), StoreError> {
@@ -267,7 +267,7 @@ impl RelationsStore for MemoryRelationsStore {
     type DefaultWriter = MemoryWriter;
 
     fn default_writer(&self) -> Self::DefaultWriter {
-        MemoryWriter::default()
+        MemoryWriter
     }
 
     fn set_parents(&mut self, _writer: impl DbWriter, hash: Hash, parents: BlockHashes) -> Result<(), StoreError> {

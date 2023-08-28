@@ -72,7 +72,14 @@ Logging in `kaspad` and `simpa` can be [filtered](https://docs.rs/env_logger/0.1
 $ (cargo run --bin kaspad -- --loglevel info,kaspa_rpc_core=trace,kaspa_grpc_core=trace,consensus=trace,kaspa_core=trace) 2>&1 | tee ~/rusty-kaspa.log
 ```
 
+## Heap-profiling
+Heap-profiling in `kaspad` and `simpa` can be done by enabling `heap` feature and profile, ie.:
 
+```bash
+$ cargo run --bin kaspad --profile heap --features=heap
+```
+
+It will produce `{bin-name}-heap.json` file in the root of the workdir, that can be inspected by the [dhat-viewer](https://github.com/unofficial-mirror/valgrind/tree/master/dhat)
 
 ## Tests & Benchmarks
 
@@ -111,8 +118,17 @@ To build WASM on MacOS you need to install `llvm` from homebrew (at the time of 
 brew install llvm
 ```
 NOTE: depending on your setup, the installation location may be different.
-To determine the installation location you can type `which llvm` or `which clang`
+To determine the installation location you can use `which llvm`, `which clang`
+or `brew list llvm` commands
 and then modify the paths below accordingly.
+
+```bash
+% brew list llvm
+/usr/local/Cellar/llvm/15.0.7_1/bin/FileCheck
+/usr/local/Cellar/llvm/15.0.7_1/bin/UnicodeNameMappingGenerator
+```
+should i replace 'opt/homebrew/opt' to ''/usr/local/Cellar/llvm/15.0.7_1"?
+
 
 Add the following to your `~/.zshrc` file:
 ```bash
@@ -121,6 +137,8 @@ export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
 export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
 export AR=/opt/homebrew/opt/llvm/bin/llvm-ar
 ```
+
+
 Reload the `~/.zshrc` file
 ```bash
 source ~/.zshrc
@@ -147,20 +165,7 @@ wRPC subsystem is disabled by default in `kaspad` and can be enabled via:
 
 ## wRPC to gRPC Proxy
 
-Proxy providing wRPC to gRPC relay is available in `rpc/wrpc/proxy`.
-By default, the proxy server will connect to *grpc://127.0.01:16110*
-while offering wRPC connections on *wrpc://127.0.0.1:17110*. Use `--help`
-to see configuration options.
-
-The Proxy server is currently used for testing with the Golang implementation
-of Kaspad. At the time of writing, the gRPC has only partial messsage translation
-implementation.
-
-To run the proxy:
-```bash
-cd rpc/wrpc/proxy
-cargo run
-```
+wRPC to gRPC Proxy is deprecated and no longer supported.
 
 ## Native JavaScript & TypeScript RPC clients for Browsers and Node.js environments
 
@@ -194,17 +199,14 @@ the browser provides the W3C WebSocket class natively.
 
 ## Wallet CLI
 
-The wallet CLI is under heavy development.  To test the environment you can do the following:
-
-- Start Golang Kaspad
-- Start wRPC proxy
-
-Native (OS command line):
+Wallet CLI is now available via the `/cli` or `/kos` projects.
 
 ```bash
-cd wallet/native
-cargo run
+cd cli
+cargo run --release
 ```
+
+For KOS, please see [`kos/README.md`](kos/README.md)
 
 Web Browser (WASM):
 
@@ -217,17 +219,3 @@ basic-http-server
 The *basic-http-server* will serve on port 4000 by default, so open your web browser and load http://localhost:4000
 
 The framework is compatible with all major desktop and mobile browsers.
-
-## Using Wallet CLI
-
-This project is under heavy development and currently demonstrates only the RPC data exchange and
-address generation using the native or WASM wallet library. 
-
-Here are the few commands that work:
-
-```
-get-info
-subscribe-daa-score
-new-address
-exit
-```

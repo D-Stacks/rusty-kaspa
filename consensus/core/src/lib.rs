@@ -1,4 +1,7 @@
-use indexmap::IndexMap;
+extern crate alloc;
+extern crate core;
+extern crate self as consensus_core;
+
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
 
@@ -78,6 +81,7 @@ impl HashMapCustomHasher for BlockHashSet {
     }
 }
 
+#[derive(Default, Debug)]
 pub struct ChainPath {
     pub added: Vec<Hash>,
     pub removed: Vec<Hash>,

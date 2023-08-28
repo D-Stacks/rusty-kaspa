@@ -37,7 +37,8 @@ use kaspa_consensus_notify::service::NotifyService;
 use kaspa_consensusmanager::ConsensusManager;
 use kaspa_core::task::tick::TickService;
 use kaspa_core::time::unix_now;
-use kaspa_database::utils::{create_temp_db, get_kaspa_tempdir};
+use kaspa_database::utils::get_kaspa_tempdir;
+use kaspa_grpc_client::GrpcClient;
 use kaspa_hashes::Hash;
 
 use flate2::read::GzDecoder;
@@ -47,16 +48,22 @@ use kaspa_core::core::Core;
 use kaspa_core::info;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
+use kaspa_database::create_temp_db;
+use kaspa_database::prelude::ConnBuilder;
 use kaspa_index_processor::service::IndexService;
 use kaspa_math::Uint256;
 use kaspa_muhash::MuHash;
+use kaspa_rpc_core::notify::mode::NotificationMode;
 use kaspa_utxoindex::api::{UtxoIndexApi, UtxoIndexProxy};
 use kaspa_utxoindex::UtxoIndex;
+use kaspad::args::Args;
+use kaspad::daemon::create_core_with_runtime;
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, Ordering};
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     fs::File,
@@ -64,6 +71,7 @@ use std::{
     io::{BufRead, BufReader},
     str::{from_utf8, FromStr},
 };
+use tempfile::{tempdir, TempDir};
 
 use crate::common;
 
@@ -110,7 +118,7 @@ fn reachability_stretch_test(use_attack_json: bool) {
     map.get_mut(&blocks[0]).unwrap().parents.push(root);
 
     // Act
-    let (_temp_db_lifetime, db) = create_temp_db();
+    let (_temp_db_lifetime, db) = create_temp_db!(ConnBuilder::default());
     let mut store = DbReachabilityStore::new(db.clone(), 100000);
     let mut relations = DbRelationsStore::new(db, 0, 100000); // TODO: remove level
     let mut builder = DagBuilder::new(&mut store, &mut relations);
@@ -130,7 +138,7 @@ fn reachability_stretch_test(use_attack_json: bool) {
     let validation_freq = usize::max(1, num_chains / 100);
 
     use rand::prelude::*;
-    let mut rng = StdRng::seed_from_u64(22322);
+    let mut rng: StdRng = StdRng::seed_from_u64(22322);
 
     for i in 0..num_chains {
         let rand_idx = rng.gen_range(0..blocks.len());
@@ -910,10 +918,9 @@ async fn json_test(file_path: &str, concurrency: bool) {
     let notify_service = Arc::new(NotifyService::new(tc.notification_root(), notification_recv));
 
     // External storage for storing block bodies. This allows separating header and body processing phases
-    let (_external_db_lifetime, external_storage) = create_temp_db();
+    let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default());
     let external_block_store = DbBlockTransactionsStore::new(external_storage, config.perf.block_data_cache_size);
-
-    let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db();
+    let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default());
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
     let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
     let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone()))));
@@ -1032,6 +1039,9 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     // Assert that at least one body tip was resolved with valid UTXO
     assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusUTXOValid));
+    // Assert that the indexed selected chain store matches the virtual chain obtained
+    // through the reachability iterator
+    assert_selected_chain_store_matches_virtual_chain(&tc);
     let virtual_utxos: HashSet<TransactionOutpoint> =
         HashSet::from_iter(tc.get_virtual_utxos(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
     let utxoindex_utxos = utxoindex.read().get_all_outpoints().unwrap();
@@ -1071,7 +1081,7 @@ fn submit_body_chunk(
 }
 
 fn rpc_header_to_header(rpc_header: &RPCBlockHeader) -> Header {
-    Header::new(
+    Header::new_finalized(
         rpc_header.Version,
         rpc_header
             .Parents
@@ -1605,6 +1615,8 @@ async fn difficulty_test() {
 
 #[tokio::test]
 async fn selected_chain_test() {
+    kaspa_core::log::try_init_logger("info");
+
     let config = ConfigBuilder::new(MAINNET_PARAMS)
         .skip_proof_of_work()
         .edit_consensus_params(|p| {
@@ -1614,12 +1626,12 @@ async fn selected_chain_test() {
     let consensus = TestConsensus::new(&config);
     let wait_handles = consensus.init();
 
-    consensus.add_block_with_parents(1.into(), vec![config.genesis.hash]).await.unwrap();
+    consensus.add_utxo_valid_block_with_parents(1.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     for i in 2..7 {
         let hash = i.into();
-        consensus.add_block_with_parents(hash, vec![(i - 1).into()]).await.unwrap();
+        consensus.add_utxo_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
     }
-    consensus.add_block_with_parents(7.into(), vec![1.into()]).await.unwrap(); // Adding a non chain block shouldn't affect the selected chain store.
+    consensus.add_utxo_valid_block_with_parents(7.into(), vec![1.into()], vec![]).await.unwrap(); // Adding a non chain block shouldn't affect the selected chain store.
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
     for i in 1..7 {
@@ -1627,10 +1639,10 @@ async fn selected_chain_test() {
     }
     assert!(consensus.selected_chain_store.read().get_by_index(7).is_err());
 
-    consensus.add_block_with_parents(8.into(), vec![config.genesis.hash]).await.unwrap();
+    consensus.add_utxo_valid_block_with_parents(8.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     for i in 9..15 {
         let hash = i.into();
-        consensus.add_block_with_parents(hash, vec![(i - 1).into()]).await.unwrap();
+        consensus.add_utxo_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
     }
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
@@ -1641,16 +1653,32 @@ async fn selected_chain_test() {
 
     // We now check a situation where there's a shorter selected chain (3 blocks) with more blue work
     for i in 15..23 {
-        consensus.add_block_with_parents(i.into(), vec![config.genesis.hash]).await.unwrap();
+        consensus.add_utxo_valid_block_with_parents(i.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     }
-    consensus.add_block_with_parents(23.into(), (15..23).map(|i| i.into()).collect_vec()).await.unwrap();
+    consensus.add_utxo_valid_block_with_parents(23.into(), (15..23).map(|i| i.into()).collect_vec(), vec![]).await.unwrap();
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
-    assert_eq!(consensus.selected_chain_store.read().get_by_index(1).unwrap(), 22.into()); // We expect 23's selected parent to be 22 because of GHOSTDAG tie breaer rules.
+    assert_eq!(consensus.selected_chain_store.read().get_by_index(1).unwrap(), 22.into()); // We expect 23's selected parent to be 22 because of GHOSTDAG tie-breaking rules.
     assert_eq!(consensus.selected_chain_store.read().get_by_index(2).unwrap(), 23.into());
     assert!(consensus.selected_chain_store.read().get_by_index(3).is_err());
+    assert_selected_chain_store_matches_virtual_chain(&consensus);
 
     consensus.shutdown(wait_handles);
+}
+
+fn assert_selected_chain_store_matches_virtual_chain(consensus: &TestConsensus) {
+    let pruning_point = consensus.pruning_point();
+    let iter1 = selected_chain_store_iterator(consensus, pruning_point);
+    let iter2 = consensus.reachability_service().backward_chain_iterator(consensus.get_sink(), pruning_point, false);
+    itertools::assert_equal(iter1, iter2);
+}
+
+fn selected_chain_store_iterator(consensus: &TestConsensus, pruning_point: Hash) -> impl Iterator<Item = Hash> + '_ {
+    let selected_chain_read = consensus.selected_chain_store.read();
+    let (idx, current) = selected_chain_read.get_tip().unwrap();
+    std::iter::once(current)
+        .chain((0..idx).rev().map(move |i| selected_chain_read.get_by_index(i).unwrap()))
+        .take_while(move |&h| h != pruning_point)
 }
 
 #[tokio::test]
@@ -1662,7 +1690,7 @@ async fn staging_consensus_test() {
     let consensus_db_dir = db_path.join("consensus");
     let meta_db_dir = db_path.join("meta");
 
-    let meta_db = kaspa_database::prelude::open_db(meta_db_dir, true, 1);
+    let meta_db = kaspa_database::prelude::ConnBuilder::default().with_db_path(meta_db_dir).build();
 
     let (notification_send, _notification_recv) = unbounded();
     let notification_root = Arc::new(ConsensusNotificationRoot::new(notification_send));
@@ -1680,4 +1708,80 @@ async fn staging_consensus_test() {
 
     core.shutdown();
     core.join(joins);
+}
+
+#[tokio::test]
+async fn sanity_integration_test() {
+    let core1 = DaemonWithRpc::new_random();
+    let (workers1, rpc_client1) = core1.start().await;
+
+    let core2 = DaemonWithRpc::new_random();
+    let (workers2, rpc_client2) = core2.start().await;
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    rpc_client1.disconnect().await.unwrap();
+    drop(rpc_client1);
+    core1.core.shutdown();
+    core1.core.join(workers1);
+
+    rpc_client2.disconnect().await.unwrap();
+    drop(rpc_client2);
+    core2.core.shutdown();
+    core2.core.join(workers2);
+}
+
+struct DaemonWithRpc {
+    core: Arc<Core>,
+    rpc_port: u16,
+    _appdir_tempdir: TempDir,
+}
+
+impl DaemonWithRpc {
+    fn new_random() -> DaemonWithRpc {
+        let mut args = Args { devnet: true, ..Default::default() };
+
+        // This should ask the OS to allocate free port for socket 1 to 4.
+        let socket1 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let rpc_port = socket1.local_addr().unwrap().port();
+
+        let socket2 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let p2p_port = socket2.local_addr().unwrap().port();
+
+        let socket3 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let rpc_json_port = socket3.local_addr().unwrap().port();
+
+        let socket4 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let rpc_borsh_port = socket4.local_addr().unwrap().port();
+
+        drop(socket1);
+        drop(socket2);
+        drop(socket3);
+        drop(socket4);
+
+        args.rpclisten = Some(format!("0.0.0.0:{rpc_port}").try_into().unwrap());
+        args.listen = Some(format!("0.0.0.0:{p2p_port}").try_into().unwrap());
+        args.rpclisten_json = Some(format!("0.0.0.0:{rpc_json_port}").parse().unwrap());
+        args.rpclisten_borsh = Some(format!("0.0.0.0:{rpc_borsh_port}").parse().unwrap());
+        let appdir_tempdir = tempdir().unwrap();
+        args.appdir = Some(appdir_tempdir.path().to_str().unwrap().to_owned());
+
+        let core = create_core_with_runtime(&Default::default(), &args);
+        DaemonWithRpc { core, rpc_port, _appdir_tempdir: appdir_tempdir }
+    }
+
+    async fn start(&self) -> (Vec<std::thread::JoinHandle<()>>, GrpcClient) {
+        let workers = self.core.start();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let rpc_client = GrpcClient::connect(
+            NotificationMode::Direct,
+            format!("grpc://localhost:{}", self.rpc_port),
+            true,
+            None,
+            false,
+            Some(500_000),
+        )
+        .await
+        .unwrap();
+        (workers, rpc_client)
+    }
 }

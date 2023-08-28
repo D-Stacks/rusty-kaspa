@@ -382,8 +382,12 @@ impl ConsensusApi for Consensus {
     fn get_virtual_merge_depth_root(&self) -> Option<Hash> {
         // TODO: consider saving the merge depth root as part of virtual state
         // TODO: unwrap on pruning_point and virtual state reads when staging consensus is implemented
-        let Some(pruning_point) = self.pruning_point_store.read().pruning_point().unwrap_option() else { return None; };
-        let Some(virtual_state) = self.virtual_stores.read().state.get().unwrap_option() else { return None; };
+        let Some(pruning_point) = self.pruning_point_store.read().pruning_point().unwrap_option() else {
+            return None;
+        };
+        let Some(virtual_state) = self.virtual_stores.read().state.get().unwrap_option() else {
+            return None;
+        };
         let virtual_ghostdag_data = &virtual_state.ghostdag_data;
         let root = self.services.depth_manager.calc_merge_depth_root(virtual_ghostdag_data, pruning_point);
         if root.is_origin() {
@@ -576,7 +580,13 @@ impl ConsensusApi for Consensus {
         Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
     }
 
-    fn create_headers_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        self.validate_block_exists(low)?;
+        self.validate_block_exists(hash)?;
+        Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
+    }
+
+    fn create_virtual_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
         if let Some(low) = low {
             self.validate_block_exists(low)?;
         }
@@ -585,7 +595,7 @@ impl ConsensusApi for Consensus {
             self.validate_block_exists(high)?;
         }
 
-        Ok(self.services.sync_manager.create_headers_selected_chain_block_locator(low, high)?)
+        Ok(self.services.sync_manager.create_virtual_selected_chain_block_locator(low, high)?)
     }
 
     fn pruning_point_headers(&self) -> Vec<Arc<Header>> {
@@ -671,8 +681,8 @@ impl ConsensusApi for Consensus {
         Ok(self.services.sync_manager.get_missing_block_body_hashes(high)?)
     }
 
-    fn pruning_point(&self) -> Option<Hash> {
-        self.pruning_point_store.read().pruning_point().unwrap_option()
+    fn pruning_point(&self) -> Hash {
+        self.pruning_point_store.read().pruning_point().unwrap()
     }
 
     fn get_daa_window(&self, hash: Hash) -> ConsensusResult<Vec<Hash>> {
@@ -692,27 +702,32 @@ impl ConsensusApi for Consensus {
         self.validate_block_exists(hash)?;
 
         // In order to guarantee the chain height is at least k, we check that the pruning point is not genesis.
-        if self.pruning_point().unwrap() == self.config.genesis.hash {
+        if self.pruning_point() == self.config.genesis.hash {
             return Err(ConsensusError::UnexpectedPruningPoint);
         }
 
         let mut hashes = Vec::with_capacity(self.config.params.ghostdag_k as usize);
         let mut current = hash;
-        // TODO: This will crash if we don't have the data for k blocks in the past of
-        // current. The syncee should validate it got all of the associated data.
         for _ in 0..=self.config.params.ghostdag_k {
             hashes.push(current);
-            current = self.ghostdag_primary_store.get_selected_parent(current).unwrap();
+            // TODO: ideally the syncee should validate it got all of the associated data up
+            // to k blocks back and then we would be able to safely unwrap here. For now we
+            // just break the loop, since if the data was truly missing we wouldn't accept
+            // the staging consensus in the first place
+            let Some(parent) = self.ghostdag_primary_store.get_selected_parent(current).unwrap_option() else {
+                break;
+            };
+            current = parent;
         }
         Ok(hashes)
     }
 
     fn create_block_locator_from_pruning_point(&self, high: Hash, limit: usize) -> ConsensusResult<Vec<Hash>> {
         self.validate_block_exists(high)?;
-
-        let pp_read_guard = self.pruning_point_store.read();
-        let pp = pp_read_guard.pruning_point().unwrap();
-        Ok(self.services.sync_manager.create_block_locator_from_pruning_point(high, pp, Some(limit))?)
+        // Keep the pruning point read guard throughout building the locator
+        let pruning_point_read = self.pruning_point_store.read();
+        let pruning_point = pruning_point_read.pruning_point().unwrap();
+        Ok(self.services.sync_manager.create_block_locator_from_pruning_point(high, pruning_point, Some(limit))?)
     }
 
     fn estimate_network_hashes_per_second(&self, start_hash: Option<Hash>, window_size: usize) -> ConsensusResult<u64> {

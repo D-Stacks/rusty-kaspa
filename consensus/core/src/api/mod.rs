@@ -181,7 +181,11 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn create_headers_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        unimplemented!()
+    }
+
+    fn create_virtual_selected_chain_block_locator(&self, low: Option<Hash>, high: Option<Hash>) -> ConsensusResult<Vec<Hash>> {
         unimplemented!()
     }
 
@@ -250,7 +254,7 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn pruning_point(&self) -> Option<Hash> {
+    fn pruning_point(&self) -> Hash {
         unimplemented!()
     }
 

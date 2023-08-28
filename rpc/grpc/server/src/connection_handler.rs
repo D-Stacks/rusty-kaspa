@@ -12,7 +12,7 @@ use kaspa_grpc_core::{
     },
     RPC_MAX_MESSAGE_SIZE,
 };
-use kaspa_notify::{events::EVENT_TYPE_ARRAY, notifier::Notifier, subscriber::Subscriber};
+use kaspa_notify::{connection::ChannelType, events::EVENT_TYPE_ARRAY, notifier::Notifier, subscriber::Subscriber};
 use kaspa_rpc_core::{
     api::rpc::DynRpcService,
     notify::{channel::NotificationChannel, connection::ChannelConnection},
@@ -45,7 +45,8 @@ impl ConnectionHandler {
     pub fn new(core_service: DynRpcService, core_notifier: Arc<Notifier<Notification, ChannelConnection>>, manager: Manager) -> Self {
         // Prepare core objects
         let core_channel = NotificationChannel::default();
-        let core_listener_id = core_notifier.register_new_listener(ChannelConnection::new(core_channel.sender()));
+        let core_listener_id =
+            core_notifier.register_new_listener(ChannelConnection::new(core_channel.sender(), ChannelType::Closable));
 
         // Prepare internals
         let core_events = EVENT_TYPE_ARRAY[..].into();
@@ -77,7 +78,7 @@ impl ConnectionHandler {
 
             match serve_result {
                 Ok(_) => info!("GRPC Server stopped on: {}", serve_address),
-                Err(err) => panic!("gRPC Server {serve_address} stopped with error: {err:?}"),
+                Err(err) => panic!("GRPC Server {serve_address} stopped with error: {err:?}"),
             }
         });
         termination_sender
@@ -89,7 +90,7 @@ impl ConnectionHandler {
     }
 
     pub fn start(&self) {
-        debug!("gRPC: Starting the connection handler");
+        debug!("GRPC: Starting the connection handler");
 
         // Start the internal notifier
         self.notifier().start();
@@ -99,7 +100,7 @@ impl ConnectionHandler {
     }
 
     pub async fn stop(&self) -> RpcResult<()> {
-        debug!("gRPC: Stopping the connection handler");
+        debug!("GRPC: Stopping the connection handler");
 
         // Refuse new incoming connections
         self.running.store(false, Ordering::SeqCst);
@@ -142,7 +143,7 @@ impl Rpc for ConnectionHandler {
             ));
         }
 
-        debug!("gRPC: incoming message stream from {:?}", remote_address);
+        debug!("GRPC: incoming message stream from {:?}", remote_address);
 
         // Build the in/out pipes
         let (outgoing_route, outgoing_receiver) = mpsc_channel(Self::outgoing_route_channel_size());

@@ -9,6 +9,7 @@ pub type AcceptanceData = Vec<MergesetBlockAcceptanceData>;
 pub struct MergesetBlockAcceptanceData {
     pub block_hash: Hash,
     pub accepted_transactions: Vec<AcceptedTxEntry>,
+    pub accepting_blue_score: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

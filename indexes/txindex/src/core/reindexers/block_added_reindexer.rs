@@ -1,33 +1,33 @@
-use std::sync::Arc;
 use kaspa_consensus_core::{
     block::Block, 
-    BlockHashMap, 
     HashMapCustomHasher, 
-    acceptance_data::{BlockAcceptanceData, MergesetBlockAcceptanceData, AcceptanceData},
-    tx::TransactionIds,
 };
 use kaspa_hashes::Hash;
-use crate::model::transaction_entries::{TransactionEntriesById, TransactionOffset};
+use crate::model::{transaction_entries::{TransactionCompactEntriesById, TransactionOffset}, TxCompactEntry, TxOffset};
 
 pub struct TxIndexBlockAddedReindexer {
-    to_remove_transaction_ids: TransactionEntriesById,
+    to_add_compact_transaction_entries: TransactionCompactEntriesById,
 }
 
 impl TxIndexBlockAddedReindexer {
     pub fn new() -> Self {
         Self {
-            to_remove_transaction_ids: TransactionEntriesById::new(),
+            to_add_compact_transaction_entries: TransactionCompactEntriesById::new(),
         }
     }
 
-    pub fn get_to_add_transaction_entries(&self) {
-        self.to_remove_transaction_ids
+    pub fn get_to_add_compact_transaction_entries(&self) {
+        self.to_add_compact_transaction_entries
     }
     
-    pub fn remove_block_transactions(&mut self, to_remove_block: Block) {
-        self.to_remove_transaction_ids.extend(to_remove_block
+    pub fn add_block_transactions(&mut self, to_add_block: Block) {
+        self.to_add_compact_transaction_entries.extend(to_add_block.transactions
         .into_iter()
-        .map(move |(transaction)| transaction.id()),
+        .enumerate()
+        .map(move |(transaction_index, transaction)| {
+            TxCompactEntry::new(TxOffset::new(to_add_block.hash(), transaction_index), false)        
+            }
+            ),
         )
     }
 }

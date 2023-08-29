@@ -1,5 +1,6 @@
 [package]
 name = "kaspa-txindex"
+description = "Kaspa TX index"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

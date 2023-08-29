@@ -1,48 +1,47 @@
-use std::{sync::Arc, string::FromUtf8Error};
+use std::sync::Arc;
 
 use kaspa_consensus::model::stores::{
     block_transactions::{
         BlockTransactionsStoreReader, 
-        DbBlockTransactionsStore,
-        STORE_PREFIX as BLOCK_TRANSACTIONS_STORE_PREFIX,
-        
-    }, pruning::DbPruningStore, acceptance_data::DbAcceptanceDataStore, 
+        DbBlockTransactionsStore,        
+    },
+    headers::{
+        HeaderStore,
+        DbHeadersStore,
+    } 
 };
 use kaspa_consensus_core::{
-    tx::{Transaction, TransactionId, TransactionReference, TransactionIndexType},
-    acceptance_data::BlockAcceptanceData, block::Block,
+    tx::{Transaction, TransactionId, TransactionIndexType},
+    acceptance_data::AcceptanceData, BlockHashSet,
 };
 use kaspa_core::{trace, warn};
 use kaspa_database::prelude::{StoreResult, DB, StoreError};
+use kaspa_database::registry::DatabaseStorePrefixes;
 use kaspa_hashes::Hash;
 
 use crate::{
-    model::{
-        transaction_entries::{TransactionEntry, TransactionEntriesById},
-    }, 
+    model::transaction_entries::{TransactionEntry, TransactionEntriesById, TransactionOffset, TransactionAcceptanceData},
     stores::{
-        params::{TxIndexParamsStoreReader, DbTxIndexParamsStore, TxIndexParamsStore},
-        sink::{DbSinkStore, SinkStore, SinkStoreReader, STORE_PREFIX as SINK_STORE_PREFIX},
+        sink::{DbTxIndexSinkStore, TxIndexSinkStore, TxIndexSinkStoreReader},
         source::{DbTxIndexSourceStore, TxIndexSourceStore, TxIndexSourceStoreReader},
-        transaction_entries::{DbTransactionEntriesStore, TransactionEntriesStore, TransactionEntriesStoreReader}
-        tips::{DbTxIndexTips, TxIndexTips, },
+        tx_compact_entries::{DbTransactionEntriesStore, TransactionEntriesStore, TransactionEntriesStoreReader},
+        tips::{DbTxIndexTipsStore, TxIndexTipsReader, TxIndexTipsStore },
     },
     params::TxIndexParams,
     errors::{TxIndexError, TxIndexResult}, 
     IDENT
 };
 
-use super::{merge_acceptance::{DbMergeAcceptanceStore, MergeAcceptanceStoreReader, MergeAcceptanceStore}, pruning_point, transaction_entries::DbTransactionEntriesStore, last_block_added};
-
 struct ConsensusStores {
-    block_transaction_store: DbBlockTransactionsStore, //required when processing transaction_offsets
+    block_transaction_store: DbBlockTransactionsStore, // required when processing transaction_offsets
+    block_header_store: DbHeadersStore, // required to query block header data related to the transaction
 }
 
 struct TxIndexStores {
-    pruning_point: DbTxIndexPruningStore,
     transaction_entries: DbTransactionEntriesStore,
     source: DbTxIndexSourceStore,
-    sink: DbSinkStore, //required when processing accepting block hashes
+    sink: DbTxIndexSinkStore, //required when processing accepting block hashes
+    tips: DbTxIndexTipsStore,
 }
 
 #[derive(Clone)]
@@ -56,24 +55,21 @@ impl TxIndexStore {
         Self { 
             consensus_stores: ConsensusStores { 
                 block_transaction_store: DbBlockTransactionsStore::new(consensus_db, 0), //TODO: cache_size from params
+                block_header_store: DbHeadersStore::new(consensus_db, 0) //TODO: cache_size from params
             },
             txindex_stores: TxIndexStores { 
-                pruning_point: DbPruningStore::new(txindex_db), 
                 transaction_entries: DbTransactionEntriesStore::new(txindex_db, 0),
-                sink: DbSinkStore::new(txindex_db),
-                source: DbTxIndexSourceStore::new(),
+                sink: DbTxIndexSinkStore::new(txindex_db),
+                source: DbTxIndexSourceStore::new(txindex_db),
+                tips: DbTxIndexTipsStore::new(txindex_db),
             }
         }
     }
 
     pub fn get_block_transactions(&self, hash: Hash) -> TxIndexResult<Option<Arc<Vec<Transaction>>>> {
-        match self.consensus_stores.block_transaction_store.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(BLOCK_TRANSACTIONS_STORE_PREFIX.to_vec())?
-                )
-            )
-        ).get(hash) {
+        match self.consensus_stores.block_transaction_store
+        .expect("expected txindex's block transaction store to be intialized")
+        .get(hash) {
             Ok(item) => Ok(Some(item)),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
@@ -83,13 +79,9 @@ impl TxIndexStore {
     }
 
     pub fn has_block_transactions(&self, hash: Hash) -> TxIndexResult<bool> {
-        match self.consensus_stores.block_transaction_store.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(BLOCK_TRANSACTIONS_STORE_PREFIX.to_vec())?
-                )
-            )
-        ).has(hash) {
+        match self.consensus_stores.block_transaction_store
+        .expect("expected txindex's block transaction store to be intialized")
+        .has(hash) {
             Ok(item) => Ok(Some(item)),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
@@ -99,9 +91,33 @@ impl TxIndexStore {
     }
 
     pub fn get_transaction_entry(self, transaction_id: TransactionId) -> TxIndexResult<Option<TransactionEntry>> {        
+        trace!("[{0}] retrieving transaction entry for {1},", IDENT, transaction_id);     
+        match self.txindex_stores.transaction_entries.get(transaction_id) {
+            Ok(mut item) => Ok(Some(item)),
+            Err(err) => match err {
+                StoreError::KeyNotFound(_) => Ok(None),
+                default => Err(err)?,
+            },
+            }
+        }
+
+    pub fn get_transaction_offset(self, transaction_id: TransactionId) -> TxIndexResult<Option<TransactionOffset>> {        
+        trace!("[{0}] retrieving transaction entry for {1}, with inclustion data {2} and acceptance data {3}");     
         match self.txindex_stores.transaction_entries.get(transaction_id)
         {
-            Ok(item) => Ok(Some(item)),
+            Ok(item) => Ok(Some(item.offset)),
+            Err(err) => match err {
+                StoreError::KeyNotFound(_) => Ok(None),
+                default => Err(err)?,
+            },
+            }
+        }
+
+    pub fn get_transaction_acceptance_data(self, transaction_id: TransactionId) -> TxIndexResult<Option<TransactionAcceptanceData>> {        
+        trace!("[{0}] retrieving transaction acceptance data {1}", transaction_id);     
+        match self.txindex_stores.transaction_entries.get(transaction_id)
+        {
+            Ok(mut item) => Ok(item.acceptance_data),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
                 default => Err(err)?,
@@ -109,7 +125,8 @@ impl TxIndexStore {
             }
         }
     
-    pub fn has_transaction_entry(self, transaction_id: TransactionId) -> TxIndexResult<Option<TransactionEntry>> {        
+    pub fn has_transaction_entry(self, transaction_id: TransactionId) -> TxIndexResult<Option<TransactionEntry>> {   
+        trace!("[{0}] checking if db has transaction entry {1}", IDENT, transaction_id);     
         match self.txindex_stores.transaction_entries.has(transaction_id)
         {
             Ok(item) => Ok(Some(item)),
@@ -120,24 +137,10 @@ impl TxIndexStore {
             }
         }
 
-    pub fn get_params(
-        self,
-    ) -> TxIndexResult<Option<TxIndexParams>> {
-        trace!("[{0}] retrieving params", IDENT);
-
-        match self.txindex_stores.params.get() {
-            Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
-        }
-    }
-
     pub fn get_source(
         self,
     ) -> TxIndexResult<Option<Hash>> {
-        trace!("[{0}] retrieving pruning point", IDENT);
+        trace!("[{0}] retrieving source", IDENT);
 
         match self.txindex_stores.source.get() {
             Ok(item) => Ok(Some(item)),
@@ -153,13 +156,7 @@ impl TxIndexStore {
     ) -> TxIndexResult<Option<Hash>> {
         trace!("[{0}] retrieving sink", IDENT);
 
-        match self.txindex_stores.sink.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(SINK_STORE_PREFIX.to_vec())?
-                )
-            )
-        ).get() {
+        match self.txindex_stores.sink.get() {
             Ok(item) => Ok(Some(item)),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
@@ -168,17 +165,12 @@ impl TxIndexStore {
         }
     }
 
-    pub fn get_last_block_added(
+    pub fn get_tips(
         self,
-    ) -> TxIndexResult<Option<Hash>> {
-        trace!("[{0}] retrieving last_block_added", IDENT);
+    ) -> TxIndexResult<Option<BlockHashSet<Hash>>> {
+        trace!("[{0}] retrieving tips", IDENT);
 
-        match self.txindex_stores.last_block_added.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(LAST_BLOCK_ADDED_STORE_PREFIX.to_vec())?
-                ))
-        ).get() {
+        match self.txindex_stores.tips.get() {
             Ok(item) => Ok(Some(item)),
             Err(err) => match err {
                 StoreError::KeyNotFound(_) => Ok(None),
@@ -186,84 +178,73 @@ impl TxIndexStore {
             },
         }
     }
+
+    pub fn add_tip(
+        self,
+        tip: Hash
+    ) -> TxIndexResult<Hash> {
+        trace!("[{0}] adding tip {1}", IDENT, tip);
+
+        match self.txindex_stores.tips {
+            Ok(item) => Ok(Some(item)),
+            Err(err) => match err {
+                StoreError::KeyNotFound(_) => Ok(None),
+                default => Err(err)?,
+            },
+        }
+    }
+
+    pub fn remove_tips(
+        self,
+        tips: BlockHashSet<Hash>
+    ) -> TxIndexResult<Hash> {
+        trace!("[{0}] filtering tips {1}", IDENT, tips);
+        match self.txindex_stores.tips {
+            Ok(item) => Ok(Some(item)),
+            Err(err) => match err {
+                StoreError::KeyNotFound(_) => Ok(None),
+                default => Err(err)?,
+            },
+        }
+    }
+
 
     pub fn remove_transaction_entries(
         &mut self,
-        transaction_ids: TransactionIds,
-        try_reset_on_err: bool
+        transaction_ids: Vec<TransactionId>,
     ) -> TxIndexResult<()> {
         trace!("[{0}] removing {1} transaction entires: {1}", IDENT, transaction_ids.len());
-
-        let res = self.txindex_stores.transaction_entries.remove_many(transaction_ids);
-        if try_reset_on_err && res.is_err() {
-            warn!("[{0}] failed to remove transaction entries, attempting to reset the txindex db...");
-            self.delete_all()?;
-        };
-        res
+        self.txindex_stores.transaction_entries.remove_many(transaction_ids)
     }
 
     pub fn add_transaction_entries(
         &mut self,
         transaction_entries_by_id: TransactionEntriesById,
         overwrite: bool,
-        try_reset_on_err: bool
     ) -> TxIndexResult<()> {
-        trace!("[{0}] removing {1} transaction entires: {1}", IDENT, transaction_ids.len());
+        trace!("[{0}] adding {1} transaction entires: {1}", IDENT, transaction_entries_by_id.len());
 
         let res = self.txindex_stores.transaction_entries.insert_many(
             transaction_entries_by_id,
             overwrite
         );
-        if try_reset_on_err && res.is_err() {
-            warn!("[{0}] failed to remove transaction entries, attempting to reset the txindex db...");
-            self.delete_all()?;
-        };
         res
     }
 
-    pub fn set_params(
+    pub fn set_source(
         &mut self,
-        params: TxIndexParams
+        source: Hash
     ) -> TxIndexResult<()> {
-        trace!("[{0}] setting params: {1}", IDENT, params);
-        self.txindex_stores.params.set(params)
-    }
-
-    pub fn set_pruning_point(
-        &mut self,
-        pruning_point: Hash
-    ) -> TxIndexResult<()> {
-        trace!("[{0}] setting params: {1}", IDENT, params);
-        self.txindex_stores.pruning_point.set(pruning_point)
+        trace!("[{0}] setting source: {1}", IDENT, source);
+        self.txindex_stores.source.set(source)
     }
 
     pub fn set_sink(
         &mut self,
         sink: Hash
     ) -> TxIndexResult<()> {
-        trace!("[{0}] setting params: {1}", IDENT, params);
-        
-        self.txindex_stores.sink.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(SINK_STORE_PREFIX.to_vec())?
-                )
-            )
-        ).set(sink)
-    }
-
-    pub fn set_last_block_added(
-        &mut self,
-        last_block_added: Hash
-    ) -> TxIndexResult<()> {
-        trace!("[{0}] setting params: {1}", IDENT, params);
-        self.txindex_stores.last_block_added.unwrap_or(
-            return Err(
-                TxIndexError::DBReadingFromUninitializedStoreError(
-                    String::from_utf8(SINK_STORE_PREFIX.to_vec())?
-                )
-            )
-        ).set(last_block_added)
+        trace!("[{0}] setting sink: {1}", IDENT, sink);   
+        self.txindex_stores.sink.set(sink)
     }
 
     /// Resets the txindex database:
@@ -272,14 +253,12 @@ impl TxIndexStore {
         trace!("[{0}] attempting to clear txindex database...", IDENT);
 
         // Clear all
-        trace!("[{0}] clearing last_block_added database...", IDENT);
-        self.txindex_stores.last_block_added.remove()?;
+        trace!("[{0}] clearing source database...", IDENT);
+        self.txindex_stores.source.remove()?;
+        trace!("[{0}] clearing tips database...", IDENT);
+        self.txindex_stores.tips.remove()?;
         trace!("[{0}] clearing sink database...", IDENT);
         self.txindex_stores.sink.remove()?;
-        trace!("[{0}] clearing pruning_point database...", IDENT);
-        self.txindex_stores.pruning_point.remove()?;
-        trace!("[{0}] clearing params database...", IDENT);
-        self.txindex_stores.params.remove()?;
         trace!("[{0}] clearing transaction_entries database...", IDENT);
         self.txindex_stores.transaction_entries.delete_all()?;
 

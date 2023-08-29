@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::Sub;
 use std::sync::Arc;
 
 use kaspa_consensus_core::BlockHashSet;
@@ -18,21 +19,20 @@ pub trait TxIndexTipsReader {
 
 pub trait TxIndexTips: TxIndexTipsReader {
     fn set(&mut self, tips: BlockHashSet) -> StoreResult<()>;
-    fn add(&mut self, tip: Hash) -> StoreResult<()>;
-    fn remove(&mut self, merged_block_hashes: BlockHashSet) -> StoreResult<()>;
-    fn clear(&mut self) -> StoreResult<()>;
+    fn update_add_tip(&mut self, tip: Hash) -> StoreResult<()>;
+    fn update_remove_tips(&mut self, merged_block_hashes: BlockHashSet) -> StoreResult<()>;
+    fn remove(&mut self) -> StoreResult<()>;
 }
 
 /// A DB + cache implementation of `Source` trait, with concurrent readers support.
 #[derive(Clone)]
 pub struct DbTxIndexTips {
     db: Arc<DB>,
-    access: CachedDbItem<BlockHashSet, BlockHasher>,
+    access: CachedDbItem<BlockHashSet>,
 }
 
-const STORE_PREFIX: &[u8] = b"txindex-pruning-point";
 
-impl DbTxIndexTips {
+impl DbTxIndexTipsStore {
     pub fn new(db: Arc<DB>) -> Self {
         Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), STORE_PREFIX.to_vec()) }
     }
@@ -42,23 +42,27 @@ impl DbTxIndexTips {
     }
 }
 
-impl TxIndexTipsReader for DbTxIndexTips {
-    fn get(&self) -> StoreResult<HashSet> {
+impl TxIndexTipsReader for DbTxIndexTipsStore {
+    fn get(&self) -> StoreResult<BlockHashSet> {
         self.access.read()
     }
 }
 
-impl TxIndexTips for DbTxIndexTips {
+impl TxIndexTipsStore for DbTxIndexTipsStore {
     fn set(&mut self, tips: Hash) -> StoreResult<()> {
         self.access.write(DirectDbWriter::new(&self.db), &source)
     }
 
-    fn add(&mut self, tip: Hash) -> StoreResult<()> {
+    fn update_add_tip(&mut self, tip: Hash) -> StoreResult<()> {
         self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet<Hash>| { tips.insert(tip); tips } )
     }
 
-    fn remove(&mut self, merged_block_hashes_1: BlockHashSet<Hash>, merged_block_hashes_2: HashSet<Hash>) -> StoreResult<()> {
+    fn update_remove_tips(&mut self, merged_block_hashes_1: BlockHashSet<Hash>, merged_block_hashes_2: HashSet<Hash>) -> StoreResult<()> {
         let merged_block_hashes_3 = &merged_block_hashes_1 - &merged_block_hashes_2;
-        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet<Hash>| (&tips - &merged_block_hashes) )
+        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet<Hash>| (tips.sub(&merged_block_hashes)) )
     }
+
+    fn remove(&mut self) -> StoreResult<()> {
+        self.access.remove(DirectDbWriter::new(&self.db))
+    } 
 }

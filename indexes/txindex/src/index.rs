@@ -21,7 +21,7 @@ use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;
 use std::{
     fmt::Debug,
-    sync::{Arc, Weak}, cmp::min, collections::{hash_map::{Entry, VacantEntry, OccupiedEntry}, HashMap}, hash::Hash, iter::Zip,
+    sync::{Arc, Weak}, cmp::min, collections::{hash_map::{Entry, VacantEntry, OccupiedEntry}, HashMap}, hash::Hash, iter::Zip, ops::Sub,
 };
 
 use crate::{
@@ -34,14 +34,16 @@ use crate::{
     reindexers::TxIndexReindexers
 };
 
-/// 256 blocks per chunk - this corresponds to ~ 62976 txs under current blocksize max load. 
+/// 256 blocks per chunk - this corresponds to ~ 62976 txs under current block size, and max throughput. 
 /// this should be adjusted on blocksize changes. 
-/// note: max should not exceed max mergeset size. 
+/// 
+/// note: [`MAX_RESYNC_CHUNK_SIZE`] should not exceed the min exceed mergeset size. 
+/// 
+// TODO: move this into a `TxIndex` config and make [`MAX_RESYNC_CHUNK_SIZE`] a function which exceeds that of merge_depth. 
 const MAX_RESYNC_CHUNK_SIZE: usize = 256;
 
 pub struct TxIndex {
     config: Arc<Config>,
-    params: TxIndexParams, 
     consensus_manager: Arc<ConsensusManager>,
     reindexers: TxIndexReindexers,
     store: TxIndexStore,
@@ -56,13 +58,12 @@ impl TxIndex {
         consensus_db: Arc<DB>,
     ) -> TxIndexResult<Arc<RwLock<Self>>> {
         
-        assert!(config.merge_depth < MAX_RESYNC_CHUNK_SIZE); // Ensure we don't go beyond max merge depth
+        assert!(config.merge_depth <= MAX_RESYNC_CHUNK_SIZE); // Ensure we don't go beyond max merge depth
         
         let mut txindex = Self { 
             config,
             consensus_manager: consensus_manager.clone(), 
             store: TxIndexStore::new(txindex_db, consensus_db),
-            params,
             reindexers: TxIndexReindexers::new(), 
         };
 
@@ -76,18 +77,28 @@ impl TxIndex {
 impl TxIndexApi for TxIndex {
 
     /// Resync the txindexes included transactions from the dag tips down to the vsp chain. 
-    fn resync_from_tips(&mut self, consensus_session: ConsensusSessionBlocking<'a>) -> TxIndexResult<()> {
-        // get included transactions between tips and sink
+    fn resync_tips(&mut self, consensus_session: ConsensusSessionBlocking<'a>) -> TxIndexResult<()> {
+
+        info!("Resyncing the utxoindex...");
+
+        let consensus = self.consensus_manager.consensus();
+        let session = futures::executor::block_on(consensus.session_blocking());
+
+        let consensus_session = self.consensus_manager.
+        let consensus_tips: BlockHashSet = consensus_session.get_tips().collect();
         let sink = consensus_session.get_sink();
-        for tip in consensus_session.get_tips().into_iter() {
-            // we expect one tip to be the sink, we can "short-circuit" this tip. 
-            if tip == sink{
-                continue;
+        consensus_tips.remove(&sink); // we can remove the sink from the tips. 
+        let to_resync_tips = match self.store.get_tips()? {
+            Some(txindex_tips) => {
+                consensus_tips.sub(&txindex_tips)
             }
+            None => consensus_tips
+        };
+
+        for tip in to_resync_tips.into_iter() {
 
             let end_hash = consensus_session.find_highest_common_chain_block(tip, sink)?;
-
-
+            
             // TODO: Possible optimization is to use the common ancestor between tip and sink, instead of the sink
             loop {
 
@@ -95,13 +106,11 @@ impl TxIndexApi for TxIndex {
 
                 for hash in hashes.into_iter() {
                     consensus_session.get_block(hash)?;
-                    self.reindexers.add_blocks_transactions(
+                    self.reindexers.block_added_reindexer.add_blocks_transactions(
                         block, 
                         false // we do not want to overwrite accepted blocks
                     );
                 }
-
-                self.reindexers.
 
                 
             }
@@ -207,23 +216,39 @@ impl TxIndexApi for TxIndex {
                 } {
                     
                 }
-            }
-            None => {
-
-            },
-        }
-
-        // 1) Resync up the virtual selected parent chain form source
-        self.resync_segment(source, sink)?;
-
-        // 2) Resync included transactions from the tips to sink common ancestor
-        self.resync_tips(sink, tips)?;
-    
-        Ok(())
     }
 
-    fn is_synced(self) -> TxIndexResult<bool> {
-        todo!()
+    fn is_inclusion_synced(&self) -> TxIndexResult<bool> {
+        let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
+        let consensus_tips: BlockHashSet = consensus_session.get_tips().collect();
+        let txindex_tips = self.store.get_tips()?.collect();
+        if let Some(txindex_tips) = txindex_tips {
+            return Ok(consensus_tips == txindex_tips)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn is_acceptance_synced(&self) -> TxIndexResult<bool> {
+        let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
+        let consensus_sink = consensus_session.get_sink();
+        let txindex_sink = self.store.get_sink()?;
+        if let Some(txindex_sink) = txindex_sink {
+            Ok(consensus_sink == txindex_sink)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn is_source_synced(&self) -> TxIndexResult<bool> {
+        let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
+        let consensus_source = consensus_session.get_source();
+        let tindex_source = self.store.get_source()?;
+        if let Some(txindex_source) = tindex_source {
+            Ok(consensus_source == tindex_source)
+        } else {
+            Ok(false)
+        }
     }
 
     fn get_transaction_offsets(

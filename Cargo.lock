@@ -2770,6 +2770,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-txindex"
+version = "0.1.6"
+dependencies = [
+ "bincode",
+ "futures",
+ "kaspa-consensus",
+ "kaspa-consensus-core",
+ "kaspa-consensusmanager",
+ "kaspa-core",
+ "kaspa-database",
+ "kaspa-hashes",
+ "kaspa-index-core",
+ "kaspa-utils",
+ "log",
+ "parking_lot",
+ "rand 0.8.5",
+ "rocksdb",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "kaspa-txscript"
 version = "0.1.6"
 dependencies = [

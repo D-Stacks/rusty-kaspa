@@ -26,6 +26,7 @@ members = [
     "indexes/core",
     "indexes/processor",
     "indexes/utxoindex",
+    "indexes/txindex",
     "rpc/macros",
     "rpc/core",
     "rpc/service",

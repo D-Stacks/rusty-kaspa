@@ -1,35 +1,74 @@
-use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, HashMapCustomHasher};
+use kaspa_consensus::model::stores::headers::CompactHeaderData;
+use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId, Transaction}, BlockHashMap};
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 use std::{vec::Vec, collections::HashMap};
 
-pub type TransactionIdsByBlockHash = BlockHashMap<TransactionId>;
-pub type TransactionEntriesById= HashMap<TransactionId, TransactionEntry>;
+pub type TxEntriesById = HashMap<TransactionId, TxEntry>;
+pub type TxCompactEntriesById = HashMap<TransactionId, TxCompactEntry>;
+pub type TxAcceptanceDataByBlockHash = BlockHashMap<TxAcceptanceData>;
 
-
-pub struct TransactionEntry {
-    pub offset: TransactionOffset,
-    pub acceptance_data: Option<TransactionAcceptenceData>, // `None` indicates transaction is not accepted, only included.  
-}
-
-impl TransactionEntry {
-    pub fn new(offset: Option<TransactionOffset>, acceptance_data: Option<Hash>) -> Self{
-        Self { offset, acceptance_data}
-    }
-
-    pub fn clear_acceptance_data(&mut self) {
-        self.acceptance_data = None
-    }
-}
-
-/// Holds the reference to a transaction for a block transaction store. 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
-pub struct TransactionOffset {
+pub struct TxEntry {
+    offset: TxOffset,
+    tx_acceptance_data: Option<TxAcceptanceData>,
+}
+
+impl TxEntry {
+    pub fn new(offset: TxOffset, tx_acceptance_data: Option<TxAcceptanceData>) -> Self {
+        Self { offset, tx_acceptance_data }
+    }
+
+    pub fn offset(&self) -> TxOffset {
+        self.offset
+    }
+
+    pub fn tx_acceptance_data(&self) -> Option<TxAcceptanceData> {
+        self.tx_acceptance_data
+    }
+
+    pub fn is_accepted(&self) -> bool {
+        self.tx_acceptance_data.is_some()
+    }
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
+pub struct TxCompactEntry {
+    offset: TxOffset,
+    is_accepted: bool,
+}
+
+impl TxCompactEntry {
+    pub fn new(offset: TxOffset, is_accepted: bool) -> Self{
+        Self { offset, is_accepted}
+    }
+
+    pub fn set_as_unaccepted(&mut self) {
+        self.is_accepted = false
+    }
+
+    pub fn set_as_accepted(&mut self, is_accepted: bool) {
+        self.is_accepted = true
+    }
+
+    pub fn is_accepted(&self) -> bool {
+        self.is_accepted
+    }
+
+    pub fn offset(&self) -> TxOffset {
+        self.offset
+    }
+
+}
+
+/// Holds the inlcluding_block [`Hash`] and [`TransactionIndexType`] to reference further transaction details. 
+#[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
+pub struct TxOffset {
     including_block: Hash,
     transaction_index: TransactionIndexType,
 }
 
-impl TransactionOffset {
+impl TxOffset {
     pub fn new(including_block: Hash, transaction_index: TransactionIndexType) -> Self { 
         Self{ including_block, transaction_index }
     }
@@ -43,22 +82,22 @@ impl TransactionOffset {
     }
 }
 
-struct TransactionAcceptanceData{
-    accepting_block: Hash,
-    accepting_blue_score: u64,
+#[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
+pub struct TxAcceptanceData {
+    accepting_block_hash: Hash,
+    accepting_blue_score: u64
 }
 
-impl  TransactionAcceptanceData {
-    pub fn new(accepting_block: Hash, accepting_blue_score: u64) -> Self {
-        Self{ accepting_block, accepting_blue_score }
-    }
-    pub fn gaccepting_block(&self) -> Hash {
-        self.accepting_block
+impl TxAcceptanceData {
+    pub fn new(accepting_block_hash: Hash, accepting_blue_score: u64) -> Self {
+        Self { accepting_block_hash, accepting_blue_score }
     }
 
-    pub fn accepting_blue_score(&self) -> u64 {
+    fn accepting_block_hash(&self) -> Hash {
+        self.accepting_block_hash
+    }
+
+    fn accepting_blue_score(&self) -> u64 {
         self.accepting_blue_score
     }
 }
-
-pub type TransactionOffsets = BlockHashMap<Vec<TransactionIndexType>>;

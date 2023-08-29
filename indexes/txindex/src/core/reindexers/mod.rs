@@ -1,8 +1,13 @@
-mod acceptance_data_reindexer;
-mod block_added_reindexer;
-mod block_pruned_reindexer;
+pub mod acceptance_data_reindexer;
+pub mod block_added_reindexer;
+pub mod block_pruned_reindexer;
 
-pub use::reindexers::*;
+pub use {
+        acceptance_data_reindexer::*, 
+        block_added_reindexer::*, 
+        block_pruned_reindexer::*
+    };
+
 
 pub struct TxIndexReindexers {
     pub acceptance_data_reindexer: TxIndexAcceptanceDataReindexer,

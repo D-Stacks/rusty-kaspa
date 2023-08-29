@@ -82,7 +82,6 @@ impl VirtualStateProcessor {
         ) {
             // Create a composed UTXO view from the selected parent UTXO view + the mergeset UTXO diff
             let composed_view = selected_parent_utxo_view.compose(&ctx.mergeset_diff);
-
             // Validate transactions in current UTXO context
             let validated_transactions = self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score);
 
@@ -100,6 +99,9 @@ impl VirtualStateProcessor {
                     .into_iter()
                     .map(|(tx, tx_idx)| AcceptedTxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
                     .collect(),
+                    // For Review: confirm below is correct / works - TODO remove this comment when reviewed
+                    // alternative pass pov blue score explicitly into function. 
+                    accepting_blue_score: ctx.ghostdag_data.blue_score,
             });
 
             let coinbase_data = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload).unwrap();

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{vec::Vec, collections::HashMap};
 
 pub type TxEntriesById = HashMap<TransactionId, TxEntry>;
-pub type TxCompactEntriesById = HashMap<TransactionId, TxCompactEntry>;
+pub type TxOffsetById = HashMap<TransactionId, TxOffset>;
 pub type TxAcceptanceDataByBlockHash = BlockHashMap<TxAcceptanceData>;
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
@@ -30,35 +30,6 @@ impl TxEntry {
     pub fn is_accepted(&self) -> bool {
         self.tx_acceptance_data.is_some()
     }
-}
-
-#[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
-pub struct TxCompactEntry {
-    offset: TxOffset,
-    is_accepted: bool,
-}
-
-impl TxCompactEntry {
-    pub fn new(offset: TxOffset, is_accepted: bool) -> Self{
-        Self { offset, is_accepted}
-    }
-
-    pub fn set_as_unaccepted(&mut self) {
-        self.is_accepted = false
-    }
-
-    pub fn set_as_accepted(&mut self, is_accepted: bool) {
-        self.is_accepted = true
-    }
-
-    pub fn is_accepted(&self) -> bool {
-        self.is_accepted
-    }
-
-    pub fn offset(&self) -> TxOffset {
-        self.offset
-    }
-
 }
 
 /// Holds the inlcluding_block [`Hash`] and [`TransactionIndexType`] to reference further transaction details. 

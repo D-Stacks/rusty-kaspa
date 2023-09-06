@@ -655,6 +655,12 @@ impl ConsensusApi for Consensus {
         Ok(())
     }
 
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        self.validate_block_exists(low)?;
+        self.validate_block_exists(hash)?;
+        Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
+    }
+
     fn is_chain_ancestor_of(&self, low: Hash, high: Hash) -> ConsensusResult<bool> {
         let _guard = self.pruning_lock.blocking_read();
         self.validate_block_exists(low)?;

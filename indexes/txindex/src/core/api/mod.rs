@@ -15,11 +15,15 @@ pub enum TxQuery {
 
 pub trait TxIndexApi: Send + Sync + Debug {
     
-    fn is_inclusion_synced(&self) -> TxIndexResult<bool>;
+    fn is_tips_synced(&self) -> TxIndexResult<bool>;
 
     fn is_acceptance_synced(&self) -> TxIndexResult<bool>;
 
     fn is_source_synced(&self) -> TxIndexResult<bool>;
+
+    fn resync_tips(&mut self) -> TxIndexResult<()>;
+
+    fn resync_blockdag_segment(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()>;
 
     fn get_transaction_offsets(
         self, 

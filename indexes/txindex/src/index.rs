@@ -34,14 +34,6 @@ use crate::{
     reindexers::TxIndexReindexers
 };
 
-/// 256 blocks per chunk - this corresponds to ~ 62976 txs under current block size, and max throughput. 
-/// this should be adjusted on blocksize changes. 
-/// 
-/// note: [`MAX_RESYNC_CHUNK_SIZE`] should not exceed the min exceed mergeset size. 
-/// 
-// TODO: move this into a `TxIndex` config and make [`MAX_RESYNC_CHUNK_SIZE`] a function which exceeds that of merge_depth. 
-const MAX_RESYNC_CHUNK_SIZE: usize = 256;
-
 pub struct TxIndex {
     config: Arc<Config>,
     consensus_manager: Arc<ConsensusManager>,
@@ -57,9 +49,7 @@ impl TxIndex {
         txindex_db: Arc<DB>, 
         consensus_db: Arc<DB>,
     ) -> TxIndexResult<Arc<RwLock<Self>>> {
-        
-        assert!(config.merge_depth <= MAX_RESYNC_CHUNK_SIZE); // Ensure we don't go beyond max merge depth
-        
+                
         let mut txindex = Self { 
             config,
             consensus_manager: consensus_manager.clone(), 
@@ -77,16 +67,15 @@ impl TxIndex {
 impl TxIndexApi for TxIndex {
 
     /// Resync the txindexes included transactions from the dag tips down to the vsp chain. 
-    fn resync_tips(&mut self, consensus_session: ConsensusSessionBlocking<'a>) -> TxIndexResult<()> {
+    fn resync_tips(&mut self) -> TxIndexResult<()> {
 
         info!("Resyncing the utxoindex...");
 
         let consensus = self.consensus_manager.consensus();
         let session = futures::executor::block_on(consensus.session_blocking());
 
-        let consensus_session = self.consensus_manager.
-        let consensus_tips: BlockHashSet = consensus_session.get_tips().collect();
-        let sink = consensus_session.get_sink();
+        let consensus_tips: BlockHashSet = session.get_tips().collect();
+        let sink = session.get_sink();
         consensus_tips.remove(&sink); // we can remove the sink from the tips. 
         let to_resync_tips = match self.store.get_tips()? {
             Some(txindex_tips) => {
@@ -97,15 +86,17 @@ impl TxIndexApi for TxIndex {
 
         for tip in to_resync_tips.into_iter() {
 
-            let end_hash = consensus_session.find_highest_common_chain_block(tip, sink)?;
+            let end_hash = session..find_highest_common_chain_block(tip, sink)?;
             
-            // TODO: Possible optimization is to use the common ancestor between tip and sink, instead of the sink
             loop {
 
-                let (hashes, end_hash) = consensus_session.get_hashes_between(end_hash, tip, MAX_RESYNC_CHUNK_SIZE)?;
+                let (hashes, end_hash) = session.get_hashes_between(
+                    end_hash, tip, 
+                    self.config.mergeset_size_limit // TODO: perhaps use `min()` between constant and mergeset_size_limit. 
+                )?;
 
                 for hash in hashes.into_iter() {
-                    consensus_session.get_block(hash)?;
+                    session.get_block(hash)?;
                     self.reindexers.block_added_reindexer.add_blocks_transactions(
                         block, 
                         false // we do not want to overwrite accepted blocks
@@ -121,7 +112,7 @@ impl TxIndexApi for TxIndex {
     /// Resync the txindex along an added vsp chain path. 
     /// 
     /// Note: `end_hash` is expected to be a chain block. 
-    fn resync_block_dag_segment(&mut self, consensus_session: ConsensusSessionBlocking<'a>, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
+    fn resync_blockdag_segment(&mut self, consensus_session: ConsensusSessionBlocking<'a>, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
         
         let end_segment: Hash;
 
@@ -131,7 +122,10 @@ impl TxIndexApi for TxIndex {
         // 1) remove from start_hash to checkpoint
         if start_hash != checkpoint_hash {
             loop {
-                let (end_hashes, end_segment) = consensus_session.get_hashes_between(checkpoint_hash, start_hash, MAX_RESYNC_CHUNK_SIZE)?;
+                let (end_hashes, end_segment) = consensus_session.get_hashes_between(
+                    checkpoint_hash, 
+                    start_hash, s
+                    self.config.mergeset_size_limit)?;
                 
                 if end_segment == start_hash {
                     break
@@ -218,7 +212,7 @@ impl TxIndexApi for TxIndex {
                 }
     }
 
-    fn is_inclusion_synced(&self) -> TxIndexResult<bool> {
+    fn is_tips_synced(&self) -> TxIndexResult<bool> {
         let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
         let consensus_tips: BlockHashSet = consensus_session.get_tips().collect();
         let txindex_tips = self.store.get_tips()?.collect();

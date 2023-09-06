@@ -56,22 +56,23 @@ pub enum DatabaseStorePrefixes {
     CirculatingSupply = 194,
     
     // 2) TX index
-    TxIndexTransactionEntries = 198,
-    TxIndexTips = 199,
-    TxIndexSink = 200,
-    TxIndexSource = 201,
-    TxIndexBlockAcceptance = 202, // Move to acceptance index eventually. 
+    TxIndexIncludedOffsets = 198,
+    TxIndexAcceptedOffsets = 199,
+    TxIndexTips = 200,
+    TxIndexSink = 201,
+    TxIndexSource = 202,
+    TxIndexBlockAcceptance = 203, // Move to acceptance index eventually. 
 
-    // 3) ADDR index
-    //AddrIndexAcceptedTxs = 206   // Reserve
-    //AddrIndexIncludedTxs = 207   // Reserve
+    // 3) ADDR index    // Reserve
+    //AddrIndexAcceptedTxs = 207,   // Reserve
+    //AddrIndexIncludedTxs = 208,   // Reserve
 
-    // 4) HT index 
-    //HtIndexDaaScore = 211,     // Reserve
-    //HtIndexBlueScore = 212,    // Reserve
+    // 4) HT index  // Reserve
+    //HtIndexDaaScore = 212,    // Reserve
+    //HtIndexBlueScore = 213,   // Reserve
 
     // 5) ACC index
-    // AccIndexBlockAcceptance = 216,    // Reserve
+    // AccIndexBlockAcceptance = 217,   // Reserve
 
     // ---- Separator ----
     /// Reserved as a separator

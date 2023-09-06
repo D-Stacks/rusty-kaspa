@@ -24,7 +24,7 @@ use crate::{
     stores::{
         sink::{DbTxIndexSinkStore, TxIndexSinkStore, TxIndexSinkStoreReader},
         source::{DbTxIndexSourceStore, TxIndexSourceStore, TxIndexSourceStoreReader},
-        tx_compact_entries::{DbTransactionEntriesStore, TransactionEntriesStore, TransactionEntriesStoreReader},
+        tx_offsets::{DbTransactionEntriesStore, TransactionEntriesStore, TransactionEntriesStoreReader},
         tips::{DbTxIndexTipsStore, TxIndexTipsReader, TxIndexTipsStore },
     },
     params::TxIndexParams,

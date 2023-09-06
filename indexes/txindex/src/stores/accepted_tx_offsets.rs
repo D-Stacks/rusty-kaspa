@@ -1,4 +1,4 @@
-use crate::model::{TxCompactEntry, TxCompactEntriesById};
+use crate::model::{TxOffsetById, TxCompactEntriesById};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB}, registry::DatabaseStorePrefixes};
@@ -12,16 +12,15 @@ pub const STORE_PREFIX: &[u8] = b"txindex-accepted-offsets";
 
 // Traits:
 
-pub trait TxIndexTxEntriesStoreReader {
+pub trait TxIndexAcceptedTxOffsetsStoreReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
-    fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionEntry>;
+    fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionOffset>;
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool>;
 }
 
-pub trait TxIndexTxEntriesStore: TxIndexTxEntriesStoreReader {
+pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsStoreReader {
     fn remove_many(&mut self, transaction_ids: Vec<TransactionId>) -> StoreResult<()>;
-    fn insert_many(&mut self, transaction_entries_by_id: TxCompactEntriesById, overwrite: bool) -> StoreResult<()>;
-    fn set_as_unaccepted_many(&mut self, transaction_ids: Vec<TransactionId>);
+    fn insert_many(&mut self, transaction_offsets_by_id: TxOffsetById) -> StoreResult<()>;
 
     fn delete_all(&mut self) -> StoreResult<()>;
 }
@@ -29,18 +28,18 @@ pub trait TxIndexTxEntriesStore: TxIndexTxEntriesStoreReader {
 // Implementations:
 
 #[derive(Clone)]
-pub struct DbTxIndexTxEntriesStore {
+pub struct DbTxIndexAcceptedTxOffsetsStore {
     db: Arc<DB>,
     access: CachedDbAccess<TransactionId, TxCompactEntry>,
 }
 
-impl DbTxIndexTxEntriesStore {
+impl DbTxIndexAcceptedTxOffsetsStore {
     pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
         Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexTransactionEntries) }
     }
 }
 
-impl TxIndexTxEntriesStoreReader for DbTxIndexTxEntriesStore {   
+impl TxIndexAcceptedTxOffsetsStoreReader for DbTxIndexAcceptedTxOffsetsStore {   
     fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionEntry> {
         self.access.read(transaction_id)
     }
@@ -51,7 +50,7 @@ impl TxIndexTxEntriesStoreReader for DbTxIndexTxEntriesStore {
     
 }
 
-impl TxIndexTxEntriesStore for DbTxIndexTxEntriesStore {
+impl TxIndexAcceptedTxOffsetsStore for DbTxIndexAcceptedTxOffsetsStore {
     fn remove_many(&mut self, mut transaction_ids: Vec<TransactionId>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
@@ -76,21 +75,6 @@ impl TxIndexTxEntriesStore for DbTxIndexTxEntriesStore {
 
         self.access.write_many(writer, &mut transaction_entries_by_id.iter())
 
-    }
-    /// Sets the stored [`TxCompactEntry`] as unaccepted i.e. the `is_accepted` field to `false`
-    fn set_as_unaccepted_many(&mut self, transaction_ids: Vec<TransactionId>) {
-        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
-
-        let mut to_unaccept = transaction_ids.iter();
-
-        self.access.update_many(
-            writer, 
-            &mut transaction_entries_by_id.iter(), 
-            move |transaction_entry: &mut TxCompactEntry| {
-                transaction_entry.set_as_unaccepted();
-                transaction_entry
-            }   
-        )
     }
 
     /// Removes all [`TxCompactEntry`] values and keys from the cache and db.

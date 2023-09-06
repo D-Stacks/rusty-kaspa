@@ -519,6 +519,12 @@ impl ConsensusApi for Consensus {
         }
     }
 
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
+        self.validate_block_exists(low)?;
+        self.validate_block_exists(hash)?;
+        Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
+    }
+
     fn is_chain_ancestor_of(&self, low: Hash, high: Hash) -> ConsensusResult<bool> {
         self.validate_block_exists(low)?;
         self.validate_block_exists(high)?;

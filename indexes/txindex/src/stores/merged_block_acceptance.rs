@@ -1,9 +1,12 @@
+use crate::model::transaction_entries::{TransactionAcceptanceData, TransactionEntriesById, TransactionEntry, TransactionOffset};
 use crate::model::{TxAcceptanceData, TxAcceptanceDataByBlockHash};
-use crate::model::transaction_entries::{TransactionEntry, TransactionEntriesById, TransactionOffset, TransactionAcceptanceData};
 
-use kaspa_consensus_core::BlockHasher;
 use kaspa_consensus_core::tx::TransactionId;
-use kaspa_database::{prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB}, registry::DatabaseStorePrefixes};
+use kaspa_consensus_core::BlockHasher;
+use kaspa_database::{
+    prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB},
+    registry::DatabaseStorePrefixes,
+};
 use kaspa_hashes::Hash;
 use std::sync::Arc;
 
@@ -36,7 +39,7 @@ impl DbTxIndexMergedBlockAcceptanceStore {
     }
 }
 
-impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {   
+impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {
     fn get(&self, block_hash: Hash) -> StoreResult<TxAcceptanceData> {
         self.access.read(&block_hash)
     }
@@ -44,7 +47,6 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
     fn has(&self, block_hash: Hash) -> StoreResult<bool> {
         self.access.has(&block_hash)
     }
-    
 }
 
 impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
@@ -58,7 +60,6 @@ impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
         self.access.write_many(writer, &mut merged_block_acceptance.iter())
-
     }
 
     /// Removes all Offset in the cache and db, besides prefixes themselves.

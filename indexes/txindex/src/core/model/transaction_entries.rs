@@ -1,8 +1,11 @@
 use kaspa_consensus::model::stores::headers::CompactHeaderData;
-use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId, Transaction}, BlockHashMap};
+use kaspa_consensus_core::{
+    tx::{Transaction, TransactionId, TransactionIndexType},
+    BlockHashMap,
+};
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
-use std::{vec::Vec, collections::HashMap};
+use std::{collections::HashMap, vec::Vec};
 
 pub type TxEntriesById = HashMap<TransactionId, TxEntry>;
 pub type TxOffsetById = HashMap<TransactionId, TxOffset>;
@@ -32,7 +35,7 @@ impl TxEntry {
     }
 }
 
-/// Holds the inlcluding_block [`Hash`] and [`TransactionIndexType`] to reference further transaction details. 
+/// Holds the inlcluding_block [`Hash`] and [`TransactionIndexType`] to reference further transaction details.
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
 pub struct TxOffset {
     including_block: Hash,
@@ -40,8 +43,8 @@ pub struct TxOffset {
 }
 
 impl TxOffset {
-    pub fn new(including_block: Hash, transaction_index: TransactionIndexType) -> Self { 
-        Self{ including_block, transaction_index }
+    pub fn new(including_block: Hash, transaction_index: TransactionIndexType) -> Self {
+        Self { including_block, transaction_index }
     }
 
     pub fn including_block(&self) {
@@ -56,7 +59,7 @@ impl TxOffset {
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
 pub struct TxAcceptanceData {
     accepting_block_hash: Hash,
-    accepting_blue_score: u64
+    accepting_blue_score: u64,
 }
 
 impl TxAcceptanceData {

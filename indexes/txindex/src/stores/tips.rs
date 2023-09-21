@@ -3,7 +3,10 @@ use std::ops::Sub;
 use std::sync::Arc;
 
 use kaspa_consensus_core::BlockHashSet;
-use kaspa_database::{prelude::{CachedDbItem, DirectDbWriter, DB, StoreResult}, registry::DatabaseStorePrefixes};
+use kaspa_database::{
+    prelude::{CachedDbItem, DirectDbWriter, StoreResult, DB},
+    registry::DatabaseStorePrefixes,
+};
 use kaspa_hashes::Hash;
 
 /// Reader API for `Source`.
@@ -24,7 +27,6 @@ pub struct DbTxIndexTipsStore {
     db: Arc<DB>,
     access: CachedDbItem<BlockHashSet>,
 }
-
 
 impl DbTxIndexTipsStore {
     pub fn new(db: Arc<DB>) -> Self {
@@ -48,14 +50,17 @@ impl TxIndexTipsStore for DbTxIndexTipsStore {
     }
 
     fn update_add_tip(&mut self, tip: Hash) -> StoreResult<()> {
-        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet | { tips.insert(tip); tips } )
+        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet| {
+            tips.insert(tip);
+            tips
+        })
     }
 
-    fn update_remove_tips(&mut self, merged_block_hashes: BlockHashSet ) -> StoreResult<()> {
-        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet | tips.sub(&merged_block_hashes) )
+    fn update_remove_tips(&mut self, merged_block_hashes: BlockHashSet) -> StoreResult<()> {
+        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet| tips.sub(&merged_block_hashes))
     }
 
     fn remove(&mut self) -> StoreResult<()> {
         self.access.remove(DirectDbWriter::new(&self.db))
-    } 
+    }
 }

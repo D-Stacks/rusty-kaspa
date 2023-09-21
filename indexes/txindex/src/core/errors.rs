@@ -1,5 +1,5 @@
-use std::{io, string::FromUtf8Error};
 use kaspa_consensus_core::errors::consensus::ConsensusError;
+use std::{io, string::FromUtf8Error};
 use thiserror::Error;
 
 use crate::IDENT;

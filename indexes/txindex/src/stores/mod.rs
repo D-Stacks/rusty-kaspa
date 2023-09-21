@@ -1,7 +1,7 @@
-mod source;
+mod accepted_tx_offsets;
+mod merged_block_acceptance;
 mod sink;
+mod source;
 pub mod store_manager;
 mod tips;
-mod merged_block_acceptance;
-mod accepted_tx_offsets;
 mod unaccepted_tx_offsets;

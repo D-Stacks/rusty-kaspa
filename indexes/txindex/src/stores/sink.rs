@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use kaspa_database::{prelude::{CachedDbItem, DirectDbWriter, DB, StoreResult}, registry::DatabaseStorePrefixes};
+use kaspa_database::{
+    prelude::{CachedDbItem, DirectDbWriter, StoreResult, DB},
+    registry::DatabaseStorePrefixes,
+};
 use kaspa_hashes::Hash;
 
 /// Reader API for `SinkStore`.

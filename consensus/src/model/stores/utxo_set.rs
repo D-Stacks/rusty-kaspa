@@ -7,7 +7,7 @@ use kaspa_consensus_core::{
 };
 use kaspa_database::prelude::StoreResultExtensions;
 use kaspa_database::prelude::DB;
-use kaspa_database::prelude::{StoreError, BatchDbWriter, CachedDbAccess, DirectDbWriter};
+use kaspa_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter, StoreError};
 use kaspa_hashes::Hash;
 use rocksdb::WriteBatch;
 use std::{error::Error, fmt::Display, sync::Arc};

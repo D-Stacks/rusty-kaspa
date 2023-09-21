@@ -134,7 +134,7 @@ pub trait ConsensusApi: Send + Sync {
     }
 
     /// Gets the virtual chain paths from `low` to the `high` hash, or until max_blocks is reached
-    /// 
+    ///
     /// Note:   
     /// 1) Specifying the `high` hash as `None` will calculate the chain path up to the current sink.
     /// 2) Specifying `max_blocks` as `None` will impose no limit.

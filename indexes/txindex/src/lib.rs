@@ -9,10 +9,12 @@ const IDENT: &str = "txindex";
 
 #[cfg(test)]
 mod tests {
-    use crate::{core::*, model::transaction_entries::{TransactionEntry, TransactionOffset}};
+    use crate::{
+        core::*,
+        model::transaction_entries::{TransactionEntry, TransactionOffset},
+    };
     use kaspa_consensus::test_helpers::generate_random_hash;
     use kaspa_core::info;
-
 
     /// TODO: use proper Simnet when implemented.
     #[test]
@@ -20,13 +22,9 @@ mod tests {
         kaspa_core::log::try_init_logger("INFO");
         let rng = &mut SmallRng::seed_from_u64(43);
         let test_entry = TransactionEntry {
-            offset: Some(TransactionOffset{
-                including_block: generate_random_hash(rng),
-                transaction_index: rng.gen::<u32>(),
-            }),
+            offset: Some(TransactionOffset { including_block: generate_random_hash(rng), transaction_index: rng.gen::<u32>() }),
             accepting_block: Some(generate_random_hash(rng)),
         };
         info!(bincode::serialized_size(rng));
-        
     }
 }

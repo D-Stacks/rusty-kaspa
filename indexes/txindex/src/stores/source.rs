@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use kaspa_database::{prelude::{CachedDbItem, DirectDbWriter, DB, StoreResult}, registry::DatabaseStorePrefixes};
+use kaspa_database::{
+    prelude::{CachedDbItem, DirectDbWriter, StoreResult, DB},
+    registry::DatabaseStorePrefixes,
+};
 use kaspa_hashes::Hash;
 
-// TODO (when pruning is implemented): Use this store to check sync and resync from earliest header pruning point. 
+// TODO (when pruning is implemented): Use this store to check sync and resync from earliest header pruning point.
 // TODO: move to db registry
 pub const STORE_PREFIX: &[u8] = b"txindex-source";
-
 
 /// Reader API for `Source`.
 pub trait TxIndexSourceReader {

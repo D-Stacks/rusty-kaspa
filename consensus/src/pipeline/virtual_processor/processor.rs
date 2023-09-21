@@ -217,6 +217,22 @@ impl VirtualStateProcessor {
     }
 
     pub fn worker(self: &Arc<Self>) {
+        // TEMP: upgrade from prev DB version where the chain was the headers selected chain
+        if let Some(virtual_state) = self.virtual_stores.read().state.get().unwrap_option() {
+            let sink = virtual_state.ghostdag_data.selected_parent;
+            let mut selected_chain_write = self.selected_chain_store.write();
+            if let Some((_, tip)) = selected_chain_write.get_tip().unwrap_option() {
+                // This means we are upgrading from the previous version
+                if sink != tip {
+                    let chain_path = self.dag_traversal_manager.calculate_chain_path(tip, sink, None);
+                    info!("Upgrading the DB from HSC storage to VSC storage: {:?}", chain_path);
+                    let mut batch = WriteBatch::default();
+                    selected_chain_write.apply_changes(&mut batch, &chain_path).unwrap();
+                    self.db.write(batch).unwrap();
+                }
+            }
+        }
+
         'outer: while let Ok(msg) = self.receiver.recv() {
             if msg.is_exit_message() {
                 break;
@@ -282,7 +298,7 @@ impl VirtualStateProcessor {
         assert_eq!(virtual_ghostdag_data.selected_parent, new_sink);
 
         let sink_multiset = self.utxo_multisets_store.get(new_sink).unwrap();
-        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink);
+        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, None);
         let new_virtual_state = self
             .calculate_and_commit_virtual_state(
                 virtual_read,
@@ -401,7 +417,7 @@ impl VirtualStateProcessor {
 
                     let mut ctx = UtxoProcessingContext::new(mergeset_data.into(), selected_parent_multiset_hash);
 
-                    self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score, pov_blue_score);
+                    self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
                     let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
 
                     if let Err(rule_error) = res {

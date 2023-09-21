@@ -67,9 +67,11 @@ impl TxIndex {
 impl TxIndexApi for TxIndex {
 
     /// Resync the txindexes included transactions from the dag tips down to the vsp chain. 
-    fn resync_tips(&mut self) -> TxIndexResult<()> {
+    fn sync_unaccepted_data(&mut self) -> TxIndexResult<()> {
 
         info!("Resyncing the utxoindex...");
+
+        assert!(self.is_sink_synced() && self.is_source_synced());
 
         let consensus = self.consensus_manager.consensus();
         let session = futures::executor::block_on(consensus.session_blocking());
@@ -84,9 +86,9 @@ impl TxIndexApi for TxIndex {
             None => consensus_tips
         };
 
-        for tip in to_resync_tips.into_iter() {
+        for tip in to_resync_tips.into_iter().filter(move |tip| tip != sink ) {
 
-            let end_hash = session..find_highest_common_chain_block(tip, sink)?;
+            let end_hash = session.find_highest_common_chain_block(tip, sink)?;
             
             loop {
 
@@ -99,50 +101,39 @@ impl TxIndexApi for TxIndex {
                     session.get_block(hash)?;
                     self.reindexers.block_added_reindexer.add_blocks_transactions(
                         block, 
-                        false // we do not want to overwrite accepted blocks
                     );
                 }
 
                 
             }
         }
+
+        self.store.add_unaccepted_transaction_offsets(
+            self.reindexers.block_added_reindexer.added_transaction_offsets(), 
+        );
+
     Ok(())
     }
 
-    /// Resync the txindex along an added vsp chain path. 
-    /// 
-    /// Note: `end_hash` is expected to be a chain block. 
-    fn resync_blockdag_segment(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
+    /// Resync the txindex acceptance data along the added vsp chain path. 
+    fn sync_acceptance_data(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
 
         let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
+        
+        // assert we are resyncing along the vsp chain path. 
+        assert!(consensus_session.is_chain_block(start_hash));
+        assert!(consensus_session.is_chain_block(end_hash));
+        
         // If start hash is not a chain block we take the highest common chain block. 
         let checkpoint_hash = consensus_session.find_highest_common_chain_block(start_hash, end_hash)?;
-
-        // 1) remove from start_hash to checkpoint
-        let end_segment: Hash;
-        if start_hash != checkpoint_hash {
-            loop {
-                let (end_hashes, end_segment) = consensus_session.get_hashes_between(
-                    checkpoint_hash, 
-                    start_hash, 
-                    self.config.mergeset_size_limit)?;
-                
-                if end_segment == start_hash {
-                    break
-                } else {
-
-                }
-            }
-        }
-
         // 1) resync fom checkpoint chain_block to `end_hash`
         loop{
 
-            for (i, hash) in consensus_session.get_virtual_chain_from_block(checkpoint_hash, end_hash, self.config.mergeset_size_limit)?.added.into_iter().enumerate() {
+            for (i, hash) in consensus_session.get_virtual_chain_from_block(checkpoint_hash, Some(end_hash), Some(self.config.mergeset_size_limit as usize))?.added.into_iter().enumerate() {
                 let block_acceptance_data = consensus_session.get_block_acceptance_data(hash)?;
-                if i == MAX_RESYNC_CHUNK_SIZE || hash == end_hash {
+                if i == self.config.mergeset_size_limit || hash == end_hash {
                     end_segment = hash;
-                } else { continue }
+                }
             };
 
             self.store.add_transaction_entries(
@@ -186,14 +177,14 @@ impl TxIndexApi for TxIndex {
             self.resync_blockdag_segment(consensus_source, consensus_sink)?;
         } else if !self.is_sink_synced() { // txindex's sink is not synced
             assert!(consensus_session.is_chain_ancestor_of(txindex_sink, consensus_sink)); // sanity check
-            self.resync_blockdag_segment(txindex_sink, consensus_sink)
-        };
-
-        if !self.are_tips_synced() {
-            self.resync_tips()?
+            self.resync_accept(txindex_sink, consensus_sink)
         };
         
         drop(consensus_session);
+
+        if !self.are_tips_synced() {
+            self.re()?
+        };
 
     }
 
@@ -228,6 +219,11 @@ impl TxIndexApi for TxIndex {
         } else {
             Ok(false)
         }
+    }
+
+    // TODO: move this to a txindex config
+    fn resync_chunk_size(&self) -> usize {
+        min(self.config.mergeset_size_limit as usize, 1024)
     }
 
     fn get_transaction_offsets(

@@ -88,6 +88,15 @@ pub struct ChainPath {
     pub removed: Vec<Hash>,
 }
 
+impl ChainPath {
+    pub fn new(added: Vec<Hash>, removed: Vec<Hash>) -> Self {
+        Self { added, removed }
+    }
+    pub fn last_block_queried(&self) -> Option<&Hash> {
+        self.added.last().or(self.removed.last())
+    }
+}
+
 /// `hashes::Hash` writes 4 u64s so we just use the last one as the hash here
 #[derive(Default, Clone, Copy)]
 pub struct BlockHasher(u64);

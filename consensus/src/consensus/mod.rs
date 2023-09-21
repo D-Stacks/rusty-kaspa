@@ -485,14 +485,25 @@ impl ConsensusApi for Consensus {
         self.config.is_nearly_synced(compact.timestamp, compact.daa_score)
     }
 
-    fn get_virtual_chain_from_block(&self, hash: Hash) -> ConsensusResult<ChainPath> {
+    fn get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: Option<usize>) -> ConsensusResult<ChainPath> {
         // Calculate chain changes between the given hash and the
         // sink. Note that we explicitly don't
         // do the calculation against the virtual itself so that we
         // won't later need to remove it from the result.
-        let _guard = self.pruning_lock.blocking_read();
-        self.validate_block_exists(hash)?;
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, self.get_sink()))
+        let sink = self.get_sink();
+        let high = if let Some(high) = high {
+            self.validate_block_exists(high)?;
+            let new_high = self.find_highest_common_chain_block(high, sink)?;
+            if !self.is_chain_ancestor_of(low, new_high)? {
+                return Err(ConsensusError::ExpectedAncestor(low, high))
+            };
+            new_high
+        } else {
+            sink
+        };
+        self.validate_block_exists(low)?;
+
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(low, high, None))
     }
 
     /// Returns a Vec of header samples since genesis

@@ -191,7 +191,6 @@ impl TxIndexStore {
     pub fn add_accepted_transaction_offsets(
         &mut self,
         tx_offsets_by_id: TxOffsetById,
-        overwrite: bool,
     ) -> TxIndexResult<()> {
         trace!("[{0}] adding {1} accepted transaction offsets", IDENT, transaction_entries_by_id.len());
 
@@ -210,7 +209,6 @@ impl TxIndexStore {
     pub fn add_unaccepted_transaction_offsets(
         &mut self,
         tx_offsets_by_id: TxOffsetById,
-        overwrite: bool,
     ) -> TxIndexResult<()> {
         trace!("[{0}] adding {1} unaccepted transaction offsets", IDENT, transaction_entries_by_id.len());
 

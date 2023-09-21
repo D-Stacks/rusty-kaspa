@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use kaspa_database::prelude::StoreResult;
-use kaspa_database::prelude::DB;
-use kaspa_database::prelude::{CachedDbItem, DirectDbWriter};
+use kaspa_database::{prelude::{CachedDbItem, DirectDbWriter, DB, StoreResult}, registry::DatabaseStorePrefixes};
 use kaspa_hashes::Hash;
 
 // TODO (when pruning is implemented): Use this store to check sync and resync from earliest header pruning point. 
@@ -29,7 +27,7 @@ pub struct DbTxIndexSourceStore {
 
 impl DbTxIndexSourceStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), STORE_PREFIX.to_vec()) }
+        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSource) }
     }
 
     pub fn clone_with_new_cache(&self) -> Self {

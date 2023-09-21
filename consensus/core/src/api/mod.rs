@@ -194,7 +194,7 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<bool> {
+    fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
         unimplemented!()
     }
 

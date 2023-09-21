@@ -1,24 +1,19 @@
-use crate::model::{TxOffsetById, TxCompactEntriesById};
+use crate::model::{TxOffsetById, TxCompactEntriesById, TxOffset};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB}, registry::DatabaseStorePrefixes};
 use kaspa_hashes::Hash;
 use std::sync::Arc;
 
-// Prefixes:
-
-/// Prefixes the [`TransactionId`] indexed [`TransactionOffset`] store.
-pub const STORE_PREFIX: &[u8] = b"txindex-accepted-offsets";
-
 // Traits:
 
-pub trait TxIndexAcceptedTxOffsetsStoreReader {
+pub trait TxIndexUnacceptedTxOffsetsReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
     fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionOffset>;
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool>;
 }
 
-pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsStoreReader {
+pub trait TxIndexUnacceptedTxOffsetsStore: TxIndexUnacceptedTxOffsetsReader {
     fn remove_many(&mut self, transaction_ids: Vec<TransactionId>) -> StoreResult<()>;
     fn insert_many(&mut self, transaction_offsets_by_id: TxOffsetById) -> StoreResult<()>;
 
@@ -28,18 +23,18 @@ pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsStoreReader {
 // Implementations:
 
 #[derive(Clone)]
-pub struct DbTxIndexAcceptedTxOffsetsStore {
+pub struct DbTxIndexUnacceptedTxOffsetsStore {
     db: Arc<DB>,
-    access: CachedDbAccess<TransactionId, TxCompactEntry>,
+    access: CachedDbAccess<TransactionId, TxOffset>,
 }
 
-impl DbTxIndexAcceptedTxOffsetsStore {
+impl DbTxIndexUnacceptedTxOffsetsStore {
     pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexTransactionEntries) }
+        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexUnacceptedOffsets) }
     }
 }
 
-impl TxIndexAcceptedTxOffsetsStoreReader for DbTxIndexAcceptedTxOffsetsStore {   
+impl TxIndexUnacceptedTxOffsetsReader for DbTxIndexUnacceptedTxOffsetsStore {   
     fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionEntry> {
         self.access.read(transaction_id)
     }
@@ -50,7 +45,7 @@ impl TxIndexAcceptedTxOffsetsStoreReader for DbTxIndexAcceptedTxOffsetsStore {
     
 }
 
-impl TxIndexAcceptedTxOffsetsStore for DbTxIndexAcceptedTxOffsetsStore {
+impl TxIndexUnacceptedTxOffsetsStore for DbTxIndexUnacceptedTxOffsetsStore {
     fn remove_many(&mut self, mut transaction_ids: Vec<TransactionId>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 

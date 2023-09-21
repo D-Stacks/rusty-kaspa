@@ -657,7 +657,7 @@ impl ConsensusApi for Consensus {
 
     fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
         self.validate_block_exists(low)?;
-        self.validate_block_exists(hash)?;
+        self.validate_block_exists(high)?;
         Ok(self.services.sync_manager.find_highest_common_chain_block(low, high))
     }
 

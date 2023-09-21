@@ -25,6 +25,9 @@ pub enum TxIndexError {
 
     #[error("[{IDENT}]: {0}")]
     NoProcessingPurposeError(String),
+
+    #[error("[{IDENT}]: {0}")]
+    ReindexingError(String),
 }
 
 /// Results originating from the [`UtxoIndex`].

@@ -28,7 +28,7 @@ pub enum ConsensusError {
 
     #[error("traversal error: {0}")]
     TraversalError(#[from] TraversalError),
-    
+
     #[error("difficulty error: {0}")]
     DifficultyError(#[from] DifficultyError),
 

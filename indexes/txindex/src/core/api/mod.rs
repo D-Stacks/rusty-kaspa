@@ -15,9 +15,9 @@ pub enum TxQuery {
 
 pub trait TxIndexApi: Send + Sync + Debug {
     
-    fn is_tips_synced(&self) -> TxIndexResult<bool>;
+    fn are_tips_synced(&self) -> TxIndexResult<bool>;
 
-    fn is_acceptance_synced(&self) -> TxIndexResult<bool>;
+    fn is_sink_synced(&self) -> TxIndexResult<bool>;
 
     fn is_source_synced(&self) -> TxIndexResult<bool>;
 

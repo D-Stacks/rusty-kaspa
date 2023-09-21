@@ -33,6 +33,7 @@ js-sys.workspace = true
 wasm-bindgen.workspace = true
 workflow-wasm.workspace = true
 rand.workspace = true
+indexmap.workspace = true
 workflow-log.workspace = true
 workflow-core.workspace = true
 

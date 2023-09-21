@@ -1,21 +1,14 @@
 use std::sync::Arc;
 
-use kaspa_database::prelude::StoreResult;
-use kaspa_database::prelude::DB;
-use kaspa_database::prelude::{CachedDbItem, DirectDbWriter};
+use kaspa_database::{prelude::{CachedDbItem, DirectDbWriter, DB, StoreResult}, registry::DatabaseStorePrefixes};
 use kaspa_hashes::Hash;
 
-// Use this store to check sync and resync from last_block_added. 
-// TODO: move to db registry
-pub const STORE_PREFIX: &[u8] = b"txindex-sink";
-
-
 /// Reader API for `SinkStore`.
-pub trait TxIndexSinkStoreReader {
+pub trait TxIndexSinkReader {
     fn get(&self) -> StoreResult<Option<Hash>>;
 }
 
-pub trait TxIndexSinkStore: TxIndexSinkStoreReader {
+pub trait TxIndexSinkStore: TxIndexSinkReader {
     fn set(&mut self, sink: Hash) -> StoreResult<()>;
     fn remove(&mut self) -> StoreResult<()>;
 }
@@ -29,7 +22,7 @@ pub struct DbTxIndexSinkStore {
 
 impl DbTxIndexSinkStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), STORE_PREFIX.to_vec()) }
+        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSink) }
     }
 
     pub fn clone_with_new_cache(&self) -> Self {
@@ -37,7 +30,7 @@ impl DbTxIndexSinkStore {
     }
 }
 
-impl TxIndexSinkStoreReader for DbTxIndexSinkStore {
+impl TxIndexSinkReader for DbTxIndexSinkStore {
     fn get(&self) -> StoreResult<Hash> {
         self.access.read()
     }

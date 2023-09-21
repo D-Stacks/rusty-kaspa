@@ -99,9 +99,9 @@ impl VirtualStateProcessor {
                     .into_iter()
                     .map(|(tx, tx_idx)| AcceptedTxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
                     .collect(),
-                    // For Review: confirm below is correct / works - TODO remove this comment when reviewed
-                    // alternative pass pov blue score explicitly into function. 
-                    accepting_blue_score: ctx.ghostdag_data.blue_score,
+                // For Review: confirm below is correct / works - TODO remove this comment when reviewed
+                // alternative pass pov blue score explicitly into function.
+                accepting_blue_score: ctx.ghostdag_data.blue_score,
             });
 
             let coinbase_data = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload).unwrap();

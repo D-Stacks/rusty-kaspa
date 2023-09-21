@@ -112,19 +112,19 @@ impl TxIndexApi for TxIndex {
     /// Resync the txindex along an added vsp chain path. 
     /// 
     /// Note: `end_hash` is expected to be a chain block. 
-    fn resync_blockdag_segment(&mut self, consensus_session: ConsensusSessionBlocking<'a>, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
-        
-        let end_segment: Hash;
+    fn resync_blockdag_segment(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()> {
 
+        let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
         // If start hash is not a chain block we take the highest common chain block. 
         let checkpoint_hash = consensus_session.find_highest_common_chain_block(start_hash, end_hash)?;
 
         // 1) remove from start_hash to checkpoint
+        let end_segment: Hash;
         if start_hash != checkpoint_hash {
             loop {
                 let (end_hashes, end_segment) = consensus_session.get_hashes_between(
                     checkpoint_hash, 
-                    start_hash, s
+                    start_hash, 
                     self.config.mergeset_size_limit)?;
                 
                 if end_segment == start_hash {
@@ -135,10 +135,10 @@ impl TxIndexApi for TxIndex {
             }
         }
 
-        // 2) resync fom checkpoint chain_block to `end_hash`
+        // 1) resync fom checkpoint chain_block to `end_hash`
         loop{
 
-            for (i, hash) in consensus_session.get_virtual_chain_from_block(checkpoint_hash, end_hash, MAX_RESYNC_CHUNK_SIZE)?.added.into_iter().enumerate() {
+            for (i, hash) in consensus_session.get_virtual_chain_from_block(checkpoint_hash, end_hash, self.config.mergeset_size_limit)?.added.into_iter().enumerate() {
                 let block_acceptance_data = consensus_session.get_block_acceptance_data(hash)?;
                 if i == MAX_RESYNC_CHUNK_SIZE || hash == end_hash {
                     end_segment = hash;
@@ -163,7 +163,7 @@ impl TxIndexApi for TxIndex {
 
     fn get_sync_state(&self) -> TxIndexResult<TxIndexSyncState> {
         
-    } 
+    }
 
     fn resync(&mut self) -> TxIndexResult<()> {
         
@@ -174,45 +174,30 @@ impl TxIndexApi for TxIndex {
         let consensus_sink = consensus_session.get_sink();
         let consensus_source = consensus_session.get_source();
         
+        //TODO: prune db if txindex source != consensus source.. 
+
         let tips = consensus_session.get_tips();
 
-        if Some(txindex_source) != consensus_source || txindex_source.is_none() {
+        if !self.is_source_synced() { // txindex's source is not synced
             // Source is not synced
             // Resync whole txindex from scratch - if we have unsynced source there is no other way. 
+            // TODO: better way is perhaps to iterate txindex database, and remove if including block of offsets are not in consensus...
             self.store.delete_all();
-            self.resync_segment(consensus_source, consensus_sink)?;
-        } else if Some(txindex_sink) != consensus_sink || txindex_sink.is_none() {
-            // Sink is not synced
-            // We may resync from the sink of the txindex to the consensus sink
-        } else {
-            // Tips are not synced. 
-        }
+            self.resync_blockdag_segment(consensus_source, consensus_sink)?;
+        } else if !self.is_sink_synced() { // txindex's sink is not synced
+            assert!(consensus_session.is_chain_ancestor_of(txindex_sink, consensus_sink)); // sanity check
+            self.resync_blockdag_segment(txindex_sink, consensus_sink)
+        };
 
-        match txindex_source {
-            Some(txindex_source) => {
-                if txindex_source != consensus_source {
-                    // Resync whole txindex from scratch - if we have unsynced source there is no other way. 
-                    self.store.delete_all();
-                    self.resync_segment(consensus_source, consensus_sink)?;
-                } else if match txindex_sink {
-                    Some(txindex_sink) => {
-                        if txindex_sink != consensus_sink {
-                            self.resync_segment(txindex_sink, consensus_sink)
-                        }
-                    }
-                }
-            },
-            None => {
-                // Resync whole txindex from scratch - if we have unsynced source there is no other way. 
-                self.store.delete_all();
-                self.resync_segment(consensus_source, consensus_sink)?;
-            }
-                } {
-                    
-                }
+        if !self.are_tips_synced() {
+            self.resync_tips()?
+        };
+        
+        drop(consensus_session);
+
     }
 
-    fn is_tips_synced(&self) -> TxIndexResult<bool> {
+    fn are_tips_synced(&self) -> TxIndexResult<bool> {
         let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
         let consensus_tips: BlockHashSet = consensus_session.get_tips().collect();
         let txindex_tips = self.store.get_tips()?.collect();
@@ -223,7 +208,7 @@ impl TxIndexApi for TxIndex {
         }
     }
 
-    fn is_acceptance_synced(&self) -> TxIndexResult<bool> {
+    fn is_sink_synced(&self) -> TxIndexResult<bool> {
         let consensus_session = futures::executor::block_on(self.consensus_manager.consensus().session_blocking());
         let consensus_sink = consensus_session.get_sink();
         let txindex_sink = self.store.get_sink()?;
@@ -301,11 +286,11 @@ impl TxIndexApi for TxIndex {
         todo!()
     }
 
-    fn update_via_inclusion(&mut self) -> TxIndexResult<()> {
+    fn update_block_added(&mut self) -> TxIndexResult<()> {
         todo!()
     }
 
-    fn update_via_acceptance(&mut self) -> TxIndexResult<()> {
+    fn update_pruned_block(&mut self) -> TxIndexResult<()> {
         todo!()
     }
 

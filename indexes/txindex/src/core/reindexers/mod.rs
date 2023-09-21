@@ -8,7 +8,6 @@ pub use {
         block_pruned_reindexer::*
     };
 
-
 pub struct TxIndexReindexers {
     pub acceptance_data_reindexer: TxIndexAcceptanceDataReindexer,
     pub block_added_reindexer: TxIndexBlockAddedReindexer,

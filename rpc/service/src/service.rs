@@ -2,6 +2,7 @@
 
 use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
+use crate::service::NetworkType::{Mainnet, Testnet};
 use async_trait::async_trait;
 use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::{
@@ -9,7 +10,7 @@ use kaspa_consensus_core::{
     coinbase::MinerData,
     config::Config,
     constants::MAX_SOMPI,
-    networktype::NetworkType,
+    network::NetworkType,
     tx::{Transaction, COINBASE_TRANSACTION_INDEX},
 };
 use kaspa_consensus_notify::{
@@ -205,6 +206,11 @@ impl RpcCoreService {
             .await
             .unwrap_or_default()
     }
+
+    fn has_sufficient_peer_connectivity(&self) -> bool {
+        // Other network types can be used in an isolated environment without peers
+        !matches!(self.flow_context.config.net.network_type, Mainnet | Testnet) || self.flow_context.hub().has_peers()
+    }
 }
 
 #[async_trait]
@@ -213,7 +219,7 @@ impl RpcApi for RpcCoreService {
         let session = self.consensus_manager.consensus().session().await;
 
         // TODO: consider adding an error field to SubmitBlockReport to document both the report and error fields
-        let is_synced: bool = self.flow_context.hub().has_peers() && session.async_is_nearly_synced().await;
+        let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
 
         if !self.config.enable_unsynced_mining && !is_synced {
             // error = "Block not submitted - node is not synced"
@@ -281,7 +287,7 @@ impl RpcApi for RpcCoreService {
             self.config.is_nearly_synced(block_template.selected_parent_timestamp, block_template.selected_parent_daa_score);
         Ok(GetBlockTemplateResponse {
             block: (&block_template.block).into(),
-            is_synced: self.flow_context.hub().has_peers() && is_nearly_synced,
+            is_synced: self.has_sufficient_peer_connectivity() && is_nearly_synced,
         })
     }
 
@@ -353,7 +359,7 @@ impl RpcApi for RpcCoreService {
             mempool_size: self.mining_manager.clone().transaction_count(true, false).await as u64,
             server_version: version().to_string(),
             is_utxo_indexed: self.config.utxoindex,
-            is_synced: self.flow_context.hub().has_peers() && is_nearly_synced,
+            is_synced: self.has_sufficient_peer_connectivity() && is_nearly_synced,
             has_notify_command: true,
             has_message_id: true,
         })
@@ -699,7 +705,7 @@ impl RpcApi for RpcCoreService {
 
     async fn get_server_info_call(&self, _request: GetServerInfoRequest) -> RpcResult<GetServerInfoResponse> {
         let session = self.consensus_manager.consensus().session().await;
-        let is_synced: bool = self.flow_context.hub().has_peers() && session.async_is_nearly_synced().await;
+        let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
         let virtual_daa_score = session.async_get_virtual_daa_score().await;
 
         Ok(GetServerInfoResponse {
@@ -714,7 +720,7 @@ impl RpcApi for RpcCoreService {
 
     async fn get_sync_status_call(&self, _request: GetSyncStatusRequest) -> RpcResult<GetSyncStatusResponse> {
         let session = self.consensus_manager.consensus().session().await;
-        let is_synced: bool = self.flow_context.hub().has_peers() && session.async_is_nearly_synced().await;
+        let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
         Ok(GetSyncStatusResponse { is_synced })
     }
 

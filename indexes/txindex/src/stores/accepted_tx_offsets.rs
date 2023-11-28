@@ -17,11 +17,11 @@ pub const STORE_PREFIX: &[u8] = b"txindex-accepted-offsets";
 
 pub trait TxIndexAcceptedTxOffsetsReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
-    fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionOffset>;
+    fn get(&self, transaction_id: TransactionId) -> StoreResult<TxOffset>;
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool>;
 }
 
-pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsStoreReader {
+pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsReader {
     fn remove_many(&mut self, transaction_ids: Vec<TransactionId>) -> StoreResult<()>;
     fn insert_many(&mut self, transaction_offsets_by_id: TxOffsetById) -> StoreResult<()>;
 
@@ -43,7 +43,7 @@ impl DbTxIndexAcceptedTxOffsetsStore {
 }
 
 impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
-    fn get(&self, transaction_id: TransactionId) -> StoreResult<TransactionEntry> {
+    fn get(&self, transaction_id: TransactionId) -> StoreResult<TxOffset> {
         self.access.read(transaction_id)
     }
 

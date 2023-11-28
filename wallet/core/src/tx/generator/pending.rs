@@ -1,7 +1,7 @@
 use crate::result::Result;
+use crate::rpc::DynRpcApi;
 use crate::tx::{DataKind, Generator};
 use crate::utxo::UtxoEntryReference;
-use crate::DynRpcApi;
 use kaspa_addresses::Address;
 use kaspa_consensus_core::network::NetworkType;
 use kaspa_consensus_core::sign::sign_with_multiple_v2;
@@ -170,7 +170,7 @@ impl PendingTransaction {
     pub async fn try_submit(&self, rpc: &Arc<DynRpcApi>) -> Result<RpcTransactionId> {
         self.commit().await?; // commit transactions only if we are submitting
         let rpc_transaction: RpcTransaction = self.rpc_transaction();
-        Ok(rpc.submit_transaction(rpc_transaction, true).await?)
+        Ok(rpc.submit_transaction(rpc_transaction, false).await?)
     }
 
     pub async fn log(&self) -> Result<()> {

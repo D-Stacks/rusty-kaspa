@@ -17,21 +17,33 @@ impl Import {
         let what = argv.get(0).unwrap();
         match what.as_str() {
             "mnemonic" => {
-                crate::wizards::import::import_with_mnemonic(&ctx).await?;
+                let account_kind =
+                    if let Some(account_kind) = argv.get(1) { account_kind.parse::<AccountKind>()? } else { AccountKind::Bip32 };
+                if argv.len() > 1 {
+                    crate::wizards::import::import_with_mnemonic(&ctx, account_kind, &argv[2..]).await?;
+                } else {
+                    crate::wizards::import::import_with_mnemonic(&ctx, account_kind, &[]).await?;
+                }
             }
             "legacy" => {
                 if exists_legacy_v0_keydata().await? {
                     let import_secret = Secret::new(
-                        ctx.term().ask(true, "Enter the password for the wallet you are importing:").await?.trim().as_bytes().to_vec(),
+                        ctx.term()
+                            .ask(true, "Enter the password for the account you are importing: ")
+                            .await?
+                            .trim()
+                            .as_bytes()
+                            .to_vec(),
                     );
-                    let wallet_secret = Secret::new(ctx.term().ask(true, "Enter wallet password:").await?.trim().as_bytes().to_vec());
-                    wallet.import_gen0_keydata(import_secret, wallet_secret).await?;
+                    let wallet_secret = Secret::new(ctx.term().ask(true, "Enter wallet password: ").await?.trim().as_bytes().to_vec());
+                    wallet.import_gen0_keydata(import_secret, wallet_secret, None).await?;
                 } else if application_runtime::is_web() {
                     return Err("'kaspanet' web wallet storage not found at this domain name".into());
                 } else {
                     return Err("KDX/kaspanet keydata file not found".into());
                 }
             }
+            // todo "read-only" => {}
             // "core" => {}
             v => {
                 tprintln!(ctx, "unknown command: '{v}'\r\n");
@@ -45,7 +57,10 @@ impl Import {
     async fn display_help(self: Arc<Self>, ctx: Arc<KaspaCli>) -> Result<()> {
         ctx.term().help(
             &[
-                ("mnemonic", "Import a 24 or 12 word mnemonic"),
+                (
+                    "mnemonic [<type>] [<additional xpub keys>] ",
+                    "Import a 24 or 12 word mnemonic (types: 'bip32' (default), 'legacy', 'multisig'), ",
+                ),
                 ("legacy", "Import a legacy (local KDX) wallet"),
                 // ("purge", "Purge an account from the wallet"),
             ],

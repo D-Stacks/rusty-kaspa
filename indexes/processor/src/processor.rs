@@ -94,7 +94,14 @@ impl Processor {
     ) -> IndexResult<UtxosChangedNotification> {
         trace!("[{IDENT}]: processing {:?}", notification);
         if let Some(utxoindex) = self.utxoindex.clone() {
-            return Ok(utxoindex.update(notification.accumulated_utxo_diff.clone(), notification.virtual_parents).await?.into());
+            let converted_notification: UtxosChangedNotification =
+                utxoindex.update(notification.accumulated_utxo_diff.clone(), notification.virtual_parents).await?.into();
+            debug!(
+                "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
+                converted_notification.added.len(),
+                converted_notification.removed.len()
+            );
+            return Ok(converted_notification);
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
     }
@@ -147,7 +154,7 @@ mod tests {
     impl NotifyPipeline {
         fn new() -> Self {
             let (consensus_sender, consensus_receiver) = unbounded();
-            let (utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default());
+            let (utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
             let config = Arc::new(Config::new(DEVNET_PARAMS));
             let tc = TestConsensus::new(&config);
             tc.init();

@@ -1,6 +1,7 @@
 use crate::model::*;
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use kaspa_consensus_core::block_count::BlockCount;
+use kaspa_core::debug;
 use kaspa_notify::subscription::{single::UtxosChangedSubscription, Command};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -169,17 +170,17 @@ impl GetPeerAddressesResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct GetSelectedTipHashRequest {}
+pub struct GetSinkRequest {}
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct GetSelectedTipHashResponse {
-    pub selected_tip_hash: RpcHash,
+pub struct GetSinkResponse {
+    pub sink: RpcHash,
 }
 
-impl GetSelectedTipHashResponse {
+impl GetSinkResponse {
     pub fn new(selected_tip_hash: RpcHash) -> Self {
-        Self { selected_tip_hash }
+        Self { sink: selected_tip_hash }
     }
 }
 
@@ -398,6 +399,7 @@ pub struct GetBlockDagInfoResponse {
     pub virtual_parent_hashes: Vec<RpcHash>,
     pub pruning_point_hash: RpcHash,
     pub virtual_daa_score: u64,
+    pub sink: RpcHash,
 }
 
 impl GetBlockDagInfoResponse {
@@ -411,6 +413,7 @@ impl GetBlockDagInfoResponse {
         virtual_parent_hashes: Vec<RpcHash>,
         pruning_point_hash: RpcHash,
         virtual_daa_score: u64,
+        sink: RpcHash,
     ) -> Self {
         Self {
             network,
@@ -422,6 +425,7 @@ impl GetBlockDagInfoResponse {
             virtual_parent_hashes,
             pruning_point_hash,
             virtual_daa_score,
+            sink,
         }
     }
 }
@@ -718,13 +722,13 @@ pub struct ConsensusMetrics {
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GetMetricsResponse {
-    pub server_time: u128,
+    pub server_time: u64,
     pub process_metrics: Option<ProcessMetrics>,
     pub consensus_metrics: Option<ConsensusMetrics>,
 }
 
 impl GetMetricsResponse {
-    pub fn new(server_time: u128, process_metrics: Option<ProcessMetrics>, consensus_metrics: Option<ConsensusMetrics>) -> Self {
+    pub fn new(server_time: u64, process_metrics: Option<ProcessMetrics>, consensus_metrics: Option<ConsensusMetrics>) -> Self {
         Self { process_metrics, consensus_metrics, server_time }
     }
 }
@@ -752,6 +756,30 @@ pub struct GetSyncStatusRequest {}
 #[serde(rename_all = "camelCase")]
 pub struct GetSyncStatusResponse {
     pub is_synced: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetDaaScoreTimestampEstimateRequest {
+    pub daa_scores: Vec<u64>,
+}
+
+impl GetDaaScoreTimestampEstimateRequest {
+    pub fn new(daa_scores: Vec<u64>) -> Self {
+        Self { daa_scores }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetDaaScoreTimestampEstimateResponse {
+    pub timestamps: Vec<u64>,
+}
+
+impl GetDaaScoreTimestampEstimateResponse {
+    pub fn new(timestamps: Vec<u64>) -> Self {
+        Self { timestamps }
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -921,6 +949,7 @@ impl UtxosChangedNotification {
         } else {
             let added = Self::filter_utxos(&self.added, subscription);
             let removed = Self::filter_utxos(&self.removed, subscription);
+            debug!("CRPC, Creating UtxosChanged notifications with {} added and {} removed utxos", added.len(), removed.len());
             if added.is_empty() && removed.is_empty() {
                 None
             } else {
@@ -1068,7 +1097,7 @@ impl SubscribeResponse {
 }
 
 ///
-///  wRPC response for RpcApiOps::Subscribe request
+///  wRPC response for RpcApiOps::Unsubscribe request
 ///
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 #[serde(rename_all = "camelCase")]

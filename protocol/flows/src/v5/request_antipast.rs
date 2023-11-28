@@ -4,20 +4,20 @@ use kaspa_core::debug;
 use kaspa_hashes::Hash;
 use kaspa_p2p_lib::{
     common::ProtocolError,
-    dequeue, make_message,
+    dequeue_with_request_id, make_response,
     pb::{kaspad_message::Payload, BlockHeadersMessage, DoneHeadersMessage},
     IncomingRoute, Router,
 };
 use std::sync::Arc;
 
-pub struct HandleAnticoneRequests {
+pub struct HandleAntipastRequests {
     ctx: FlowContext,
     router: Arc<Router>,
     incoming_route: IncomingRoute,
 }
 
 #[async_trait::async_trait]
-impl Flow for HandleAnticoneRequests {
+impl Flow for HandleAntipastRequests {
     fn router(&self) -> Option<Arc<Router>> {
         Some(self.router.clone())
     }
@@ -27,14 +27,14 @@ impl Flow for HandleAnticoneRequests {
     }
 }
 
-impl HandleAnticoneRequests {
+impl HandleAntipastRequests {
     pub fn new(ctx: FlowContext, router: Arc<Router>, incoming_route: IncomingRoute) -> Self {
         Self { ctx, router, incoming_route }
     }
 
     async fn start_impl(&mut self) -> Result<(), ProtocolError> {
         loop {
-            let msg = dequeue!(self.incoming_route, Payload::RequestAnticone)?;
+            let (msg, request_id) = dequeue_with_request_id!(self.incoming_route, Payload::RequestAntipast)?;
             let (block, context): (Hash, Hash) = msg.try_into()?;
 
             debug!("received anticone request with block hash: {}, context hash: {} for peer {}", block, context, self.router);
@@ -42,10 +42,11 @@ impl HandleAnticoneRequests {
             let consensus = self.ctx.consensus();
             let session = consensus.session().await;
 
-            // get_anticone_from_pov is expected to be called by the syncee for getting the anticone of the header selected tip
-            // intersected by past of the relayed block, and is thus expected to be bounded by mergeset limit since
-            // we relay blocks only if they enter virtual's mergeset. We add a 2 factor for possible sync gaps.
-            let hashes = session.async_get_anticone_from_pov(block, context, Some(self.ctx.config.mergeset_size_limit * 2)).await?;
+            // `RequestAntipast` is expected to be called by the syncee for getting the antipast of `sink`
+            // intersected by past of the relayed block. We do not expect the relay block to be too much after
+            // the sink (in fact usually it should be in its past or anticone), hence we bound the expected traversal to be
+            // in the order of `mergeset_size_limit`.
+            let hashes = session.async_get_antipast_from_pov(block, context, Some(self.ctx.config.mergeset_size_limit * 2)).await?;
             let mut headers = session
                 .spawn_blocking(|c| hashes.into_iter().map(|h| c.get_header(h)).collect::<Result<Vec<_>, ConsensusError>>())
                 .await?;
@@ -55,12 +56,13 @@ impl HandleAnticoneRequests {
             headers.sort_by(|a, b| a.blue_work.cmp(&b.blue_work));
 
             self.router
-                .enqueue(make_message!(
+                .enqueue(make_response!(
                     Payload::BlockHeaders,
-                    BlockHeadersMessage { block_headers: headers.into_iter().map(|header| header.as_ref().into()).collect() }
+                    BlockHeadersMessage { block_headers: headers.into_iter().map(|header| header.as_ref().into()).collect() },
+                    request_id
                 ))
                 .await?;
-            self.router.enqueue(make_message!(Payload::DoneHeaders, DoneHeadersMessage {})).await?;
+            self.router.enqueue(make_response!(Payload::DoneHeaders, DoneHeadersMessage {}, request_id)).await?;
         }
     }
 }

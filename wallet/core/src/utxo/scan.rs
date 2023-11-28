@@ -74,7 +74,6 @@ impl Scan {
             let first = cursor;
             let last = if cursor == 0 { max(last_address_index + 1, window_size) } else { cursor + window_size };
             cursor = last;
-            // log_info!("first: {}, last: {}", first, last);
 
             // generate address derivations
             let addresses = address_manager.get_range(first..last)?;
@@ -85,7 +84,7 @@ impl Scan {
             utxo_context.register_addresses(&addresses).await?;
 
             let ts = Instant::now();
-            let resp = utxo_context.processor().rpc().get_utxos_by_addresses(addresses).await?;
+            let resp = utxo_context.processor().rpc_api().get_utxos_by_addresses(addresses).await?;
             let elapsed_msec = ts.elapsed().as_secs_f32();
             if elapsed_msec > 1.0 {
                 log_warning!("get_utxos_by_address() fetched {} entries in: {} msec", resp.len(), elapsed_msec);
@@ -146,7 +145,7 @@ impl Scan {
         let address_vec = address_set.iter().cloned().collect::<Vec<_>>();
 
         utxo_context.register_addresses(&address_vec).await?;
-        let resp = utxo_context.processor().rpc().get_utxos_by_addresses(address_vec).await?;
+        let resp = utxo_context.processor().rpc_api().get_utxos_by_addresses(address_vec).await?;
         let refs: Vec<UtxoEntryReference> = resp.into_iter().map(UtxoEntryReference::from).collect();
 
         let balance: Balance = refs.iter().fold(Balance::default(), |mut balance, r| {

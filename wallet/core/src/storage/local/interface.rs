@@ -4,6 +4,7 @@ use crate::storage::interface::AddressBookStore;
 use crate::storage::interface::CreateArgs;
 use crate::storage::interface::OpenArgs;
 use crate::storage::interface::StorageStream;
+use crate::storage::interface::WalletDescriptor;
 use crate::storage::local::cache::*;
 use crate::storage::local::streams::*;
 use crate::storage::local::transaction::*;
@@ -11,9 +12,21 @@ use crate::storage::local::wallet::Wallet;
 use crate::storage::local::Payload;
 use crate::storage::local::Storage;
 use crate::storage::*;
+use slugify_rs::slugify;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use workflow_core::runtime::is_web;
+use workflow_store::fs;
+
+pub fn make_filename(title: &Option<String>, filename: &Option<String>) -> String {
+    if let Some(filename) = filename {
+        filename.to_string()
+    } else if let Some(title) = title {
+        slugify!(title)
+    } else {
+        super::DEFAULT_WALLET_FILE.to_string()
+    }
+}
 
 pub enum Store {
     Resident,
@@ -25,54 +38,55 @@ pub(crate) struct LocalStoreInner {
     pub store: Store,
     pub transactions: Arc<dyn TransactionRecordStore>,
     pub is_modified: AtomicBool,
-    pub name: String,
+    pub filename: String,
 }
 
 impl LocalStoreInner {
     pub async fn try_create(ctx: &Arc<dyn AccessContextT>, folder: &str, args: CreateArgs, is_resident: bool) -> Result<Self> {
-        let (store, name) = if is_resident {
-            (Store::Resident, "resident".to_string())
+        let (store, wallet_title, filename) = if is_resident {
+            (Store::Resident, Some("Resident Wallet".to_string()), "resident".to_string())
         } else {
             // log_info!("LocalStoreInner::try_create: folder: {}, args: {:?}, is_resident: {}", folder, args, is_resident);
 
-            let name = args.name.clone().unwrap_or(super::DEFAULT_WALLET_FILE.to_string());
+            let title = args.title.clone();
+            let filename = make_filename(&title, &args.filename);
 
-            let storage = Storage::new_with_folder(folder, &format!("{name}.wallet"))?;
+            let storage = Storage::try_new_with_folder(folder, &format!("{filename}.wallet"))?;
             if storage.exists().await? && !args.overwrite_wallet {
                 return Err(Error::WalletAlreadyExists);
             }
-            (Store::Storage(storage), name)
+            (Store::Storage(storage), title, filename)
         };
 
         let secret = ctx.wallet_secret().await;
         let payload = Payload::default();
-        let cache = Arc::new(Mutex::new(Cache::try_from((args.user_hint, payload, &secret))?));
-        let modified = AtomicBool::new(false);
+        let cache = Arc::new(Mutex::new(Cache::try_from((wallet_title, args.user_hint, payload, &secret))?));
+        let is_modified = AtomicBool::new(false);
         let transactions: Arc<dyn TransactionRecordStore> = if !is_web() {
-            Arc::new(fsio::TransactionStore::new(folder, &name))
+            Arc::new(fsio::TransactionStore::new(folder, &filename))
         } else {
-            Arc::new(indexdb::TransactionStore::new(&name))
+            Arc::new(indexdb::TransactionStore::new(&filename))
         };
 
-        Ok(Self { cache, store, is_modified: modified, name, transactions })
+        Ok(Self { cache, store, is_modified, filename, transactions })
     }
 
     pub async fn try_load(ctx: &Arc<dyn AccessContextT>, folder: &str, args: OpenArgs) -> Result<Self> {
-        let name = args.name.unwrap_or(super::DEFAULT_WALLET_FILE.to_string());
-        let storage = Storage::new_with_folder(folder, &format!("{name}.wallet"))?;
+        let filename = make_filename(&None, &args.filename);
+        let storage = Storage::try_new_with_folder(folder, &format!("{filename}.wallet"))?;
 
         let secret = ctx.wallet_secret().await;
         let wallet = Wallet::try_load(&storage).await?;
         let cache = Arc::new(Mutex::new(Cache::try_from((wallet, &secret))?));
-        let modified = AtomicBool::new(false);
+        let is_modified = AtomicBool::new(false);
 
         let transactions: Arc<dyn TransactionRecordStore> = if !is_web() {
-            Arc::new(fsio::TransactionStore::new(folder, &name))
+            Arc::new(fsio::TransactionStore::new(folder, &filename))
         } else {
-            Arc::new(indexdb::TransactionStore::new(&name))
+            Arc::new(indexdb::TransactionStore::new(&filename))
         };
 
-        Ok(Self { cache, store: Store::Storage(storage), is_modified: modified, name, transactions })
+        Ok(Self { cache, store: Store::Storage(storage), is_modified, filename, transactions })
     }
 
     pub async fn update_stored_metadata(&self) -> Result<()> {
@@ -202,12 +216,12 @@ impl Interface for LocalStore {
     }
 
     fn name(&self) -> Option<String> {
-        self.inner.lock().unwrap().as_ref().map(|inner| inner.name.clone())
+        self.inner.lock().unwrap().as_ref().map(|inner| inner.filename.clone())
     }
 
     async fn exists(&self, name: Option<&str>) -> Result<bool> {
         let location = self.location.lock().unwrap().clone().unwrap();
-        let store = Storage::new_with_folder(&location.folder, name.unwrap_or(super::DEFAULT_WALLET_FILE))?;
+        let store = Storage::try_new_with_folder(&location.folder, &format!("{}.wallet", name.unwrap_or(super::DEFAULT_WALLET_FILE)))?;
         store.exists().await
     }
 
@@ -225,6 +239,33 @@ impl Interface for LocalStore {
         let inner = Arc::new(LocalStoreInner::try_load(ctx, &location.folder, args).await?);
         self.inner.lock().unwrap().replace(inner);
         Ok(())
+    }
+
+    async fn wallet_list(&self) -> Result<Vec<WalletDescriptor>> {
+        let location = self.location.lock().unwrap().clone().unwrap();
+
+        let folder = fs::resolve_path(&location.folder)?;
+        let files = fs::readdir(folder.clone(), false).await?;
+        let wallets = files
+            .iter()
+            .filter_map(|de| {
+                let file_name = de.file_name();
+                file_name.ends_with(".wallet").then(|| file_name.trim_end_matches(".wallet").to_string())
+            })
+            .collect::<Vec<_>>();
+
+        let mut descriptors = vec![];
+        for filename in wallets.into_iter() {
+            let path = folder.join(format!("{}.wallet", filename));
+            let title = fs::read_to_string(&path)
+                .await
+                .ok()
+                .and_then(|json| serde_json::Value::from_str(json.as_str()).ok())
+                .and_then(|data| data.get("name").and_then(|v| v.as_str()).map(|v| v.to_string()));
+            descriptors.push(WalletDescriptor { title, filename });
+        }
+
+        Ok(descriptors)
     }
 
     fn is_open(&self) -> bool {
@@ -245,6 +286,10 @@ impl Interface for LocalStore {
     }
 
     async fn flush(&self, ctx: &Arc<dyn AccessContextT>) -> Result<()> {
+        if !self.batch.load(Ordering::SeqCst) {
+            panic!("flush() called while not in batch mode");
+        }
+
         self.batch.store(false, Ordering::SeqCst);
         self.commit(ctx).await?;
         Ok(())
@@ -252,10 +297,7 @@ impl Interface for LocalStore {
 
     async fn commit(&self, ctx: &Arc<dyn AccessContextT>) -> Result<()> {
         if !self.batch.load(Ordering::SeqCst) {
-            // log_info!("*** COMMITING ***");
             self.inner()?.store(ctx).await?;
-        } else {
-            // log_info!("*** BATCH MODE - SKIPPING COMMIT ***");
         }
         Ok(())
     }
@@ -304,6 +346,8 @@ impl PrvKeyDataStore for LocalStoreInner {
     async fn store(&self, ctx: &Arc<dyn AccessContextT>, prv_key_data: PrvKeyData) -> Result<()> {
         let wallet_secret = ctx.wallet_secret().await;
         let mut prv_key_data_map: Decrypted<PrvKeyDataMap> = self.cache().prv_key_data.decrypt(&wallet_secret)?;
+        let prv_key_data_info = Arc::new((&prv_key_data).into());
+        self.cache().prv_key_data_info.insert(prv_key_data.id, prv_key_data_info)?;
         prv_key_data_map.insert(prv_key_data.id, prv_key_data);
         self.cache().prv_key_data.replace(prv_key_data_map.encrypt(&wallet_secret)?);
         self.set_modified(true);
@@ -339,8 +383,9 @@ impl AccountStore for LocalStoreInner {
     }
 
     async fn load_single(&self, ids: &AccountId) -> Result<Option<(Arc<Account>, Option<Arc<Metadata>>)>> {
-        if let Some(account) = self.cache().accounts.load_single(ids)? {
-            Ok(Some((account, self.cache().metadata.load_single(ids)?)))
+        let cache = self.cache();
+        if let Some(account) = cache.accounts.load_single(ids)? {
+            Ok(Some((account, cache.metadata.load_single(ids)?)))
         } else {
             Ok(None)
         }

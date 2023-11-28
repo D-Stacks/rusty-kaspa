@@ -18,6 +18,7 @@ use kaspa_consensus_notify::{
     {connection::ConsensusChannelConnection, notification::Notification as ConsensusNotification},
 };
 use kaspa_consensusmanager::ConsensusManager;
+use kaspa_core::time::unix_now;
 use kaspa_core::{
     core::Core,
     debug,
@@ -27,10 +28,12 @@ use kaspa_core::{
     task::tick::TickService,
     trace, warn,
 };
+use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
 use kaspa_index_core::{
     connection::IndexChannelConnection, indexed_utxos::UtxoSetByScriptPublicKey, notification::Notification as IndexNotification,
     notifier::IndexNotifier,
 };
+use kaspa_mining::model::tx_query::TransactionQuery;
 use kaspa_mining::{manager::MiningManagerProxy, mempool::tx::Orphan};
 use kaspa_notify::{
     collector::DynCollector,
@@ -57,9 +60,9 @@ use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utxoindex::api::UtxoIndexProxy;
 use kaspa_wrpc_core::ServerCounters as WrpcServerCounters;
 use std::{
+    collections::HashMap,
     iter::once,
     sync::{atomic::Ordering, Arc},
-    time::{SystemTime, UNIX_EPOCH},
     vec,
 };
 
@@ -207,16 +210,36 @@ impl RpcCoreService {
             .unwrap_or_default()
     }
 
+    async fn get_balance_by_script_public_key<'a>(&self, addresses: impl Iterator<Item = &'a RpcAddress>) -> BalanceByScriptPublicKey {
+        self.utxoindex
+            .clone()
+            .unwrap()
+            .get_balance_by_script_public_keys(addresses.map(pay_to_address_script).collect())
+            .await
+            .unwrap_or_default()
+    }
+
     fn has_sufficient_peer_connectivity(&self) -> bool {
         // Other network types can be used in an isolated environment without peers
         !matches!(self.flow_context.config.net.network_type, Mainnet | Testnet) || self.flow_context.hub().has_peers()
+    }
+
+    fn extract_tx_query(&self, filter_transaction_pool: bool, include_orphan_pool: bool) -> RpcResult<TransactionQuery> {
+        match (filter_transaction_pool, include_orphan_pool) {
+            (true, true) => Ok(TransactionQuery::OrphansOnly),
+            // Note that the first `true` indicates *filtering* transactions and the second `false` indicates not including
+            // orphan txs -- hence the query would be empty by definition and is thus useless
+            (true, false) => Err(RpcError::InconsistentMempoolTxQuery),
+            (false, true) => Ok(TransactionQuery::All),
+            (false, false) => Ok(TransactionQuery::TransactionsOnly),
+        }
     }
 }
 
 #[async_trait]
 impl RpcApi for RpcCoreService {
     async fn submit_block_call(&self, request: SubmitBlockRequest) -> RpcResult<SubmitBlockResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
 
         // TODO: consider adding an error field to SubmitBlockReport to document both the report and error fields
         let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
@@ -275,7 +298,7 @@ impl RpcApi for RpcCoreService {
         let script_public_key = kaspa_txscript::pay_to_address_script(&request.pay_address);
         let extra_data = version().as_bytes().iter().chain(once(&(b'/'))).chain(&request.extra_data).cloned().collect::<Vec<_>>();
         let miner_data: MinerData = MinerData::new(script_public_key, extra_data);
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         let block_template = self.mining_manager.clone().get_block_template(&session, miner_data).await?;
 
         // Check coinbase tx payload length
@@ -353,10 +376,10 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_info_call(&self, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {
-        let is_nearly_synced = self.consensus_manager.consensus().session().await.async_is_nearly_synced().await;
+        let is_nearly_synced = self.consensus_manager.consensus().unguarded_session().async_is_nearly_synced().await;
         Ok(GetInfoResponse {
             p2p_id: self.flow_context.node_id.to_string(),
-            mempool_size: self.mining_manager.clone().transaction_count(true, false).await as u64,
+            mempool_size: self.mining_manager.clone().transaction_count(TransactionQuery::TransactionsOnly).await as u64,
             server_version: version().to_string(),
             is_utxo_indexed: self.config.utxoindex,
             is_synced: self.has_sufficient_peer_connectivity() && is_nearly_synced,
@@ -366,22 +389,18 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_mempool_entry_call(&self, request: GetMempoolEntryRequest) -> RpcResult<GetMempoolEntryResponse> {
-        let Some(transaction) = self
-            .mining_manager
-            .clone()
-            .get_transaction(request.transaction_id, !request.filter_transaction_pool, request.include_orphan_pool)
-            .await
-        else {
+        let query = self.extract_tx_query(request.filter_transaction_pool, request.include_orphan_pool)?;
+        let Some(transaction) = self.mining_manager.clone().get_transaction(request.transaction_id, query).await else {
             return Err(RpcError::TransactionNotFound(request.transaction_id));
         };
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         Ok(GetMempoolEntryResponse::new(self.consensus_converter.get_mempool_entry(&session, &transaction)))
     }
 
     async fn get_mempool_entries_call(&self, request: GetMempoolEntriesRequest) -> RpcResult<GetMempoolEntriesResponse> {
-        let session = self.consensus_manager.consensus().session().await;
-        let (transactions, orphans) =
-            self.mining_manager.clone().get_all_transactions(!request.filter_transaction_pool, request.include_orphan_pool).await;
+        let query = self.extract_tx_query(request.filter_transaction_pool, request.include_orphan_pool)?;
+        let session = self.consensus_manager.consensus().unguarded_session();
+        let (transactions, orphans) = self.mining_manager.clone().get_all_transactions(query).await;
         let mempool_entries = transactions
             .iter()
             .chain(orphans.iter())
@@ -394,13 +413,10 @@ impl RpcApi for RpcCoreService {
         &self,
         request: GetMempoolEntriesByAddressesRequest,
     ) -> RpcResult<GetMempoolEntriesByAddressesResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let query = self.extract_tx_query(request.filter_transaction_pool, request.include_orphan_pool)?;
+        let session = self.consensus_manager.consensus().unguarded_session();
         let script_public_keys = request.addresses.iter().map(pay_to_address_script).collect();
-        let grouped_txs = self
-            .mining_manager
-            .clone()
-            .get_transactions_by_addresses(script_public_keys, !request.filter_transaction_pool, request.include_orphan_pool)
-            .await;
+        let grouped_txs = self.mining_manager.clone().get_transactions_by_addresses(script_public_keys, query).await;
         let mempool_entries = grouped_txs
             .owners
             .iter()
@@ -419,15 +435,15 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn submit_transaction_call(&self, request: SubmitTransactionRequest) -> RpcResult<SubmitTransactionResponse> {
+        let allow_orphan = self.config.unsafe_rpc && request.allow_orphan;
         if !self.config.unsafe_rpc && request.allow_orphan {
-            warn!("SubmitTransaction RPC command called with AllowOrphan enabled while node in safe RPC mode -- ignoring.");
-            return Err(RpcError::UnavailableInSafeMode);
+            warn!("SubmitTransaction RPC command called with AllowOrphan enabled while node in safe RPC mode -- switching to ForbidOrphan.");
         }
 
         let transaction: Transaction = (&request.transaction).try_into()?;
         let transaction_id = transaction.id();
-        let session = self.consensus_manager.consensus().session().await;
-        let orphan = match request.allow_orphan {
+        let session = self.consensus_manager.consensus().unguarded_session();
+        let orphan = match allow_orphan {
             true => Orphan::Allowed,
             false => Orphan::Forbidden,
         };
@@ -447,12 +463,12 @@ impl RpcApi for RpcCoreService {
         Err(RpcError::NotImplemented)
     }
 
-    async fn get_selected_tip_hash_call(&self, _: GetSelectedTipHashRequest) -> RpcResult<GetSelectedTipHashResponse> {
-        Ok(GetSelectedTipHashResponse::new(self.consensus_manager.consensus().session().await.async_get_sink().await))
+    async fn get_sink_call(&self, _: GetSinkRequest) -> RpcResult<GetSinkResponse> {
+        Ok(GetSinkResponse::new(self.consensus_manager.consensus().unguarded_session().async_get_sink().await))
     }
 
     async fn get_sink_blue_score_call(&self, _: GetSinkBlueScoreRequest) -> RpcResult<GetSinkBlueScoreResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         Ok(GetSinkBlueScoreResponse::new(session.async_get_ghostdag_data(session.async_get_sink().await).await?.blue_score))
     }
 
@@ -471,7 +487,7 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_block_count_call(&self, _: GetBlockCountRequest) -> RpcResult<GetBlockCountResponse> {
-        Ok(self.consensus_manager.consensus().session().await.async_estimate_block_count().await)
+        Ok(self.consensus_manager.consensus().unguarded_session().async_estimate_block_count().await)
     }
 
     async fn get_utxos_by_addresses_call(&self, request: GetUtxosByAddressesRequest) -> RpcResult<GetUtxosByAddressesResponse> {
@@ -488,8 +504,8 @@ impl RpcApi for RpcCoreService {
         if !self.config.utxoindex {
             return Err(RpcError::NoUtxoIndex);
         }
-        let entry_map = self.get_utxo_set_by_script_public_key(once(&request.address)).await;
-        let balance = entry_map.values().flat_map(|x| x.values().map(|entry| entry.amount)).sum();
+        let entry_map = self.get_balance_by_script_public_key(once(&request.address)).await;
+        let balance = entry_map.values().sum();
         Ok(GetBalanceByAddressResponse::new(balance))
     }
 
@@ -500,13 +516,13 @@ impl RpcApi for RpcCoreService {
         if !self.config.utxoindex {
             return Err(RpcError::NoUtxoIndex);
         }
-        let entry_map = self.get_utxo_set_by_script_public_key(request.addresses.iter()).await;
+        let entry_map = self.get_balance_by_script_public_key(request.addresses.iter()).await;
         let entries = request
             .addresses
             .iter()
             .map(|address| {
                 let script_public_key = pay_to_address_script(address);
-                let balance = entry_map.get(&script_public_key).map(|x| x.values().map(|entry| entry.amount).sum());
+                let balance = entry_map.get(&script_public_key).copied();
                 RpcBalancesByAddressesEntry { address: address.to_owned(), balance }
             })
             .collect();
@@ -522,6 +538,64 @@ impl RpcApi for RpcCoreService {
         Ok(GetCoinSupplyResponse::new(MAX_SOMPI, circulating_sompi))
     }
 
+    async fn get_daa_score_timestamp_estimate_call(
+        &self,
+        request: GetDaaScoreTimestampEstimateRequest,
+    ) -> RpcResult<GetDaaScoreTimestampEstimateResponse> {
+        let session = self.consensus_manager.consensus().session().await;
+        // TODO: cache samples based on sufficient recency of the data and append sink data
+        let mut headers = session.async_get_chain_block_samples().await;
+        let mut requested_daa_scores = request.daa_scores.clone();
+        let mut daa_score_timestamp_map = HashMap::<u64, u64>::new();
+
+        headers.reverse();
+        requested_daa_scores.sort_by(|a, b| b.cmp(a));
+
+        let mut header_idx = 0;
+        let mut req_idx = 0;
+
+        // Loop runs at O(n + m) where n = # pp headers, m = # requested daa_scores
+        // Loop will always end because in the worst case the last header with daa_score = 0 (the genesis)
+        // will cause every remaining requested daa_score to be "found in range"
+        //
+        // TODO: optimize using binary search over the samples to obtain O(m log n) complexity (which is an improvement assuming m << n)
+        while header_idx < headers.len() && req_idx < request.daa_scores.len() {
+            let header = headers.get(header_idx).unwrap();
+            let curr_daa_score = requested_daa_scores[req_idx];
+
+            // Found daa_score in range
+            if header.daa_score <= curr_daa_score {
+                // For daa_score later than the last header, we estimate in milliseconds based on the difference
+                let time_adjustment = if header_idx == 0 {
+                    // estimate milliseconds = (daa_score * target_time_per_block)
+                    (curr_daa_score - header.daa_score).checked_mul(self.config.target_time_per_block).unwrap_or(u64::MAX)
+                } else {
+                    // "next" header is the one that we processed last iteration
+                    let next_header = &headers[header_idx - 1];
+                    // Unlike DAA scores which are monotonic (over the selected chain), timestamps are not strictly monotonic, so we avoid assuming so
+                    let time_between_headers = next_header.timestamp.checked_sub(header.timestamp).unwrap_or_default();
+                    let score_between_query_and_header = (curr_daa_score - header.daa_score) as f64;
+                    let score_between_headers = (next_header.daa_score - header.daa_score) as f64;
+                    // Interpolate the timestamp delta using the estimated fraction based on DAA scores
+                    ((time_between_headers as f64) * (score_between_query_and_header / score_between_headers)) as u64
+                };
+
+                let daa_score_timestamp = header.timestamp.checked_add(time_adjustment).unwrap_or(u64::MAX);
+                daa_score_timestamp_map.insert(curr_daa_score, daa_score_timestamp);
+
+                // Process the next daa score that's <= than current one (at earlier idx)
+                req_idx += 1;
+            } else {
+                header_idx += 1;
+            }
+        }
+
+        // Note: it is safe to assume all entries exist in the map since the first sampled header is expected to have daa_score=0
+        let timestamps = request.daa_scores.iter().map(|curr_daa_score| daa_score_timestamp_map[curr_daa_score]).collect();
+
+        Ok(GetDaaScoreTimestampEstimateResponse::new(timestamps))
+    }
+
     async fn ping_call(&self, _: PingRequest) -> RpcResult<PingResponse> {
         Ok(PingResponse {})
     }
@@ -531,7 +605,7 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_block_dag_info_call(&self, _: GetBlockDagInfoRequest) -> RpcResult<GetBlockDagInfoResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         let block_count = session.async_estimate_block_count().await;
         Ok(GetBlockDagInfoResponse::new(
             self.config.net,
@@ -543,6 +617,7 @@ impl RpcApi for RpcCoreService {
             session.async_get_virtual_parents().await.iter().copied().collect::<Vec<_>>(),
             session.async_pruning_point().await,
             session.async_get_virtual_daa_score().await,
+            session.async_get_sink().await,
         ))
     }
 
@@ -556,12 +631,23 @@ impl RpcApi for RpcCoreService {
         if request.window_size as u64 > self.config.pruning_depth {
             return Err(RpcError::WindowSizeExceedingPruningDepth(request.window_size, self.config.pruning_depth));
         }
+
+        // In the previous golang implementation the convention for virtual was the following const.
+        // In the current implementation, consensus behaves the same when it gets a None instead.
+        const LEGACY_VIRTUAL: kaspa_hashes::Hash = kaspa_hashes::Hash::from_bytes([0xff; kaspa_hashes::HASH_SIZE]);
+        let mut start_hash = request.start_hash;
+        if let Some(start) = start_hash {
+            if start == LEGACY_VIRTUAL {
+                start_hash = None;
+            }
+        }
+
         Ok(EstimateNetworkHashesPerSecondResponse::new(
             self.consensus_manager
                 .consensus()
                 .session()
                 .await
-                .async_estimate_network_hashes_per_second(request.start_hash, request.window_size as usize)
+                .async_estimate_network_hashes_per_second(start_hash, request.window_size as usize)
                 .await?,
         ))
     }
@@ -650,9 +736,6 @@ impl RpcApi for RpcCoreService {
         Err(RpcError::NotImplemented)
     }
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // UNIMPLEMENTED METHODS
-
     async fn get_metrics_call(&self, req: GetMetricsRequest) -> RpcResult<GetMetricsResponse> {
         let CountersSnapshot {
             resident_set_size,
@@ -694,9 +777,7 @@ impl RpcApi for RpcCoreService {
             mass_counts: self.processing_counters.mass_counts.load(Ordering::SeqCst),
         });
 
-        let start = SystemTime::now();
-        let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
-        let server_time = since_the_epoch.as_millis();
+        let server_time = unix_now();
 
         let response = GetMetricsResponse { server_time, process_metrics, consensus_metrics };
 
@@ -704,7 +785,7 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_server_info_call(&self, _request: GetServerInfoRequest) -> RpcResult<GetServerInfoResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
         let virtual_daa_score = session.async_get_virtual_daa_score().await;
 
@@ -719,7 +800,7 @@ impl RpcApi for RpcCoreService {
     }
 
     async fn get_sync_status_call(&self, _request: GetSyncStatusRequest) -> RpcResult<GetSyncStatusResponse> {
-        let session = self.consensus_manager.consensus().session().await;
+        let session = self.consensus_manager.consensus().unguarded_session();
         let is_synced: bool = self.has_sufficient_peer_connectivity() && session.async_is_nearly_synced().await;
         Ok(GetSyncStatusResponse { is_synced })
     }

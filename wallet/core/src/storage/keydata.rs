@@ -15,7 +15,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::storage::{AccountKind, Encryptable};
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, BorshSerialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, BorshSerialize, Ord, PartialOrd)]
 pub struct KeyDataId(pub(crate) [u8; 8]);
 
 impl KeyDataId {
@@ -44,6 +44,12 @@ impl FromHex for KeyDataId {
 }
 
 impl std::fmt::Debug for KeyDataId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeyDataId ( {:?} )", self.0)
+    }
+}
+
+impl std::fmt::Display for KeyDataId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "KeyDataId ( {:?} )", self.0)
     }
@@ -269,6 +275,11 @@ impl PrvKeyData {
         create_xpub_from_xprv(xprv, account_kind, account_index).await
     }
 
+    pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<secp256k1::SecretKey>> {
+        let payload = self.payload.decrypt(payment_secret)?;
+        payload.get_xprv(payment_secret)
+    }
+
     pub fn as_mnemonic(&self, payment_secret: Option<&Secret>) -> Result<Option<Mnemonic>> {
         let payload = self.payload.decrypt(payment_secret)?;
         payload.as_mnemonic()
@@ -344,7 +355,7 @@ impl PrvKeyData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PrvKeyDataInfo {
     pub id: PrvKeyDataId,
     pub name: Option<String>,

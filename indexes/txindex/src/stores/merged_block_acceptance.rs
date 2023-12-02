@@ -19,12 +19,11 @@ pub trait TxIndexMergedBlockAcceptanceReader {
 }
 
 pub trait TxIndexMergedBlockAcceptanceStore: TxIndexMergedBlockAcceptanceReader {
-    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()>;
-    fn insert_many(&mut self, merged_block_acceptance: TxAcceptanceDataByBlockHash) -> StoreResult<()>;
+    fn remove_many(&mut self, block_hashes: Arc<Vec<Hash>>) -> StoreResult<()>;
+    fn insert_many(&mut self, merged_block_acceptance: Arc<TxAcceptanceDataByBlockHash>) -> StoreResult<()>;
     fn delete_all(&mut self) -> StoreResult<()>;
 }
 
-pub const STORE_PREFIX: &[u8] = "txindex_block_acceptance";
 // Implementations:
 
 #[derive(Clone)]
@@ -35,31 +34,37 @@ pub struct DbTxIndexMergedBlockAcceptanceStore {
 
 impl DbTxIndexMergedBlockAcceptanceStore {
     pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance) }
+        Self {
+            db: Arc::clone(&db),
+            access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()),
+        }
     }
 }
 
 impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {
     fn get(&self, block_hash: Hash) -> StoreResult<TxAcceptanceData> {
-        self.access.read(&block_hash)
+        self.access.read(block_hash)
     }
 
     fn has(&self, block_hash: Hash) -> StoreResult<bool> {
-        self.access.has(&block_hash)
+        self.access.has(block_hash)
     }
 }
 
 impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
-    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()> {
+    fn remove_many(&mut self, block_hashes: Arc<Vec<Hash>>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
-        self.access.delete_many(writer, &mut block_hashes.iter())
+        self.access.delete_many(writer, &mut block_hashes.into_iter())
     }
 
-    fn insert_many(&mut self, merged_block_acceptance: &TxAcceptanceDataByBlockHash) -> StoreResult<()> {
+    fn insert_many(&mut self, merged_block_acceptance: Arc<TxAcceptanceDataByBlockHash>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
-        self.access.write_many(writer, &mut merged_block_acceptance.iter())
+        self.access.write_many(
+            writer,
+            &mut merged_block_acceptance.iter().map(|(block_hash, acceptance_data)| (*block_hash, *acceptance_data)),
+        )
     }
 
     /// Removes all Offset in the cache and db, besides prefixes themselves.

@@ -25,7 +25,7 @@ pub struct DbTxIndexSinkStore {
 
 impl DbTxIndexSinkStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSink) }
+        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSink.into()) }
     }
 
     pub fn clone_with_new_cache(&self) -> Self {

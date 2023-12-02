@@ -106,7 +106,7 @@ impl VirtualStateProcessor {
             // For Review: confirm below is correct / works - TODO remove this comment when reviewed
             // alternative pass pov blue score explicitly into function.
             let accepting_blue_score = ctx.ghostdag_data.blue_score;
-            
+
             if is_selected_parent {
                 // For the selected parent, we prepend the coinbase tx
                 ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
@@ -118,9 +118,9 @@ impl VirtualStateProcessor {
                                 .map(|(tx, tx_idx)| AcceptedTxEntry { transaction_id: tx.id(), index_within_block: tx_idx }),
                         )
                         .collect(),
-                        // For Review: confirm below is correct / works - TODO remove this comment when reviewed
-                        // alternative pass pov blue score explicitly into function.
-                        accepting_blue_score,
+                    // For Review: confirm below is correct / works - TODO remove this comment when reviewed
+                    // alternative pass pov blue score explicitly into function.
+                    accepting_blue_score,
                 });
             } else {
                 ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
@@ -129,7 +129,7 @@ impl VirtualStateProcessor {
                         .into_iter()
                         .map(|(tx, tx_idx)| AcceptedTxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
                         .collect(),
-                        accepting_blue_score,
+                    accepting_blue_score,
                 });
             }
 

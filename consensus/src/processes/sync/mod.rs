@@ -74,7 +74,13 @@ impl<
     /// Returns the hashes of the blocks between low's antipast and high's antipast, or up to `max_blocks`, if provided.
     /// The result excludes low and includes high. If low == high, returns nothing. If max_blocks is some then it MUST be >= MergeSetSizeLimit
     /// because it returns blocks with MergeSet granularity, so if MergeSet > max_blocks, the function will return nothing which is undesired behavior.
-    pub fn antipast_hashes_between(&self, low: Hash, high: Hash, max_blocks: Option<usize>) -> (Vec<Hash>, Hash) {
+    pub fn antipast_hashes_between(
+        &self,
+        low: Hash,
+        high: Hash,
+        max_blocks: Option<usize>,
+        exclude_vspc_hashes: bool,
+    ) -> (Vec<Hash>, Hash) {
         let max_blocks = max_blocks.unwrap_or(usize::MAX);
         assert!(max_blocks >= self.mergeset_size_limit);
 
@@ -96,15 +102,23 @@ impl<
             if blocks.len() + gd.mergeset_size() > max_blocks {
                 break;
             }
-            blocks.extend(
-                gd.consensus_ordered_mergeset(self.ghostdag_store.deref())
-                    .filter(|hash| !self.reachability_service.is_dag_ancestor_of(*hash, original_low)),
-            );
+            if !exclude_vspc_hashes {
+                blocks.extend(
+                    gd.consensus_ordered_mergeset(self.ghostdag_store.deref())
+                        .filter(|hash| !self.reachability_service.is_dag_ancestor_of(*hash, original_low)),
+                );
+            } else {
+                // we skip vspc blocks themselves
+                blocks.extend(
+                    gd.consensus_ordered_mergeset(self.ghostdag_store.deref()).skip(1) //skip chain block
+                        .filter(|hash| !self.reachability_service.is_dag_ancestor_of(*hash, original_low)),
+                );
+            }
             highest_reached = current;
         }
 
         // The process above doesn't return `highest_reached`, so include it explicitly unless it is `low`
-        if low != highest_reached {
+        if low != highest_reached && !exclude_vspc_hashes {
             blocks.push(highest_reached);
         }
 
@@ -195,7 +209,7 @@ impl<
             return Ok(vec![]);
         };
 
-        let (mut hashes_between, _) = self.antipast_hashes_between(highest_with_body.unwrap(), high, None);
+        let (mut hashes_between, _) = self.antipast_hashes_between(highest_with_body.unwrap(), high, None, false);
         let statuses = self.statuses_store.read();
         hashes_between.retain(|&h| statuses.get(h).unwrap().is_header_only());
 

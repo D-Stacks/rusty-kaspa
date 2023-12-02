@@ -19,6 +19,7 @@ use kaspa_rpc_core::{
     RpcTransactionVerboseData,
 };
 use kaspa_txscript::{extract_script_pub_key_address, script_class::ScriptClass};
+use kaspa_utils::arc::ArcExtensions;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 /// Conversion of consensus_core to rpc_core structures
@@ -162,7 +163,7 @@ impl ConsensusConverter {
         consensus: &ConsensusProxy,
         chain_path: &ChainPath,
     ) -> RpcResult<Vec<RpcAcceptedTransactionIds>> {
-        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.clone()).await.unwrap();
+        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.to_vec()).await.unwrap();
         Ok(chain_path
             .added
             .iter()

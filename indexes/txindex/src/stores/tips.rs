@@ -11,7 +11,7 @@ use kaspa_hashes::Hash;
 
 /// Reader API for `Source`.
 pub trait TxIndexTipsReader {
-    fn get(&self) -> StoreResult<HashSet>;
+    fn get(&self) -> StoreResult<BlockHashSet>;
 }
 
 pub trait TxIndexTipsStore: TxIndexTipsReader {
@@ -30,7 +30,7 @@ pub struct DbTxIndexTipsStore {
 
 impl DbTxIndexTipsStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexTips) }
+        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexTips.into()) }
     }
 
     pub fn clone_with_new_cache(&self) -> Self {
@@ -53,11 +53,15 @@ impl TxIndexTipsStore for DbTxIndexTipsStore {
         self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet| {
             tips.insert(tip);
             tips
-        })
+        })?;
+
+        Ok(())
     }
 
     fn update_remove_tips(&mut self, merged_block_hashes: BlockHashSet) -> StoreResult<()> {
-        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet| tips.sub(&merged_block_hashes))
+        self.access.update(DirectDbWriter::new(&self.db), move |tips: BlockHashSet| tips.sub(&merged_block_hashes))?;
+
+        Ok(())
     }
 
     fn remove(&mut self) -> StoreResult<()> {

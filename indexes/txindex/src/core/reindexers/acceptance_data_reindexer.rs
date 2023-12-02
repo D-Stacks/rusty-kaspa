@@ -1,121 +1,75 @@
 use crate::{
-    errors::{TxIndexError, TxIndexResult},
-    model::{TxAcceptanceData, TxAcceptanceDataByBlockHash, TxCompactEntriesById, TxCompactEntry, TxOffset, TxOffsetById},
+    errors::TxIndexResult,
+    model::{
+        BlockAcceptanceChanges, TxAcceptanceChanges, TxAcceptanceData, TxAcceptanceDataByBlockHash, TxCompactEntriesById, TxOffset,
+        TxOffsetById,
+    },
 };
-use kaspa_consensus_core::{acceptance_data::AcceptanceData, block::Block, tx::TransactionId, BlockHashMap, HashMapCustomHasher};
+use kaspa_consensus_core::{acceptance_data::AcceptanceData, tx::TransactionId};
 use kaspa_hashes::Hash;
 use std::sync::Arc;
 
 pub struct TxIndexAcceptanceDataReindexer {
-    added_accepted_tx_offsets: Arc<TxOffsetById>,
-    removed_accepted_tx_offsets: Arc<TxOffsetById>,
-    added_block_acceptance: Arc<TxAcceptanceDataByBlockHash>,
-    removed_block_acceptance: Arc<Vec<Hash>>,
-    sink: Option<Hash>,
+    tx_acceptance_changes: TxAcceptanceChanges,
+    block_acceptance_changes: BlockAcceptanceChanges,
 }
 
 impl TxIndexAcceptanceDataReindexer {
     pub fn new() -> Self {
-        Self {
-            added_accepted_tx_offsets: Arc::new(TxOffsetById::new()),
-            removed_accepted_tx_offsets: Arc::new(TxOffsetById::new()),
-            added_block_acceptance: Arc::new(TxAcceptanceDataByBlockHash::new()),
-            removed_block_acceptance: Arc::new(Vec::<Hash>::new()),
-            sink: None,
-        }
+        Self { tx_acceptance_changes: TxAcceptanceChanges::new(), block_acceptance_changes: BlockAcceptanceChanges::new() }
     }
 
-    pub fn added_accepted_tx_offsets(&self) -> Arc<TxOffsetById> {
-        self.added_accepted_tx_offsets
+    pub fn accepted_tx_offsets(&self) -> Arc<TxOffsetById> {
+        self.tx_acceptance_changes.accepted_tx_offsets
     }
 
-    pub fn removed_accepted_tx_offsets(&self) -> Arc<TxOffsetById> {
-        self.removed_accepted_tx_offsets
+    pub fn unaccepted_tx_ids(&self) -> Arc<Vec<TransactionId>> {
+        self.tx_acceptance_changes.unaccepted_tx_ids
     }
 
-    pub fn added_block_acceptance(&self) -> Arc<TxAcceptanceDataByBlockHash> {
-        self.added_block_acceptance
+    pub fn accepted_block_acceptance_data(&self) -> Arc<TxAcceptanceDataByBlockHash> {
+        self.block_acceptance_changes.accepted_chain_block_acceptance_data
     }
 
-    pub fn removed_block_acceptance(&self) -> Arc<Vec<Hash>> {
-        self.removed_block_acceptance
+    pub fn unaccepted_block_hashes(&self) -> Arc<Vec<Hash>> {
+        self.block_acceptance_changes.unaccepted_chain_block_hashes
     }
 
-    pub fn sink(&self) -> Option<Hash> {
-        self.sink
-    }
-
-    pub fn update_acceptance(
+    pub fn add_accepted_acceptance_data(
         &mut self,
-        to_add_chain_blocks: Arc<Vec<Hash>>,
-        to_remove_chain_blocks: Arc<Vec<Hash>>,
-        to_add_acceptance_data: Arc<AcceptanceData>,
-        to_remove_acceptance_data: Arc<AcceptanceData>,
+        chained_block_hashes: Arc<Vec<Hash>>,
+        accepted_mergeset_data: Arc<Vec<Arc<AcceptanceData>>>,
     ) -> TxIndexResult<()> {
-        // 1) Do some checks to verify input
-        if to_add_chain_blocks.len() != to_add_acceptance_data.len() {
-            TxIndexError::ReindexingError(
-                    format!(
-                        "Failed reindexing acceptance data - amount of added chain blocks {0} does not match amount of added acceptance data {1}", 
-                        to_add_chain_blocks.len(),
-                        to_add_acceptance_data.len()
-                    ))
-        } else if to_remove_chain_blocks.len() != to_remove_acceptance_data.len() {
-            TxIndexError::ReindexingError(
-                    format!(
-                        "Failed reindexing acceptance data - amount of removed chain blocks {0} does not match amount of removed acceptance data {1}", 
-                        to_add_chain_blocks.len(),
-                        to_add_acceptance_data.len()
-                    ))
-        } else if to_add_chain_blocks.is_empty() {
-            TxIndexError::ReindexingError("Failed reindexing acceptance data - must have at least one added chain block".to_string())
+        for (chained_block_hash, accepted_mergesets) in chained_block_hashes.into_iter().zip(accepted_mergeset_data.into_iter()) {
+            for mergeset in accepted_mergesets.into_iter() {
+                self.tx_acceptance_changes.unaccepted_tx_ids.extend(mergeset.accepted_transactions.into_iter().map(
+                    move |accepted_tx_entry| {
+                        (accepted_tx_entry.transaction_id, TxOffset::new(mergeset.block_hash, accepted_tx_entry.index_within_block))
+                    },
+                ));
+                self.block_acceptance_changes
+                    .accepted_chain_block_acceptance_data
+                    .insert(mergeset.block_hash, TxAcceptanceData::new(chained_block_hash, mergeset.accepting_blue_score));
+            }
         }
 
-        // 2) set new sink
-        self.sink = to_add_chain_blocks.last().unwrap(); // It is safe to call `.unwrap()` since we verify it is none-empty in checks above
-
-        // 3) Process added acceptance
-        self.added_accepted_tx_offsets.extend(to_add_acceptance_data.into_iter().enumerate().flat_map(
-            move |(i, merged_block_acceptance)| {
-                // For block acceptance store
-                self.added_block_acceptance.insert(
-                    to_add_chain_blocks.get(i).unwrap(), // it is safe to `.unwrap()` since we check for equal length in checks.
-                    TxAcceptanceData::new(to, merged_block_acceptance.accepting_blue_score),
-                );
-
-                merged_block_acceptance.accepted_transactions.into_iter().flat_map(move |transaction_occurrence| {
-                    (
-                        transaction_occurrence.transaction_id,
-                        TransactionOffset::new(merged_block_acceptance.block_hash, transaction_occurrence.index_within_block),
-                    )
-                })
-            },
-        ));
-
-        // 4) Process removed acceptance
-        self.removed_accepted_tx_offsets.extend(to_remove_acceptance_data.into_iter().flat_map(move |unmerged_block_acceptance| {
-            if !self.added_block_acceptance.contains_key(&unmerged_block_acceptance.block_hash) {
-                self.removed_block_acceptance.append(unmerged_block_acceptance.block_hash);
-            };
-            unmerged_block_acceptance.accepted_transactions.into_iter().filter_map(move |unaccepted_transaction| {
-                if self.added_accepted_tx_offsets.contains_key(unaccepted_transaction) {
-                    None
-                } else {
-                    Some((
-                        unaccepted_transaction.transaction_id,
-                        TxOffset::new(unmerged_block_acceptance.block_hash, unaccepted_transaction.index_within_block),
-                    ))
-                }
-            })
-        }));
         Ok(())
     }
 
-    pub fn clear(&mut self) {
-        self.added_accepted_tx_offsets = Arc::new(TxOffsetById::new());
-        self.removed_accepted_tx_offsets = Arc::new(TxOffsetById::new());
-        self.added_block_acceptance = Arc::new(TxAcceptanceDataByBlockHash::new());
-        self.removed_block_acceptance = Arc::new(Vec::<Hash>::new());
-        self.sink = None;
+    pub fn remove_unaccepted_acceptance_data(
+        &mut self,
+        unchained_block_hashes: Arc<Vec<Hash>>,
+        unaccepted_mergeset_data: Arc<Vec<Arc<AcceptanceData>>>,
+    ) -> TxIndexResult<()> {
+        for (unchained_block_hash, unaccepted_mergesets) in unchained_block_hashes.into_iter().zip(unaccepted_mergeset_data.into_iter()) {
+            for mergeset in unaccepted_mergesets.into_iter() {
+                self.tx_acceptance_changes
+                    .unaccepted_tx_ids
+                    .extend(mergeset.into_iter().map(move |accepted_tx_entry| accepted_tx_entry.transaction_id));
+                self.block_acceptance_changes.unaccepted_chain_block_hashes.push(mergeset.block_hash);
+            }
+        }
+
+        Ok(())
     }
 }

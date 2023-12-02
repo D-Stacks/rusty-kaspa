@@ -239,8 +239,14 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.is_chain_ancestor_of(low, high)).await
     }
 
-    pub async fn async_get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
-        self.clone().spawn_blocking(move |c| c.get_hashes_between(low, high, max_blocks)).await
+    pub async fn async_get_hashes_between(
+        &self,
+        low: Hash,
+        high: Hash,
+        max_blocks: usize,
+        exclude_vspc_hashes: bool,
+    ) -> ConsensusResult<(Vec<Hash>, Hash)> {
+        self.clone().spawn_blocking(move |c| c.get_hashes_between(low, high, max_blocks, exclude_vspc_hashes)).await
     }
 
     pub async fn async_get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {
@@ -327,7 +333,7 @@ impl ConsensusSessionOwned {
     /// Returns acceptance data for a set of blocks belonging to the selected parent chain.
     ///
     /// See `self::get_virtual_chain`
-    pub async fn async_get_blocks_acceptance_data(&self, hashes: Vec<Hash>) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
+    pub async fn async_get_blocks_acceptance_data(&self, hashes: Vec<Hash>) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
         self.clone().spawn_blocking(move |c| c.get_blocks_acceptance_data(&hashes)).await
     }
 

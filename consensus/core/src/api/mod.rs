@@ -147,14 +147,6 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_virtual_parents(&self) -> BlockHashSet {
-        unimplemented!()
-    }
-
-    fn get_virtual_parents_len(&self) -> usize {
-        unimplemented!()
-    }
-
     fn get_virtual_utxos(
         &self,
         from_outpoint: Option<TransactionOutpoint>,
@@ -208,7 +200,13 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
+    fn get_hashes_between(
+        &self,
+        low: Hash,
+        high: Hash,
+        max_blocks: usize,
+        exclude_vspc_hashes: bool,
+    ) -> ConsensusResult<(Vec<Hash>, Hash)> {
         unimplemented!()
     }
 
@@ -217,6 +215,14 @@ pub trait ConsensusApi: Send + Sync {
     }
 
     fn get_headers_selected_tip(&self) -> Hash {
+        unimplemented!()
+    }
+
+    /// Returns all blocks not merged into the vspc using the antipast of the `sink` from the POV of all `tip hashes`, i.e. `antipast(hash) ∩ past(tips)`, which corresponds to all unaccepted blocks in the blockDAG.  
+    /// Since this call references the `sink`` (i.e. not a deep block), we do not expect a large answer, and as such do not set a traversal limit on the number of hashes returned.
+
+    // For Reveiw: can we really expect this call to always have a small vector size?, even in adverse conditions (such as high hashrate side-chains?), i.e. should it be limitable?
+    fn get_none_vspc_merged_blocks(&self) -> ConsensusResult<Vec<Hash>> {
         unimplemented!()
     }
 
@@ -256,6 +262,10 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    fn get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
+        unimplemented!()
+    }
+
     fn get_block_even_if_header_only(&self, hash: Hash) -> ConsensusResult<Block> {
         unimplemented!()
     }
@@ -283,7 +293,7 @@ pub trait ConsensusApi: Send + Sync {
     /// Returns acceptance data for a set of blocks belonging to the selected parent chain.
     ///
     /// See `self::get_virtual_chain`
-    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
+    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
         unimplemented!()
     }
 

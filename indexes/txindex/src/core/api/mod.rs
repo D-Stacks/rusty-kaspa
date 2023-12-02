@@ -20,6 +20,10 @@ pub enum TxQuery {
 }
 
 pub trait TxIndexApi: Send + Sync + Debug {
+    fn sync_tips(&mut self) -> TxIndexResult<()>;
+
+    fn sync_vspc_segment(&mut self, start_hash: Hash, end_hash: Hash) -> TxIndexResult<()>;
+
     fn are_tips_synced(&self) -> TxIndexResult<bool>;
 
     fn is_sink_synced(&self) -> TxIndexResult<bool>;

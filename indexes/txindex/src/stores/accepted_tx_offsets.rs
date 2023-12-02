@@ -22,8 +22,8 @@ pub trait TxIndexAcceptedTxOffsetsReader {
 }
 
 pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsReader {
-    fn remove_many(&mut self, transaction_ids: Vec<TransactionId>) -> StoreResult<()>;
-    fn insert_many(&mut self, transaction_offsets_by_id: TxOffsetById) -> StoreResult<()>;
+    fn remove_many(&mut self, transaction_ids: Arc<Vec<TransactionId>>) -> StoreResult<()>;
+    fn insert_many(&mut self, transaction_offsets_by_id: Arc<TxOffsetById>) -> StoreResult<()>;
 
     fn delete_all(&mut self) -> StoreResult<()>;
 }
@@ -38,7 +38,7 @@ pub struct DbTxIndexAcceptedTxOffsetsStore {
 
 impl DbTxIndexAcceptedTxOffsetsStore {
     pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexAcceptedOffsets) }
+        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexAcceptedOffsets.into()) }
     }
 }
 
@@ -53,13 +53,13 @@ impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
 }
 
 impl TxIndexAcceptedTxOffsetsStore for DbTxIndexAcceptedTxOffsetsStore {
-    fn remove_many(&mut self, mut transaction_ids: Vec<TransactionId>) -> StoreResult<()> {
+    fn remove_many(&mut self, mut transaction_ids: Arc<Vec<TransactionId>>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
         self.access.delete_many(writer, &mut transaction_ids.into_iter()) // delete_many does "try delete" under the hood.
     }
 
-    fn insert_many(&mut self, transaction_offsets_by_id: TxOffsetById) -> StoreResult<()> {
+    fn insert_many(&mut self, transaction_offsets_by_id: Arc<TxOffsetById>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
         self.access.write_many(writer, &mut transaction_entries_by_id.iter())

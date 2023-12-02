@@ -29,7 +29,7 @@ pub struct DbTxIndexSourceStore {
 
 impl DbTxIndexSourceStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSource) }
+        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSource.into()) }
     }
 
     pub fn clone_with_new_cache(&self) -> Self {

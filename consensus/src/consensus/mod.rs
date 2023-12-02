@@ -680,13 +680,19 @@ impl ConsensusApi for Consensus {
     }
 
     // max_blocks has to be greater than the merge set size limit
-    fn get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
+    fn get_hashes_between(
+        &self,
+        low: Hash,
+        high: Hash,
+        max_blocks: usize,
+        exclude_vspc_hashes: bool,
+    ) -> ConsensusResult<(Vec<Hash>, Hash)> {
         let _guard = self.pruning_lock.blocking_read();
         assert!(max_blocks as u64 > self.config.mergeset_size_limit);
         self.validate_block_exists(low)?;
         self.validate_block_exists(high)?;
 
-        Ok(self.services.sync_manager.antipast_hashes_between(low, high, Some(max_blocks)))
+        Ok(self.services.sync_manager.antipast_hashes_between(low, high, Some(max_blocks), exclude_vspc_hashes))
     }
 
     fn get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {
@@ -695,6 +701,11 @@ impl ConsensusApi for Consensus {
 
     fn get_headers_selected_tip(&self) -> Hash {
         self.headers_selected_tip_store.read().get().unwrap().hash
+    }
+
+    fn get_none_vspc_merged_blocks(&self) -> ConsensusResult<Vec<Hash>> {
+        let _guard = self.pruning_lock.blocking_read();
+        Ok(self.services.dag_traversal_manager.antipast(self.get_sink(), self.get_tips().into_iter(), None)?)
     }
 
     fn get_antipast_from_pov(&self, hash: Hash, context: Hash, max_traversal_allowed: Option<u64>) -> ConsensusResult<Vec<Hash>> {
@@ -760,6 +771,17 @@ impl ConsensusApi for Consensus {
         })
     }
 
+    fn get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
+        if match self.statuses_store.read().get(hash).unwrap_option() {
+            Some(status) => !status.has_block_body(),
+            None => true,
+        } {
+            return Err(ConsensusError::BlockNotFound(hash));
+        }
+
+        self.block_transactions_store.get(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))
+    }
+
     fn get_block_even_if_header_only(&self, hash: Hash) -> ConsensusResult<Block> {
         let Some(status) = self.statuses_store.read().get(hash).unwrap_option().filter(|&status| status.has_block_header()) else {
             return Err(ConsensusError::HeaderNotFound(hash));
@@ -804,12 +826,16 @@ impl ConsensusApi for Consensus {
         self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash))
     }
 
-    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
-        hashes
+    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
+        match hashes
             .iter()
             .copied()
             .map(|hash| self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash)))
             .collect::<ConsensusResult<Vec<_>>>()
+        {
+            Ok(ok_res) => Ok(Arc::new(ok_res)),
+            Err(err_res) => Err(err_res),
+        }
     }
 
     fn is_chain_block(&self, hash: Hash) -> ConsensusResult<bool> {

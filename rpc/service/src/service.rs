@@ -56,6 +56,7 @@ use kaspa_rpc_core::{
     Notification, RpcError, RpcResult,
 };
 use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script};
+use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 use kaspa_utxoindex::api::UtxoIndexProxy;
@@ -357,7 +358,7 @@ impl RpcApi for RpcCoreService {
         // We use +1 because low_hash is also returned
         // max_blocks MUST be >= mergeset_size_limit + 1
         let max_blocks = self.config.mergeset_size_limit as usize + 1;
-        let (block_hashes, high_hash) = session.async_get_hashes_between(low_hash, sink_hash, max_blocks).await?;
+        let (block_hashes, high_hash) = session.async_get_hashes_between(low_hash, sink_hash, max_blocks, false).await?;
 
         // If the high hash is equal to sink it means get_hashes_between didn't skip any hashes, and
         // there's space to add the sink anticone, otherwise we cannot add the anticone because
@@ -490,7 +491,11 @@ impl RpcApi for RpcCoreService {
         } else {
             vec![]
         };
-        Ok(GetVirtualChainFromBlockResponse::new(virtual_chain.removed, virtual_chain.added, accepted_transaction_ids))
+        Ok(GetVirtualChainFromBlockResponse::new(
+            virtual_chain.removed.unwrap_or_clone(),
+            virtual_chain.added.unwrap_or_clone(),
+            accepted_transaction_ids,
+        ))
     }
 
     async fn get_block_count_call(&self, _: GetBlockCountRequest) -> RpcResult<GetBlockCountResponse> {

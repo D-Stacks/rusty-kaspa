@@ -5,6 +5,7 @@ extern crate self as consensus_core;
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
+use std::sync::Arc;
 
 pub use kaspa_hashes::Hash;
 
@@ -84,15 +85,17 @@ impl HashMapCustomHasher for BlockHashSet {
 
 #[derive(Default, Debug)]
 pub struct ChainPath {
-    pub added: Vec<Hash>,
-    pub removed: Vec<Hash>,
+    pub added: Arc<Vec<Hash>>,
+    pub removed: Arc<Vec<Hash>>,
 }
 
 impl ChainPath {
-    pub fn new(added: Vec<Hash>, removed: Vec<Hash>) -> Self {
+    pub fn new(added: Arc<Vec<Hash>>, removed: Arc<Vec<Hash>>) -> Self {
         Self { added, removed }
     }
-    pub fn last_block_queried(&self) -> Option<&Hash> {
+
+    // Retrieves the checkpoint [],
+    pub fn checkpoint_hash(&self) -> Option<&Hash> {
         self.added.last().or(self.removed.last())
     }
 }

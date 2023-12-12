@@ -10,6 +10,14 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
         with:
@@ -181,6 +189,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
+      
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -216,6 +232,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -280,6 +304,14 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
         with:
@@ -337,6 +369,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1

@@ -8,7 +8,7 @@ use kaspa_hashes::Hash;
 
 /// Reader API for `SinkStore`.
 pub trait TxIndexSinkReader {
-    fn get(&self) -> StoreResult<Option<Hash>>;
+    fn get(&self) -> StoreResult<Hash>;
 }
 
 pub trait TxIndexSinkStore: TxIndexSinkReader {

@@ -1,4 +1,3 @@
-mod accepted_tx_offsets;
 mod merged_block_acceptance;
 mod sink;
 mod source;

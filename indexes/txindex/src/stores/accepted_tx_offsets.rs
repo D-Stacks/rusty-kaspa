@@ -8,13 +8,7 @@ use kaspa_database::{
 use kaspa_hashes::Hash;
 use std::sync::Arc;
 
-// Prefixes:
-
-/// Prefixes the [`TransactionId`] indexed [`TransactionOffset`] store.
-pub const STORE_PREFIX: &[u8] = b"txindex-accepted-offsets";
-
 // Traits:
-
 pub trait TxIndexAcceptedTxOffsetsReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
     fn get(&self, transaction_id: TransactionId) -> StoreResult<TxOffset>;

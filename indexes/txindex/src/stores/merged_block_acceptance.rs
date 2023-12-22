@@ -1,7 +1,3 @@
-use crate::model::transaction_entries::{TransactionAcceptanceData, TransactionEntriesById, TransactionEntry, TransactionOffset};
-use crate::model::{TxAcceptanceData, TxAcceptanceDataByBlockHash};
-
-use kaspa_consensus_core::tx::TransactionId;
 use kaspa_consensus_core::BlockHasher;
 use kaspa_database::{
     prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB},
@@ -14,13 +10,13 @@ use std::sync::Arc;
 
 pub trait TxIndexMergedBlockAcceptanceReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
-    fn get(&self, block_hash: Hash) -> StoreResult<TxAcceptanceData>;
+    fn get(&self, block_hash: Hash) -> StoreResult<Hash>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
 }
 
 pub trait TxIndexMergedBlockAcceptanceStore: TxIndexMergedBlockAcceptanceReader {
-    fn remove_many(&mut self, block_hashes: Arc<Vec<Hash>>) -> StoreResult<()>;
-    fn insert_many(&mut self, merged_block_acceptance: Arc<TxAcceptanceDataByBlockHash>) -> StoreResult<()>;
+    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()>;
+    fn insert_many(&mut self, accepting_block_hash: Hash, accepted_hashes: Vec<Hash>) -> StoreResult<()>;
     fn delete_all(&mut self) -> StoreResult<()>;
 }
 
@@ -29,7 +25,7 @@ pub trait TxIndexMergedBlockAcceptanceStore: TxIndexMergedBlockAcceptanceReader 
 #[derive(Clone)]
 pub struct DbTxIndexMergedBlockAcceptanceStore {
     db: Arc<DB>,
-    access: CachedDbAccess<Hash, TxAcceptanceData, BlockHasher>,
+    access: CachedDbAccess<Hash, Hash, BlockHasher>,
 }
 
 impl DbTxIndexMergedBlockAcceptanceStore {
@@ -42,7 +38,7 @@ impl DbTxIndexMergedBlockAcceptanceStore {
 }
 
 impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {
-    fn get(&self, block_hash: Hash) -> StoreResult<TxAcceptanceData> {
+    fn get(&self, block_hash: Hash) -> StoreResult<Hash> {
         self.access.read(block_hash)
     }
 
@@ -52,18 +48,18 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
 }
 
 impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
-    fn remove_many(&mut self, block_hashes: Arc<Vec<Hash>>) -> StoreResult<()> {
+    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
         self.access.delete_many(writer, &mut block_hashes.into_iter())
     }
 
-    fn insert_many(&mut self, merged_block_acceptance: Arc<TxAcceptanceDataByBlockHash>) -> StoreResult<()> {
+    fn insert_many(&mut self, accepting_block_hash: Hash, accepted_hashes: Vec<Hash>) -> StoreResult<()> {
         let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
 
         self.access.write_many(
             writer,
-            &mut merged_block_acceptance.iter().map(|(block_hash, acceptance_data)| (*block_hash, *acceptance_data)),
+            &mut accepted_hashes.iter().map(|accepted_hash| (*accepted_hash, accepting_block_hash.into())),
         )
     }
 

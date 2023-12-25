@@ -6,10 +6,6 @@ use std::{cmp::{max, min}, mem};
 use crate::model::{TxOffset, BlockAcceptanceOffset};
 
 use super::config::TxIndexConfig;
-
-/// Hard limit on resync chunk size to hold about ~100 mbs worth of transactions. 
-const HARD_LIMIT_RESYNC_CHUNKSIZE: u64 = (1_000_000_000.0 / (mem::size_of::<Transaction>() + mem::size_of::<TransactionId>()) as f64).round() as u64;
-
 pub struct TxIndexParams {
     resync_chunksize: u64, 
 }
@@ -18,22 +14,12 @@ impl TxIndexParams {
     fn new(consensus_config: &ConsensusConfig, txindex_config: &TxIndexConfig ) -> Self {
 
         let maximum_amount_of_txs_per_block = (consensus_config.max_block_mass as f64 / minimal_possible_mass as f64).floor();
-        
-        let resync_chunksize = min( 
-            (104_857_600.0 / (((mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) * maximum_amount_of_txs_per_block)  + mem::size_of::<BlockAcceptanceOffset>() + mem::size_of::<Hash>()) as f64).floor() as u64, // reindexed overhead, under worst case assumptions, per block. 
-            (104_857_600.0 / ((consensus_config.mergeset_size_limit * (mem::size_of::<MergesetBlockAcceptanceData>() +  (mem::size_of::<TxEntry>() * maximum_amount_of_txs_per_block))) + mem::size_of::<Hash>()) as f64).floor() as u64, // pre-indexed overhead, under worst case assumptions, per block.
-        );
-        let resync_chunksize = (((consensus_config.max_block_mass as f64 / minimal_possible_mass as f64) * consensus_config.bps() as f64).round() as u64 + consensus_config.bps()) * 60u64;
-        println!("{resync_chunksize}");
 
         Self { 
-            // Corrosponds to an expected 1 minute worth of tx throughput, under worst-case (spamming) assumptions. 
-            // TODO: fill numbers below after values are analysed
-            // xxx on mainnet, xxx on testnet11
-            resync_chunksize: max(
-                resync_chunksize, 
-                consensus_config.mergeset_size_limit // We require at least this chunksize for consensus_hashes_between call. 
-            ), 
+          resync_chunksize = min( 
+            (104_857_600.0 / ((((mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) * maximum_amount_of_txs_per_block) * consensus_config.merset_size_limit)  +::size_of::<BlockAcceptanceOffset>() + mem::size_of::<Hash>()) as f64).floor() as u64, // reindexed overhead, under worst case assumptions, per block. 
+            (104_857_600.0 / (((mem::size_of::<MergesetBlockAcceptanceData>() +  (mem::size_of::<TxEntry>() * maximum_amount_of_txs_per_block)) * consensus_config.mergeset_size_limit) + mem::size_of::<Hash>()) as f64).floor() as u64, // pre-indexed overhead, under worst case assumptions, per block.
+        );,
         }
     }
 }

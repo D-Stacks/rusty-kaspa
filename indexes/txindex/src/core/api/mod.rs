@@ -34,7 +34,7 @@ pub trait TxIndexApi: Send + Sync + Debug {
         vspcc_notification: VirtualChainChangedNotification,
     ) -> TxIndexResult<()>;
 
-    fn update_via_block_block_body_pruned(&mut self, chain_acceptance_data_pruned: ChainAcceptanceDataPrunedNotification) -> TxIndexResult<()>;
+    fn update_chain_acceptance_data_pruned(&mut self, chain_acceptance_data_pruned: ChainAcceptanceDataPrunedNotification) -> TxIndexResult<()>;
 }
 
 /// Async proxy for the UTXO index

@@ -30,5 +30,5 @@ pub enum TxIndexError {
     ReindexingError(String),
 }
 
-/// Results originating from the [`UtxoIndex`].
+/// Results originating from the [`TxIndex`].
 pub type TxIndexResult<T> = Result<T, TxIndexError>;

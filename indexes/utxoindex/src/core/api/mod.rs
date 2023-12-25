@@ -7,6 +7,7 @@ use kaspa_consensusmanager::spawn_blocking;
 use kaspa_database::prelude::StoreResult;
 use kaspa_hashes::Hash;
 use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
+use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use parking_lot::RwLock;
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
@@ -47,7 +48,7 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     /// Update the utxoindex with the given utxo_diff, and tips.
     ///
     /// Note: Use a write lock when accessing this method
-    fn update(&mut self, utxo_diff: Arc<UtxoDiff>, tips: Arc<Vec<Hash>>) -> UtxoIndexResult<UtxoChanges>;
+    fn update_via_utxos_changed_notification(&mut self, utxos_changed_notification: ConsensusUtxosChangedNotification) -> UtxoIndexResult<UtxoChanges>;
 
     /// Resync the utxoindex from the consensus db
     ///
@@ -81,7 +82,7 @@ impl UtxoIndexProxy {
         spawn_blocking(move || self.inner.read().get_balance_by_script_public_keys(script_public_keys)).await.unwrap()
     }
 
-    pub async fn update(self, utxo_diff: Arc<UtxoDiff>, tips: Arc<Vec<Hash>>) -> UtxoIndexResult<UtxoChanges> {
-        spawn_blocking(move || self.inner.write().update(utxo_diff, tips)).await.unwrap()
+    pub async fn update_via_utxos_changed_notification(self, utxos_changed_notification: ConsensusUtxosChangedNotification) -> UtxoIndexResult<UtxoChanges> {
+        spawn_blocking(move || self.inner.write().update_via_utxos_changed_notification(utxos_changed_notification)).await.unwrap()
     }
 }

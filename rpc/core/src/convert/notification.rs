@@ -29,6 +29,7 @@ impl From<&consensus_notify::Notification> for Notification {
             consensus_notify::Notification::VirtualDaaScoreChanged(msg) => Notification::VirtualDaaScoreChanged(msg.into()),
             consensus_notify::Notification::PruningPointUtxoSetOverride(msg) => Notification::PruningPointUtxoSetOverride(msg.into()),
             consensus_notify::Notification::NewBlockTemplate(msg) => Notification::NewBlockTemplate(msg.into()),
+            _ => panic!("Unexpected notification type"),
         }
     }
 }
@@ -125,6 +126,8 @@ impl From<&index_notify::Notification> for Notification {
         match item {
             index_notify::Notification::UtxosChanged(msg) => Notification::UtxosChanged(msg.into()),
             index_notify::Notification::PruningPointUtxoSetOverride(msg) => Notification::PruningPointUtxoSetOverride(msg.into()),
+            index_notify::Notification::VirtualChainChanged(msg) => Notification::VirtualChainChanged(msg.into()),
+            _ => panic!("Unexpected notification type"),
         }
     }
 }
@@ -140,5 +143,30 @@ impl From<&index_notify::UtxosChangedNotification> for UtxosChangedNotification 
     // Use kaspa_rpc_service::converter::index::IndexConverter instead.
     fn from(item: &index_notify::UtxosChangedNotification) -> Self {
         Self { added: Arc::new(utxo_set_into_rpc(&item.added, None)), removed: Arc::new(utxo_set_into_rpc(&item.removed, None)) }
+    }
+}
+
+impl From<&index_notify::VirtualChainChangedNotification> for VirtualChainChangedNotification {
+    fn from(item: &index_notify::VirtualChainChangedNotification) -> Self {
+        Self {
+            accepted_transaction_ids: Arc::new(item.added_chain_blocks_acceptance_data
+                .iter()
+                .zip(item.added_chain_block_hashes.iter())
+                .flat_map(|(block_mergesets_acceptance, block_hash)| {
+                    block_mergesets_acceptance
+                    .iter()
+                    .map(move |mergeset_block_acceptance| {
+                        RpcAcceptedTransactionIds {
+                            accepting_block_hash: block_hash.to_owned(),
+                            accepted_transaction_ids: mergeset_block_acceptance.accepted_transactions
+                                .into_iter()
+                                .map(|tx_entry| tx_entry.transaction_id)
+                                .collect::<Vec<_>>()
+                        }
+                    })
+                }).collect::<Vec<_>>()),
+            removed_chain_block_hashes: item.removed_chain_block_hashes,
+            added_chain_block_hashes: item.added_chain_block_hashes,
+        }
     }
 }

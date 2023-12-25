@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use kaspa_consensus_notify::{notification as consensus_notification, notification::Notification as ConsensusNotification};
-use kaspa_core::{debug, trace};
+use kaspa_core::{debug, trace, warn};
 use kaspa_index_core::notification::{Notification, PruningPointUtxoSetOverrideNotification, UtxosChangedNotification};
 use kaspa_notify::{
     collector::{Collector, CollectorNotificationReceiver},
@@ -15,10 +15,11 @@ use kaspa_notify::{
 };
 use kaspa_utils::triggers::SingleTrigger;
 use kaspa_utxoindex::api::UtxoIndexProxy;
-use std::sync::{
+use kaspa_txindex::api::TxIndexProxy;
+use std::{sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
-};
+}, os::unix::process};
 
 /// Processor processes incoming consensus UtxosChanged and PruningPointUtxoSetOverride
 /// notifications submitting them to a UtxoIndex.
@@ -30,6 +31,10 @@ pub struct Processor {
     /// An optional UTXO indexer
     utxoindex: Option<UtxoIndexProxy>,
 
+    /// An optional TX indexer
+    txindex: Option<TxIndexProxy>,
+
+
     recv_channel: CollectorNotificationReceiver<ConsensusNotification>,
 
     /// Has this collector been started?
@@ -39,9 +44,10 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn new(utxoindex: Option<UtxoIndexProxy>, recv_channel: CollectorNotificationReceiver<ConsensusNotification>) -> Self {
+    pub fn new(utxoindex: Option<UtxoIndexProxy>, txindex: Option<TxIndexProxy>, recv_channel: CollectorNotificationReceiver<ConsensusNotification>) -> Self {
         Self {
             utxoindex,
+            txindex,
             recv_channel,
             collect_shutdown: Arc::new(SingleTrigger::new()),
             is_started: Arc::new(AtomicBool::new(false)),
@@ -54,36 +60,42 @@ impl Processor {
             return;
         }
         tokio::spawn(async move {
-            trace!("[Index processor] collecting task starting");
+            trace!("[{IDENT}] collecting task starting");
 
             while let Ok(notification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
                     Ok(notification) => match notifier.notify(notification) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            trace!("[Index processor] notification sender error: {err:?}");
-                        }
-                    },
+                        Ok(_) => trace!("[{IDENT}] sent notification: {notification:?}"),
+                        Err(err) => warn!("[{IDENT}] notification sender error: {err:?}"),
+                        },
                     Err(err) => {
-                        trace!("[Index processor] error while processing a consensus notification: {err:?}");
+                        warn!("[{IDENT}] error while processing a consensus notification: {err:?}");
                     }
                 }
             }
 
-            debug!("[Index processor] notification stream ended");
+            debug!("[{IDENT}] notification stream ended");
             self.collect_shutdown.trigger.trigger();
-            trace!("[Index processor] collecting task ended");
+            trace!("[{IDENT}] collecting task ended");
         });
     }
 
     async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Notification> {
         match notification {
-            ConsensusNotification::UtxosChanged(utxos_changed) => {
-                Ok(Notification::UtxosChanged(self.process_utxos_changed(utxos_changed).await?))
-            }
+            ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
+                Ok(Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?))
+            },
             ConsensusNotification::PruningPointUtxoSetOverride(_) => {
                 Ok(Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {}))
-            }
+            },
+            ConsensusNotification::VirtualChainChanged(vspcc_notification) => {
+                self.process_block_added_notification(vspcc_notification).await?;
+                Ok(Notification::VirtualChainChanged(vspcc_notification.into()).await?)
+            },
+            ConsensusNotification::ChainAcceptanceDataPrunedNotification(chain_acceptance_data_pruned) => {
+                self.process_block_added_notification(chain_acceptance_data_pruned).await?;
+                Ok(Notification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned.into()).await?)
+            },
             _ => Err(IndexError::NotSupported(notification.event_type())),
         }
     }
@@ -95,13 +107,35 @@ impl Processor {
         trace!("[{IDENT}]: processing {:?}", notification);
         if let Some(utxoindex) = self.utxoindex.clone() {
             let converted_notification: UtxosChangedNotification =
-                utxoindex.update(notification.accumulated_utxo_diff.clone(), notification.virtual_parents).await?.into();
+                utxoindex.update_via_utxos_changed_notification(notification).await?.into();
             debug!(
                 "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
                 converted_notification.added.len(),
                 converted_notification.removed.len()
             );
             return Ok(converted_notification);
+        };
+        Err(IndexError::NotSupported(EventType::UtxosChanged))
+    }
+
+    async fn process_virtual_chain_changed_notification(
+        self: &Arc<Self>,
+        notification: consensus_notification::VirtualChainChangedNotification,
+    ) -> IndexResult<UtxosChangedNotification> {
+        if let Some(txindex) = self.txindex.clone() {
+            txindex.update_via_vspcc_added(notification).await?;
+            return Ok(());
+        };
+        Err(IndexError::NotSupported(EventType::UtxosChanged))
+    }
+
+    async fn process_block_body_pruned_notification(
+        self: &Arc<Self>,
+        notification: consensus_notification::ChainAcceptanceDataPrunedNotification,
+    ) -> IndexResult<UtxosChangedNotification> {
+        if let Some(txindex) = self.txindex.clone() {
+            txindex.update_via_block_block_body_pruned(notification).await?;
+            return Ok(());
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
     }
@@ -149,22 +183,25 @@ mod tests {
         processor_receiver: Receiver<Notification>,
         test_consensus: TestConsensus,
         utxoindex_db_lifetime: DbLifetime,
+        txindex_db_lifetime: DbLifetime,
     }
 
     impl NotifyPipeline {
         fn new() -> Self {
             let (consensus_sender, consensus_receiver) = unbounded();
             let (utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+            let (txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
             let config = Arc::new(Config::new(DEVNET_PARAMS));
             let tc = TestConsensus::new(&config);
             tc.init();
             let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
             let utxoindex = Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager, utxoindex_db).unwrap()));
-            let processor = Arc::new(Processor::new(utxoindex, consensus_receiver));
+            let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db).unwrap()));
+            let processor = Arc::new(Processor::new(utxoindex, txindex, consensus_receiver));
             let (processor_sender, processor_receiver) = unbounded();
             let notifier = Arc::new(NotifyMock::new(processor_sender));
             processor.clone().start(notifier);
-            Self { test_consensus: tc, consensus_sender, processor, processor_receiver, utxoindex_db_lifetime }
+            Self { test_consensus: tc, consensus_sender, processor, processor_receiver, utxoindex_db_lifetime, txindex_db_lifetime }
         }
     }
 

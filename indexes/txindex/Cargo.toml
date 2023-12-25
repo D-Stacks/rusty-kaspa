@@ -12,6 +12,7 @@ kaspa-hashes.workspace = true
 thiserror.workspace = true
 kaspa-consensus-core.workspace = true
 kaspa-consensus.workspace = true
+kaspa-consensus-notify.workspace = true
 kaspa-core.workspace = true
 kaspa-utils.workspace = true
 kaspa-index-core.workspace = true

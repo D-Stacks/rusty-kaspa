@@ -7,6 +7,7 @@ use crate::{
     IDENT,
 };
 use kaspa_consensus_core::{tx::ScriptPublicKeys, utxo::utxo_diff::UtxoDiff, BlockHashSet};
+use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use kaspa_core::{info, trace};
 use kaspa_database::prelude::{StoreError, StoreResult, DB};
@@ -74,16 +75,16 @@ impl UtxoIndexApi for UtxoIndex {
     /// Updates the [UtxoIndex] via the virtual state supplied:
     /// 1) Saves updated utxo differences, virtual parent hashes and circulating supply to the database.
     /// 2) returns an event about utxoindex changes.
-    fn update(&mut self, utxo_diff: Arc<UtxoDiff>, tips: Arc<Vec<Hash>>) -> UtxoIndexResult<UtxoChanges> {
+    fn update_via_utxos_changed_notification(&mut self, utxo_changed_notification: ConsensusUtxosChangedNotification) -> UtxoIndexResult<UtxoChanges> {
         trace!("[{0}] updating...", IDENT);
-        trace!("[{0}] adding {1} utxos", IDENT, utxo_diff.add.len());
-        trace!("[{0}] removing {1} utxos", IDENT, utxo_diff.remove.len());
+        trace!("[{0}] adding {1} utxos", IDENT, utxo_changed_notification.accumulated_utxo_diff.add.len());
+        trace!("[{0}] removing {1} utxos", IDENT, utxo_changed_notification.accumulated_utxo_diff.remove.len());
 
         // Initiate update container
         let mut utxoindex_changes = UtxoIndexChanges::new();
-        utxoindex_changes.update_utxo_diff(utxo_diff.unwrap_or_clone());
-        utxoindex_changes.set_tips(tips.unwrap_or_clone().to_vec());
-
+        utxoindex_changes.update_utxo_diff(utxo_changed_notification.accumulated_utxo_diff.unwrap_or_clone());
+        utxoindex_changes.set_tips(utxo_changed_notification.virtual_parents.unwrap_or_clone().to_vec());
+        
         // Commit changed utxo state to db
         self.store.update_utxo_state(&utxoindex_changes.utxo_changes.added, &utxoindex_changes.utxo_changes.removed, false)?;
 

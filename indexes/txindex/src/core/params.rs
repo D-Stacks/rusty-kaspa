@@ -41,7 +41,7 @@ impl TxIndexParams {
     
         let maximum_amount_of_txs_per_block = (consensus_config.max_block_mass as f64 / minimal_possible_mass as f64).floor();
 
-        resync_chunksize = 
+        let resync_chunksize = 
             1_000_000_000.0 / //Max bytes we are willing to hold ( 100 Mbs)
             ((mem::size_of::<Transaction>() + mem::size_of::<Hash>()) * maximum_amount_of_txs_per_block) + consensus_config.mergeset_size_limit * (mem::size_of::<MergesetBlockAcceptanceData>() + mem::size_of::<Hash>()).floor() as u64; // We expect to hold this much in memory, per block, under worst-case assumptions
 

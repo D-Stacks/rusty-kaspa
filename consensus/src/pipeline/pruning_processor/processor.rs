@@ -19,6 +19,7 @@ use crate::{
             tips::{TipsStore, TipsStoreReader},
             utxo_diffs::UtxoDiffsStoreReader,
             virtual_state::VirtualStateStoreReader,
+            acceptance_data::AcceptanceDataStoreReader,
         },
     },
     processes::{pruning_proof::PruningProofManager, reachability::inquirer as reachability, relations},
@@ -34,11 +35,17 @@ use kaspa_consensus_core::{
     trusted::ExternalGhostdagData,
     BlockHashSet,
 };
+use kaspa_consensus_notify::{
+    notification::Notification as ConsensusNotification,
+    notification::ChainAcceptanceDataPrunedNotification,
+    root::ConsensusNotificationRoot,
+};
 use kaspa_consensusmanager::SessionLock;
 use kaspa_core::{debug, info, warn};
 use kaspa_database::prelude::{BatchDbWriter, MemoryWriter, StoreResultExtensions, DB};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
+use kaspa_notify::{notifier::Notify, events::EventType};
 use kaspa_utils::iter::IterExtensions;
 use parking_lot::RwLockUpgradableReadGuard;
 use rocksdb::WriteBatch;
@@ -71,6 +78,9 @@ pub struct PruningProcessor {
     pruning_point_manager: DbPruningPointManager,
     pruning_proof_manager: Arc<PruningProofManager>,
 
+    // Notifier
+    notification_root: Arc<ConsensusNotificationRoot>,
+
     // Pruning lock
     pruning_lock: SessionLock,
 
@@ -92,6 +102,7 @@ impl PruningProcessor {
         db: Arc<DB>,
         storage: &Arc<ConsensusStorage>,
         services: &Arc<ConsensusServices>,
+        notification_root: Arc<ConsensusNotificationRoot>,
         pruning_lock: SessionLock,
         config: Arc<Config>,
     ) -> Self {
@@ -103,8 +114,9 @@ impl PruningProcessor {
             ghostdag_managers: services.ghostdag_managers.clone(),
             pruning_point_manager: services.pruning_point_manager.clone(),
             pruning_proof_manager: services.pruning_proof_manager.clone(),
+            notification_root.clone(),
             pruning_lock,
-            config,
+            config
         }
     }
 
@@ -357,6 +369,18 @@ impl PruningProcessor {
                 let mut staging_reachability = StagingReachabilityStore::new(reachability_read);
                 let mut statuses_write = self.statuses_store.write();
 
+                // Collect pruned data to be sent over the notifier for external services
+
+                //check if we need to send before expensive operations.
+                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) {
+                    
+                    self.notification_root
+                        .notify(ConsensusNotification::ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification::new( 
+                            current, 
+                            self.acceptance_data_store.get(current).unwrap(),
+                            new_pruning_point,
+                        ))).expect("expecting an open unbounded channel");
+                };
                 // Prune data related to block bodies and UTXO state
                 self.utxo_multisets_store.delete_batch(&mut batch, current).unwrap();
                 self.utxo_diffs_store.delete_batch(&mut batch, current).unwrap();

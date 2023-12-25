@@ -1,38 +1,45 @@
+// External imports
 use std::{sync::Arc, mem};
+use kaspa_core::{trace, warn};
+use kaspa_database::prelude::{StoreError, StoreResult, DB};
+use kaspa_hashes::Hash;
 
-use kaspa_consensus::{model::stores::{block_transactions::{
-    BlockTransactionsStore, BlockTransactionsStoreReader, DbBlockTransactionsStore,
-}, headers::{DbHeadersStore, HeaderStoreReader, HeaderStore, CompactHeaderData}, acceptance_data::{DbAcceptanceDataStore, AcceptanceDataStore, AcceptanceDataStoreReader}}, consensus::storage::ConsensusStorage};
+// Kaspa consensus imports
+use kaspa_consensus::{
+    model::stores::{
+        block_transactions::{self, BlockTransactionsStore, BlockTransactionsStoreReader, DbBlockTransactionsStore},
+        headers::{self, DbHeadersStore, HeaderStoreReader, HeaderStore, CompactHeaderData},
+        acceptance_data::{self, DbAcceptanceDataStore, AcceptanceDataStore, AcceptanceDataStoreReader},
+    },
+    consensus::storage::ConsensusStorage,
+};
 use kaspa_consensus_core::{
     acceptance_data::AcceptanceData,
     tx::{Transaction, TransactionId},
     BlockHashSet, config::Config as ConsensusConfig, header::Header,
 };
-use kaspa_core::{trace, warn};
-use kaspa_database::prelude::{StoreError, StoreResult, DB};
-use kaspa_hashes::Hash;
 
+// Local imports
 use crate::{
     errors::TxIndexResult,
     model::{TxOffset, BlockAcceptanceOffset},
     stores::{
         tx_offsets::{DbTxIndexAcceptedTxOffsetsStore, TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore},
-        merged_block_acceptance::{
-            DbTxIndexMergedBlockAcceptanceStore, TxIndexMergedBlockAcceptanceReader, TxIndexMergedBlockAcceptanceStore,
-        },
+        merged_block_acceptance::{DbTxIndexMergedBlockAcceptanceStore, TxIndexMergedBlockAcceptanceReader, TxIndexMergedBlockAcceptanceStore},
         sink::{DbTxIndexSinkStore, TxIndexSinkReader, TxIndexSinkStore},
         source::{DbTxIndexSourceStore, TxIndexSourceReader, TxIndexSourceStore},
         tips::{DbTxIndexTipsStore, TxIndexTipsReader, TxIndexTipsStore},
-        unaccepted_tx_offsets::{
-            DbTxIndexUnacceptedTxOffsetsStore, TxIndexUnacceptedTxOffsetsReader, TxIndexUnacceptedTxOffsetsStore,
-        },
     },
     IDENT,
 };
 
+/// Stores for the TxIndex borrowed from consensus.
 struct TxIndexConsensusStores {
-    block_transaction_store: DbBlockTransactionsStore, // required when processing transaction_offsets
+    /// Store for block transactions. Required when processing transaction offsets.
+    block_transaction_store: DbBlockTransactionsStore,
+    /// Store for block headers. Required for TxVerboseData queries.
     block_header_store: DbHeadersStore,
+    /// Store for acceptance data.
     acceptance_store: DbAcceptanceDataStore,
 }
 
@@ -45,6 +52,16 @@ impl TxIndexConsensusStores {
         }
     }
 }
+impl TxIndexConsensusStores {
+    fn new(consensus_db: Arc<DB>) -> Self {
+        Self { 
+            block_transaction_store: DbBlockTransactionsStore::new(consensus_db, 0), 
+            block_header_store: DbHeadersStore::new(consensus_db, 0), 
+            acceptance_store: DbAcceptanceDataStore::new(consensus_db, 0) 
+        }
+    }
+}
+
 struct TxIndexNativeStores {
     accepted_tx_offsets: DbTxIndexAcceptedTxOffsetsStore,
     unaccepted_tx_offsets: DbTxIndexUnacceptedTxOffsetsStore,
@@ -53,30 +70,38 @@ struct TxIndexNativeStores {
     sink: DbTxIndexSinkStore,
     tips: DbTxIndexTipsStore,
 }
+
+fn calculate_offset_cache_size(consensus_config: &ConsensusConfig) -> u64 {
+    consensus_config.perf.block_data_cache_size * (((consensus_config.max_block_mass as f64 / consensus_config.mass_per_tx_byte as f64) / (mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) as f64).floor() as u64)
+}
+
+fn calculate_block_acceptance_cache_size(consensus_config: &ConsensusConfig) -> u64 {
+    consensus_config.perf.headers_cache_size * (mem::size_of::<Header>() as f64 / (mem::size_of::<BlockAcceptanceOffset> + mem::size_of::<Hash>()) as f64).floor() as u64
+}
+/// Stores for the transaction index.
 pub struct TxIndexStore {
     consensus_stores: TxIndexConsensusStores,
     txindex_stores: TxIndexNativeStores,
 }
 
 impl TxIndexStore {
-    pub fn new(txindex_db: Arc<DB>, consensus_db: Arc<DB>, consensus_config: ConsensusConfig) -> Self {
-        
-        // consensus block data cache size normalized to Txoffset + TransactionId sizes. 
-        let offset_cache_size = consensus_config.perf.block_data_cache_size * (((consensus_config.max_block_mass as f64 / consensus_config.mass_per_tx_byte as f64) / (mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) as f64).floor() as u64);
-        // consensus block header cache size normalized to BlockAcceptanceOffset + Hash sizes. 
-        let block_acceptance_cache_size = consensus_config.perf.headers_cache_size * (mem::size_of::<Header>() as f64 / (mem::size_of::<BlockAcceptanceOffset> + mem::size_of::<Hash>()) as f64).floor() as u64;
-        Self {
-            consensus_stores: TxIndexConsensusStores::new(consensus_db),
+    pub fn new(txindex_db: Arc<DB>, consensus_db: Arc<DB>, consensus_config: ConsensusConfig) -> Result<Self, StoreError> {
+        let offset_cache_size = calculate_offset_cache_size(&consensus_config);
+        let block_acceptance_cache_size = calculate_block_acceptance_cache_size(&consensus_config);
+
+        Ok(Self {
+            consensus_stores: TxIndexConsensusStores::new(consensus_db)?,
             txindex_stores: TxIndexStores {
-                accepted_tx_offsets: DbTxIndexAcceptedTxOffsetsStore::new(txindex_db, offset_cache_size),
-                unaccepted_tx_offsets: DbTxIndexUnacceptedTxOffsetsStore::new(txindex_db, offset_cache_size), 
-                merged_block_acceptance: DbTxIndexMergedBlockAcceptanceStore::new(txindex_db, block_acceptance_cache_size),
-                source: DbTxIndexSourceStore::new(txindex_db),
-                sink: DbTxIndexSinkStore::new(txindex_db),
-                tips: DbTxIndexTipsStore::new(txindex_db),
+                accepted_tx_offsets: DbTxIndexAcceptedTxOffsetsStore::new(txindex_db, offset_cache_size)?,
+                unaccepted_tx_offsets: DbTxIndexUnacceptedTxOffsetsStore::new(txindex_db, offset_cache_size)?, 
+                merged_block_acceptance: DbTxIndexMergedBlockAcceptanceStore::new(txindex_db, block_acceptance_cache_size)?,
+                source: DbTxIndexSourceStore::new(txindex_db)?,
+                sink: DbTxIndexSinkStore::new(txindex_db)?,
+                tips: DbTxIndexTipsStore::new(txindex_db)?,
             },
-        }
+        })
     }
+}
 
     pub fn add_block_transactions(&self, block_hash: Hash, txs: Arc<Vec<Transaction>>) -> TxIndexResult<()> {
         trace!("[{0}] retrieving transactions from block: {1}", IDENT, block_hash);
@@ -92,11 +117,8 @@ impl TxIndexStore {
         trace!("[{0}] retrieving transactions from block: {1}", IDENT, block_hash);
         match self.consensus_stores.block_transaction_store.get(block_hash) {
             Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
-        }
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
     }
 
     pub fn add_unaccepted_transaction_offsets(&mut self, tx_offsets_by_id: Vec<(TransactionId, TxOffset)>) -> TxIndexResult<()> {
@@ -122,10 +144,8 @@ impl TxIndexStore {
 
         match self.txindex_stores.unaccepted_tx_offsets.get(transaction_id) {
             Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -155,11 +175,9 @@ impl TxIndexStore {
         trace!("[{0}] retrieving acceptance data for block: {1}", IDENT, block_hash);
 
         match self.txindex_stores.merged_block_acceptance.get(block_hash) {
-            Ok(mut item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Ok(item) => Ok(Some(item)),
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -183,13 +201,10 @@ impl TxIndexStore {
 
     pub fn get_accepted_transaction_offsets(self, tx_id: TransactionId) -> TxIndexResult<Option<TxOffset>> {
         trace!("[{0}] retrieving accepted transaction entry for txID: {1},", IDENT, tx_id);
-
         match self.txindex_stores.accepted_tx_offsets.get(tx_id) {
-            Ok(mut item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Ok(item) => Ok(Some(item)),
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -203,10 +218,8 @@ impl TxIndexStore {
 
         match self.txindex_stores.source.get() {
             Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -220,10 +233,8 @@ impl TxIndexStore {
 
         match self.txindex_stores.sink.get() {
             Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -244,10 +255,8 @@ impl TxIndexStore {
 
         match self.txindex_stores.tips.get() {
             Ok(item) => Ok(Some(item)),
-            Err(err) => match err {
-                StoreError::KeyNotFound(_) => Ok(None),
-                default => Err(err)?,
-            },
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
@@ -256,24 +265,32 @@ impl TxIndexStore {
         // TODO: explore possibility of deleting and replacing whole db, currently there is an issue because of file lock and db being in an arc.
         trace!("[{0}] attempting to clear txindex database...", IDENT);
 
-        // Clear all
-        trace!("[{0}] clearing source database...", IDENT);
-        self.txindex_stores.source.remove()?;
-        trace!("[{0}] clearing tips database...", IDENT);
-        self.txindex_stores.tips.remove()?;
-        trace!("[{0}] clearing sink database...", IDENT);
-        self.txindex_stores.sink.remove()?;
-        trace!("[{0}] clearing transaction_entries database...", IDENT);
-        self.txindex_stores.accepted_tx_offsets.delete_all()?;
-        trace!("[{0}] clearing accepted transaction offset database...", IDENT);
-        self.txindex_stores.accepted_tx_offsets.delete_all()?;
-        trace!("[{0}] clearing unaccepted transaction offset database...", IDENT);
-        self.txindex_stores.unaccepted_tx_offsets.delete_all()?;
-        trace!("[{0}] clearing merged block acceptance database...", IDENT);
-        self.txindex_stores.merged_block_acceptance.delete_all()?;
-
-        trace!("[{0}] clearing txindex database - success!", IDENT);
-
+        self.txindex_stores.source.remove()
+            .map_err(|e| format!("Failed to clear source database: {}", e))?;
+        trace!("[{0}] cleared source database", IDENT);
+    
+        self.txindex_stores.tips.remove()
+            .map_err(|e| format!("Failed to clear tips database: {}", e))?;
+        trace!("[{0}] cleared tips database", IDENT);
+    
+        self.txindex_stores.sink.remove()
+            .map_err(|e| format!("Failed to clear sink database: {}", e))?;
+        trace!("[{0}] cleared sink database", IDENT);
+    
+        self.txindex_stores.accepted_tx_offsets.delete_all()
+            .map_err(|e| format!("Failed to clear accepted transaction offset database: {}", e))?;
+        trace!("[{0}] cleared accepted transaction offset database", IDENT);
+    
+        self.txindex_stores.unaccepted_tx_offsets.delete_all()
+            .map_err(|e| format!("Failed to clear unaccepted transaction offset database: {}", e))?;
+        trace!("[{0}] cleared unaccepted transaction offset database", IDENT);
+    
+        self.txindex_stores.merged_block_acceptance.delete_all()
+            .map_err(|e| format!("Failed to clear merged block acceptance database: {}", e))?;
+        trace!("[{0}] cleared merged block acceptance database", IDENT);
+    
+        trace!("[{0}] cleared txindex database", IDENT);
+    
         Ok(())
     }
 }

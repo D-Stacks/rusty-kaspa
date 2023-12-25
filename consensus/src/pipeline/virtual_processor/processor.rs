@@ -74,7 +74,7 @@ use kaspa_core::{debug, info, time::unix_now, trace, warn};
 use kaspa_database::prelude::{StoreError, StoreResultEmptyTuple, StoreResultExtensions};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
-use kaspa_notify::notifier::Notify;
+use kaspa_notify::{notifier::Notify, events::EventType};
 
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use itertools::Itertools;
@@ -333,15 +333,20 @@ impl VirtualStateProcessor {
             .notify(Notification::VirtualDaaScoreChanged(VirtualDaaScoreChangedNotification::new(new_virtual_state.daa_score)))
             .expect("expecting an open unbounded channel");
         // TODO: Fetch acceptance data only if there's a subscriber for the below notification.
-        let added_chain_blocks_acceptance_data =
-            chain_path.added.iter().copied().map(|added| self.acceptance_data_store.get(added).unwrap()).collect_vec();
-        self.notification_root
-            .notify(Notification::VirtualChainChanged(VirtualChainChangedNotification::new(
-                chain_path.added.into(),
-                chain_path.removed.into(),
-                Arc::new(added_chain_blocks_acceptance_data),
-            )))
-            .expect("expecting an open unbounded channel");
+        if self.notification_root.has_subscription(EventType::VirtualChainChanged) {
+            let added_chain_blocks_acceptance_data =
+                chain_path.added.iter().copied().map(|added| self.acceptance_data_store.get(added).unwrap()).collect_vec();
+            let removed_chain_blocks_acceptance_data =
+                chain_path.removed.iter().copied().map(|removed| self.acceptance_data_store.get(removed).unwrap()).collect_vec();
+            self.notification_root
+                .notify(Notification::VirtualChainChanged(VirtualChainChangedNotification::new(
+                    chain_path.added.into(),
+                    chain_path.removed.into(),
+                    Arc::new(added_chain_blocks_acceptance_data),
+                    Arc::new(removed_chain_blocks_acceptance_data),
+                )))
+                .expect("expecting an open unbounded channel");
+        }
     }
 
     pub(crate) fn virtual_finality_point(&self, virtual_ghostdag_data: &GhostdagData, pruning_point: Hash) -> Hash {
@@ -410,7 +415,6 @@ impl VirtualStateProcessor {
                     let header = self.headers_store.get_header(current).unwrap();
                     let mergeset_data = self.ghostdag_primary_store.get_data(current).unwrap();
                     let pov_daa_score = header.daa_score;
-                    let pov_blue_score = header.blue_score;
 
                     let selected_parent_multiset_hash = self.utxo_multisets_store.get(selected_parent).unwrap();
                     let selected_parent_utxo_view = (&stores.utxo_set).compose(&*diff);
@@ -1073,7 +1077,8 @@ impl VirtualStateProcessor {
             &virtual_read.utxo_set,
             new_pruning_point_header.daa_score,
             TxValidationFlags::Full,
-        );
+            false,
+        ).0;
         if validated_transactions.len() < new_pruning_point_transactions.len() - 1 {
             // Some non-coinbase transactions are invalid
             return Err(PruningImportError::NewPruningPointTxErrors);

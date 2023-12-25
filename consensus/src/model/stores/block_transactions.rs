@@ -6,10 +6,14 @@ use kaspa_database::prelude::DB;
 use kaspa_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use kaspa_database::registry::DatabaseStorePrefixes;
 use kaspa_hashes::Hash;
+use kaspa_utils::arc::ArcExtensions;
+use kaspa_utils::vec::VecExtensions;
 use rocksdb::WriteBatch;
 
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError>;
+
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -54,6 +58,12 @@ impl DbBlockTransactionsStore {
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
         self.access.read(hash)
+    }
+    
+    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError> {
+        let mut txs = (self.access.read(hash)?).unwrap_or_clone();
+        txs.retain_indices(indices)?;
+        Ok(Arc::new(txs))
     }
 }
 

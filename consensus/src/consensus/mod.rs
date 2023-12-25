@@ -250,7 +250,7 @@ impl Consensus {
         ));
 
         let pruning_processor =
-            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, pruning_lock.clone(), config.clone()));
+            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, notification_root, pruning_lock.clone(), config.clone()));
 
         // Ensure the relations stores are initialized
         header_processor.init();
@@ -274,10 +274,10 @@ impl Consensus {
             storage,
             services,
             pruning_lock,
-            notification_root,
             counters,
             config,
             creation_timestamp,
+            notification_root,
         }
     }
 
@@ -503,7 +503,7 @@ impl ConsensusApi for Consensus {
             sink
         };
 
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(low, high, None))
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(low, high, max_blocks))
     }
 
     /// Returns a Vec of header samples since genesis

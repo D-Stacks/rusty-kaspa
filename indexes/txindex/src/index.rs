@@ -1,11 +1,14 @@
-use std::{sync::{Arc, Weak}, fmt::Debug};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Weak},
+};
 
 use kaspa_consensus_core::{config::Config as ConsensusConfig, tx::TransactionId};
-use kaspa_index_core::notification::{VirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification};
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler, ConsensusSessionBlocking};
-use kaspa_core::{info, trace, error};
+use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
+use kaspa_index_core::notification::{ChainAcceptanceDataPrunedNotification, VirtualChainChangedNotification};
 use kaspa_utils::as_slice::AsSlice;
 use parking_lot::RwLock;
 use rocksdb::WriteBatch;
@@ -13,35 +16,40 @@ use rocksdb::WriteBatch;
 use crate::{
     core::api::TxIndexApi,
     core::errors::TxIndexResult,
-    core::model::BlockAcceptanceOffset, perf::{perf::TxIndexPerfParams}, model::{TxIndexVSPCCChanges, TxOffset},
-    stores::{TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceStore, TxIndexStores, TxIndexSinkStore, TxIndexSinkReader, TxIndexSourceReader, TxIndexAcceptedTxOffsetsReader, TxIndexMergedBlockAcceptanceReader}, errors::TxIndexError,
+    core::model::BlockAcceptanceOffset,
+    errors::TxIndexError,
+    model::{TxIndexVSPCCChanges, TxOffset},
+    perf::perf::TxIndexPerfParams,
+    stores::{
+        TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
+        TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores,
+    },
 };
 
 pub struct TxIndex {
     stores: TxIndexStores,
-    consensus_manager: Arc<ConsensusManager>, 
-    txindex_perf: TxIndexPerfParams, // move into config, once txindex is configurable. 
+    consensus_manager: Arc<ConsensusManager>,
+    txindex_perf: TxIndexPerfParams, // move into config, once txindex is configurable.
 }
 
 impl TxIndex {
     fn new(
-        consensus_manager: Arc<ConsensusManager>, 
-        txindex_db: Arc<DB>, 
+        consensus_manager: Arc<ConsensusManager>,
+        txindex_db: Arc<DB>,
         consensus_config: &ConsensusConfig,
-    ) ->  TxIndexResult<Arc<RwLock<Self>>> {
-
+    ) -> TxIndexResult<Arc<RwLock<Self>>> {
         let txindex_perf = TxIndexPerfParams::new(consensus_config);
         let mut txindex = Self {
             stores: TxIndexStores::new(txindex_db, &txindex_perf)?,
             consensus_manager: consensus_manager.clone(),
-            txindex_perf: txindex_perf
+            txindex_perf,
         };
 
         if !txindex.is_synced()? {
             match txindex.resync() {
                 Ok(_) => {
                     info!("[{0:?}] Resync Successful", txindex);
-                },
+                }
                 Err(e) => {
                     error!("[{0:?}] Failed to resync: {1}", txindex, e);
                     txindex.stores.delete_all()?; // we try and delete all, in order to remove any partial data that may have been written.
@@ -58,20 +66,15 @@ impl TxIndex {
     // For internal usage only
     fn _resync_segement(
         &mut self,
-        mut start_hash: Hash, 
+        mut start_hash: Hash,
         end_hash: Hash,
         session: &ConsensusSessionBlocking<'_>,
-        // Setting below to true will remove data added along the start_hash -> end_hash path. 
+        // Setting below to true will remove data added along the start_hash -> end_hash path.
         unsync_segment: bool,
     ) -> TxIndexResult<()> {
-        info!(
-            "[{0:?}] Resyncing from {1} to {2}",
-            self,
-            start_hash,
-            end_hash,
-        );
+        info!("[{0:?}] Resyncing from {1} to {2}", self, start_hash, end_hash,);
         let split_hash = session.find_highest_common_chain_block(start_hash, end_hash)?;
-        let split_daa_score = session.get_header(split_hash)?.daa_score;        
+        let split_daa_score = session.get_header(split_hash)?.daa_score;
         let total_blocks_to_remove = session.get_header(start_hash)?.daa_score - split_daa_score; // start_daa_score - split_daa_score;
         let total_blocks_to_add = session.get_header(end_hash)?.daa_score - split_daa_score; // end_daa_score - split_daa_score;
         drop(split_daa_score);
@@ -81,10 +84,10 @@ impl TxIndex {
         let mut removed_processed_in_batch = 0u64;
         let mut added_processed_in_batch = 0u64;
         while start_hash != end_hash {
-            
-            let mut chain_path = session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.txindex_perf.resync_chunksize as usize))?;
-            
-            // We switch added to removed, and clear removed, as we have no use for the removed data. 
+            let mut chain_path =
+                session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.txindex_perf.resync_chunksize as usize))?;
+
+            // We switch added to removed, and clear removed, as we have no use for the removed data.
             if unsync_segment {
                 chain_path.added = chain_path.removed;
                 chain_path.removed = Arc::new(vec![])
@@ -93,7 +96,7 @@ impl TxIndex {
             let removed_chain_blocks_acceptance_data = if !chain_path.removed.is_empty() {
                 session.get_blocks_acceptance_data(chain_path.added.as_slice())?
             } else {
-               Arc::new(vec![])
+                Arc::new(vec![])
             };
 
             let added_chain_blocks_acceptance_data = if !chain_path.added.is_empty() {
@@ -108,10 +111,10 @@ impl TxIndex {
             start_hash = *chain_path.checkpoint_hash().expect("chain path should not be empty");
 
             let vspcc_notification = VirtualChainChangedNotification::new(
-                chain_path.added, 
-                chain_path.removed, 
-                added_chain_blocks_acceptance_data, 
-                removed_chain_blocks_acceptance_data
+                chain_path.added,
+                chain_path.removed,
+                added_chain_blocks_acceptance_data,
+                removed_chain_blocks_acceptance_data,
             );
 
             self.update_via_vspcc_added(vspcc_notification)?;
@@ -125,7 +128,7 @@ impl TxIndex {
                     removed_processed_in_batch,
                     total_blocks_removed,
                     total_blocks_to_remove,
-                    total_blocks_removed as f64 / total_blocks_to_remove as f64 * 100.0, 
+                    total_blocks_removed as f64 / total_blocks_to_remove as f64 * 100.0,
                 );
                 removed_processed_in_batch = 0;
             }
@@ -150,7 +153,7 @@ impl TxIndex {
 }
 
 impl TxIndexApi for TxIndex {
-    // Resync methods. 
+    // Resync methods.
     fn resync(&mut self) -> TxIndexResult<()> {
         info!("[{0:?}] Started Resyncing", self);
 
@@ -181,24 +184,20 @@ impl TxIndexApi for TxIndex {
                 if txindex_sink != consensus_sink {
                     info!(
                         "[{0:?}] txindex sink is not synced with consensus sink. txindex sink: {1:?}, consensus sink: {2}",
-                        self,
-                        txindex_sink,
-                        consensus_sink,
+                        self, txindex_sink, consensus_sink,
                     );
                     // If txindex sink is not synced with consensus sink, and not a chain block, we must first unsync from the highest common chain block.
                     if !session.is_chain_block(txindex_sink)? {
                         let hccb = session.find_highest_common_chain_block(txindex_sink, consensus_sink)?;
                         info!(
                             "[{0:?}] txindex sink is not a chain block, unsyncing from {1} to the highest common chain block: {2}",
-                            self,
-                            txindex_sink,
-                            hccb,
+                            self, txindex_sink, hccb,
                         );
                         self._resync_segement(txindex_sink, hccb, &session, true)?;
                     }
                 }
                 Ok(consensus_sink)
-            }
+            },
         )?;
 
         self._resync_segement(start_hash, end_hash, &session, false)?;
@@ -217,74 +216,62 @@ impl TxIndexApi for TxIndex {
                 if let Some(txindex_source) = self.stores.source_store.get()? {
                     if txindex_source == session.get_source() {
                         return Ok(true);
-                    }           
-                }    
+                    }
+                }
             }
         };
 
         Ok(false)
-        }
+    }
 
-    fn get_merged_block_acceptance_offset(
-        &self, 
-        hashes: Vec<Hash>,
-    ) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>> {
-        trace!(
-            "[{0:?}] Getting merged block acceptance offsets for {1} blocks",
-            self,
-            hashes.len()
-        );
+    fn get_merged_block_acceptance_offset(&self, hashes: Vec<Hash>) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>> {
+        trace!("[{0:?}] Getting merged block acceptance offsets for {1} blocks", self, hashes.len());
 
         Ok(Arc::new(
             hashes
-            .iter()
-            .map(move |hash| self.stores.merged_block_acceptance_store.get(*hash))
-            .collect::<Result<Vec<Option<BlockAcceptanceOffset>>, _>>()?
-        ))    
+                .iter()
+                .map(move |hash| self.stores.merged_block_acceptance_store.get(*hash))
+                .collect::<Result<Vec<Option<BlockAcceptanceOffset>>, _>>()?,
+        ))
     }
 
-    fn get_tx_offsets(
-        &self, 
-        tx_ids: Vec<TransactionId>, 
-    ) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>> {
-        trace!(
-            "[{0:?}] Getting tx offsets for {1} txs",
-            self,
-            tx_ids.len()
-        );
+    fn get_tx_offsets(&self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>> {
+        trace!("[{0:?}] Getting tx offsets for {1} txs", self, tx_ids.len());
 
         Ok(Arc::new(
             tx_ids
-            .iter()
-            .map(move |tx_id| self.stores.accepted_tx_offsets_store.get(*tx_id))
-            .collect::<Result<Vec<Option<TxOffset>>, _>>()?
+                .iter()
+                .map(move |tx_id| self.stores.accepted_tx_offsets_store.get(*tx_id))
+                .collect::<Result<Vec<Option<TxOffset>>, _>>()?,
         ))
     }
 
     // Update methods
-    fn update_via_vspcc_added(
-        &mut self,
-        vspcc_notification: VirtualChainChangedNotification,
-    ) -> TxIndexResult<()> {
+    fn update_via_vspcc_added(&mut self, vspcc_notification: VirtualChainChangedNotification) -> TxIndexResult<()> {
         trace!(
             "[{0:?}] Updating db with {1} added chain blocks and {2} removed chain blocks",
             self,
             vspcc_notification.added_chain_block_hashes.len(),
             vspcc_notification.removed_chain_blocks_acceptance_data.len()
         );
-        
+
         let txindex_vspcc_changes = TxIndexVSPCCChanges::from(vspcc_notification);
-        
+
         let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
 
         self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_vspcc_changes.tx_offset_changes())?;
-        self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, txindex_vspcc_changes.block_acceptance_offsets_changes())?;
+        self.stores
+            .merged_block_acceptance_store
+            .write_diff_batch(&mut batch, txindex_vspcc_changes.block_acceptance_offsets_changes())?;
         self.stores.sink_store.set_via_batch_writer(&mut batch, txindex_vspcc_changes.new_sink())?;
-        
+
         self.stores.write_batch(batch)
     }
 
-    fn update_via_chain_acceptance_data_pruned(&mut self, _chain_acceptance_data_pruned: ChainAcceptanceDataPrunedNotification) -> TxIndexResult<()> {
+    fn update_via_chain_acceptance_data_pruned(
+        &mut self,
+        _chain_acceptance_data_pruned: ChainAcceptanceDataPrunedNotification,
+    ) -> TxIndexResult<()> {
         todo!()
     }
 }

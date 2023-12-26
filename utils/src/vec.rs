@@ -28,10 +28,9 @@ pub trait VecExtensions<T> {
     fn swap_insert(&mut self, index: usize, value: T);
 
     /// Retains only the elements at the specified indices of the vector.
-    /// 
+    ///
     /// Note: This function was defined to be lenient, in the sense that it will not panic if the provided indices are out of bounds, instead return an [`IndexOutOfBoundsError`], and will deduplicate indices.
-    fn retain_indices(&mut self, indices: &[usize]) -> Result<(), IndexOutOfBoundsError> ;
-
+    fn retain_indices(&mut self, indices: &[usize]) -> Result<(), IndexOutOfBoundsError>;
 }
 
 impl<T> VecExtensions<T> for Vec<T> {
@@ -60,16 +59,17 @@ impl<T> VecExtensions<T> for Vec<T> {
                 }
                 *self = vec![self.remove(index)];
                 Ok(())
-            },
+            }
             // if indices has more than one element, we need to sort and deduplicate the indices and run the retain function accordingly
             len_of_indices => {
                 let indices: Vec<usize> = indices.iter().cloned().sorted_unstable().dedup().collect();
 
                 if indices.last().unwrap() >= &self.len() {
                     return Err(IndexOutOfBoundsError::new(*indices.last().unwrap(), self.len()));
-                } 
-                
-                if indices.len() == self.len() { // if indices are equal to the length of the vector, we can keep the vector as is
+                }
+
+                if indices.len() == self.len() {
+                    // if indices are equal to the length of the vector, we can keep the vector as is
                     return Ok(());
                 }
 
@@ -84,9 +84,9 @@ impl<T> VecExtensions<T> for Vec<T> {
                         false
                     }
                 });
-                
+
                 Ok(())
-            },
+            }
         }
     }
 }

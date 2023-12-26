@@ -100,7 +100,7 @@ impl BlockAddedNotification {
 
 #[derive(Debug, Clone)]
 pub struct ChainAcceptanceDataPrunedNotification {
-    pub chain_hash_pruned : Hash,
+    pub chain_hash_pruned: Hash,
     pub mergeset_block_acceptance_data_pruned: Arc<AcceptanceData>,
     pub history_root: Hash,
 }
@@ -125,7 +125,12 @@ impl VirtualChainChangedNotification {
         added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
         removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
     ) -> Self {
-        Self { added_chain_block_hashes, removed_chain_block_hashes, added_chain_blocks_acceptance_data, removed_chain_blocks_acceptance_data }
+        Self {
+            added_chain_block_hashes,
+            removed_chain_block_hashes,
+            added_chain_blocks_acceptance_data,
+            removed_chain_blocks_acceptance_data,
+        }
     }
 }
 

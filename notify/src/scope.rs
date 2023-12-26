@@ -50,7 +50,6 @@ pub enum Scope {
 #[derive(Clone, Display, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 pub struct BlockAddedScope {}
 
-
 #[derive(Clone, Display, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 pub struct ChainAcceptanceDataPrunedScope {}
 

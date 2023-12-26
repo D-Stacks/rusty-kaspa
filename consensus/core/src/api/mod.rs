@@ -156,6 +156,10 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    fn get_virtual_parents(&self, hash: Hash) -> Option<Vec<Hash>> {
+        unimplemented!()
+    }
+
     fn get_tips(&self) -> Vec<Hash> {
         unimplemented!()
     }

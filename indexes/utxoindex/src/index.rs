@@ -75,7 +75,10 @@ impl UtxoIndexApi for UtxoIndex {
     /// Updates the [UtxoIndex] via the virtual state supplied:
     /// 1) Saves updated utxo differences, virtual parent hashes and circulating supply to the database.
     /// 2) returns an event about utxoindex changes.
-    fn update_via_utxos_changed_notification(&mut self, utxo_changed_notification: ConsensusUtxosChangedNotification) -> UtxoIndexResult<UtxoChanges> {
+    fn update_via_utxos_changed_notification(
+        &mut self,
+        utxo_changed_notification: ConsensusUtxosChangedNotification,
+    ) -> UtxoIndexResult<UtxoChanges> {
         trace!("[{0}] updating...", IDENT);
         trace!("[{0}] adding {1} utxos", IDENT, utxo_changed_notification.accumulated_utxo_diff.add.len());
         trace!("[{0}] removing {1} utxos", IDENT, utxo_changed_notification.accumulated_utxo_diff.remove.len());
@@ -84,7 +87,7 @@ impl UtxoIndexApi for UtxoIndex {
         let mut utxoindex_changes = UtxoIndexChanges::new();
         utxoindex_changes.update_utxo_diff(utxo_changed_notification.accumulated_utxo_diff.unwrap_or_clone());
         utxoindex_changes.set_tips(utxo_changed_notification.virtual_parents.unwrap_or_clone().to_vec());
-        
+
         // Commit changed utxo state to db
         self.store.update_utxo_state(&utxoindex_changes.utxo_changes.added, &utxoindex_changes.utxo_changes.removed, false)?;
 

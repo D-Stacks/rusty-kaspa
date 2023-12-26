@@ -1,13 +1,13 @@
 use kaspa_consensus_core::BlockHasher;
 use kaspa_database::{
-    prelude::{CachedDbAccess, StoreResult, DB, BatchDbWriter, StoreError},
+    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
 use rocksdb::WriteBatch;
 use std::sync::Arc;
 
-use crate::model::{BlockAcceptanceOffsetsChanges, BlockAcceptanceOffset};
+use crate::model::{BlockAcceptanceOffset, BlockAcceptanceOffsetsChanges};
 
 // Traits:
 
@@ -18,7 +18,11 @@ pub trait TxIndexMergedBlockAcceptanceReader {
 }
 
 pub trait TxIndexMergedBlockAcceptanceStore {
-    fn write_diff_batch(&mut self, batch: &mut WriteBatch, block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges) -> StoreResult<()>;
+    fn write_diff_batch(
+        &mut self,
+        batch: &mut WriteBatch,
+        block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges,
+    ) -> StoreResult<()>;
     fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
 }
 
@@ -41,9 +45,7 @@ impl DbTxIndexMergedBlockAcceptanceStore {
 
 impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {
     fn get(&self, block_hash: Hash) -> StoreResult<Option<BlockAcceptanceOffset>> {
-        self.access.read(block_hash)
-        .map(Some)
-        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
+        self.access.read(block_hash).map(Some).or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
 
     fn has(&self, block_hash: Hash) -> StoreResult<bool> {
@@ -52,11 +54,10 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
 }
 
 impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
-    
     fn write_diff_batch(
-        &mut self, 
-        batch: &mut WriteBatch, 
-        block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges
+        &mut self,
+        batch: &mut WriteBatch,
+        block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges,
     ) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
         self.access.delete_many(&mut writer, &mut block_acceptance_offset_changes.to_remove.iter().map(|v| *v))?;
@@ -69,4 +70,4 @@ impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
         let mut writer = BatchDbWriter::new(batch);
         self.access.delete_all(&mut writer)
     }
-}   
+}

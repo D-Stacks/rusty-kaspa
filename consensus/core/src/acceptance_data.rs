@@ -1,7 +1,10 @@
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 
-use crate::{tx::{TransactionId, TransactionIndexType}, BlockHashMap};
+use crate::{
+    tx::{TransactionId, TransactionIndexType},
+    BlockHashMap,
+};
 
 // Acceptance data indexed by accepting chain blocks
 pub type ChainAcceptanceData = BlockHashMap<Vec<MergesetBlockAcceptanceData>>;

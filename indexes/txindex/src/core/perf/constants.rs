@@ -1,4 +1,4 @@
-use kaspa_consensus_core::{subnets::SUBNETWORK_ID_SIZE};
+use kaspa_consensus_core::subnets::SUBNETWORK_ID_SIZE;
 
 pub const STANDARD_SCHNORR_SCRIPT_PUBLIC_KEY_LEN: u64 = 34u64;
 
@@ -16,7 +16,7 @@ pub const STANDARD_TRANSACTION_HEADER_SIZE: u64 = {
 };
 
 /// The approx size of a default standard network transaction input in bytes.
-pub const  STANDARD_TRANSACTION_INPUT_SIZE: u64 = {
+pub const STANDARD_TRANSACTION_INPUT_SIZE: u64 = {
     // INPUT
     32u64 // previous transaction id
     + 4u64 // previous transaction index

@@ -1,2 +1,2 @@
-pub mod perf;
 mod constants;
+pub mod perf;

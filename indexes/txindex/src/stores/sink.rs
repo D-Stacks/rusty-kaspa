@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use kaspa_database::{
-    prelude::{CachedDbItem, StoreResult, DB, BatchDbWriter, StoreError},
+    prelude::{BatchDbWriter, CachedDbItem, StoreError, StoreResult, DB},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
@@ -36,9 +36,7 @@ impl DbTxIndexSinkStore {
 
 impl TxIndexSinkReader for DbTxIndexSinkStore {
     fn get(&self) -> StoreResult<Option<Hash>> {
-        self.access.read()
-        .map(Some)
-        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
+        self.access.read().map(Some).or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
 }
 

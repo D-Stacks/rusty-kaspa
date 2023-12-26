@@ -3,8 +3,8 @@ use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 
 pub struct TxInclusionVerboseData {
-    /// This corrosponds to a block hash which includes the transaction 
-    /// 
+    /// This corrosponds to a block hash which includes the transaction
+    ///
     /// corrosponds to the block hash which held the tx when it was successfully merged. This is deterministic between nodes.
     block: Hash,
     daa_score: u64,
@@ -27,23 +27,21 @@ pub struct TxAcceptanceVerboseData {
     confirmations: Option<u64>,
 }
 
-
 impl TxAcceptanceVerboseData {
-
-    /// When passing the `pov_blue_score`, preference should be to use the blue score of the sink cached by the txindex itself. 
+    /// When passing the `pov_blue_score`, preference should be to use the blue score of the sink cached by the txindex itself.
     pub fn new(&self, block: Hash, daa_score: u64, blue_score: u64, timestamp: u64, pov_blue_score: Option<u64>) -> Self {
-        Self { 
-            block, 
-            daa_score, 
-            blue_score, 
-            timestamp, 
-            confirmations: pov_blue_score.map_or(None, move |pov_blue_score| blue_score.checked_sub(pov_blue_score))
+        Self {
+            block,
+            daa_score,
+            blue_score,
+            timestamp,
+            confirmations: pov_blue_score.map_or(None, move |pov_blue_score| blue_score.checked_sub(pov_blue_score)),
         }
     }
 }
 
 pub struct TxIndexEntryCompact {
-    tx_offset: TxOffset, 
+    tx_offset: TxOffset,
     is_accepted: bool,
 }
 

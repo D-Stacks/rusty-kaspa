@@ -13,13 +13,16 @@ use kaspa_notify::{
     notification::Notification as NotificationTrait,
     notifier::DynNotify,
 };
+use kaspa_txindex::api::TxIndexProxy;
 use kaspa_utils::triggers::SingleTrigger;
 use kaspa_utxoindex::api::UtxoIndexProxy;
-use kaspa_txindex::api::TxIndexProxy;
-use std::{sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-}, os::unix::process};
+use std::{
+    os::unix::process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 /// Processor processes incoming consensus UtxosChanged and PruningPointUtxoSetOverride
 /// notifications submitting them to a UtxoIndex.
@@ -34,7 +37,6 @@ pub struct Processor {
     /// An optional TX indexer
     txindex: Option<TxIndexProxy>,
 
-
     recv_channel: CollectorNotificationReceiver<ConsensusNotification>,
 
     /// Has this collector been started?
@@ -44,7 +46,11 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn new(utxoindex: Option<UtxoIndexProxy>, txindex: Option<TxIndexProxy>, recv_channel: CollectorNotificationReceiver<ConsensusNotification>) -> Self {
+    pub fn new(
+        utxoindex: Option<UtxoIndexProxy>,
+        txindex: Option<TxIndexProxy>,
+        recv_channel: CollectorNotificationReceiver<ConsensusNotification>,
+    ) -> Self {
         Self {
             utxoindex,
             txindex,
@@ -68,9 +74,9 @@ impl Processor {
                         Some(notification) => match notifier.notify(notification) {
                             Ok(_) => trace!("[{IDENT}] sent notification: {notification:?}"),
                             Err(err) => warn!("[{IDENT}] notification sender error: {err:?}"),
-                            },
+                        },
                         None => trace!("[{IDENT}] no op"),
-                    }
+                    },
                     Err(err) => {
                         warn!("[{IDENT}] error while processing a consensus notification: {err:?}");
                     }
@@ -87,18 +93,18 @@ impl Processor {
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
                 Ok(Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?))
-            },
+            }
             ConsensusNotification::PruningPointUtxoSetOverride(_) => {
                 Ok(Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {}))
-            },
+            }
             ConsensusNotification::VirtualChainChanged(vspcc_notification) => {
                 self.process_virtual_chain_changed_notification(vspcc_notification).await?;
                 Ok(Notification::VirtualChainChanged(vspcc_notification).await?)
-            },
+            }
             ConsensusNotification::ChainAcceptanceDataPrunedNotification(chain_acceptance_data_pruned) => {
                 self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned).await?;
                 Ok(None)
-            },
+            }
             _ => Err(IndexError::NotSupported(notification.event_type())),
         }
     }

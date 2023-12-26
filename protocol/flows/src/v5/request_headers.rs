@@ -86,7 +86,7 @@ impl RequestHeadersFlow {
         high: Hash,
         max_blocks: usize,
     ) -> Result<(Vec<pb::BlockHeader>, Hash), ProtocolError> {
-        let hashes = consensus.get_hashes_between(low, high, max_blocks, false)?.0;
+        let hashes = consensus.get_hashes_between(low, high, max_blocks)?.0;
         let last = *hashes.last().expect("caller ensured that high and low are valid and different");
         debug!("obtained {} header hashes above {}", hashes.len(), low);
         let mut block_headers = Vec::with_capacity(hashes.len());

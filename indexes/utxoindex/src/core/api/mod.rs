@@ -48,7 +48,7 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     /// Update the utxoindex with the given utxo_diff, and tips.
     ///
     /// Note: Use a write lock when accessing this method
-    fn update_via_utxos_changed_notification(
+    fn update(
         &mut self,
         utxos_changed_notification: ConsensusUtxosChangedNotification,
     ) -> UtxoIndexResult<UtxoChanges>;
@@ -85,10 +85,10 @@ impl UtxoIndexProxy {
         spawn_blocking(move || self.inner.read().get_balance_by_script_public_keys(script_public_keys)).await.unwrap()
     }
 
-    pub async fn update_via_utxos_changed_notification(
+    pub async fn update(
         self,
         utxos_changed_notification: ConsensusUtxosChangedNotification,
     ) -> UtxoIndexResult<UtxoChanges> {
-        spawn_blocking(move || self.inner.write().update_via_utxos_changed_notification(utxos_changed_notification)).await.unwrap()
+        spawn_blocking(move || self.inner.write().update(utxos_changed_notification)).await.unwrap()
     }
 }

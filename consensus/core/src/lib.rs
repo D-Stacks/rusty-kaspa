@@ -2,7 +2,6 @@ extern crate alloc;
 extern crate core;
 extern crate self as consensus_core;
 
-use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
 use std::sync::Arc;
@@ -48,8 +47,6 @@ pub type HashKTypeMap = std::sync::Arc<BlockHashMap<KType>>;
 /// Should only be used for block hashes that have correct DAA,
 /// otherwise it is susceptible to DOS attacks via hash collisions.
 pub type BlockHashMap<V> = HashMap<Hash, V, BlockHasher>;
-
-pub type BlockIndexMap<V> = IndexMap<Hash, V, BlockHasher>;
 
 /// Same as `BlockHashMap` but a `HashSet`.
 pub type BlockHashSet = HashSet<Hash, BlockHasher>;

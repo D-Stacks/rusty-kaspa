@@ -446,7 +446,7 @@ impl HeaderProcessor {
         let ghostdag_data = ctx.ghostdag_data.as_ref().unwrap();
 
         // Create a DB batch writer
-        let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
+        let mut batch = WriteBatch::default();
 
         for (level, datum) in ghostdag_data.iter().enumerate() {
             // The data might have been already written when applying the pruning proof.

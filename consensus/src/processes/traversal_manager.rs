@@ -48,18 +48,17 @@ impl<T: GhostdagStoreReader, U: ReachabilityStoreReader, V: RelationsStoreReader
             // It is more intuitive to use forward iterator here, but going downwards the selected chain is faster.
             let mut added = self.reachability_service.backward_chain_iterator(to, common_ancestor, false).collect_vec();
             added.reverse();
-            ChainPath::new(Arc::new(added), Arc::new(removed))
-        } else {
-            // Use forward chain iterator
-            let max_added_traversal_allowed = max_traversal_allowed - removed.len();
-            let added = self
-                .reachability_service
-                .forward_chain_iterator(common_ancestor, to, true)
-                .skip(1)
-                .take(max_added_traversal_allowed)
-                .collect_vec();
-            ChainPath::new(Arc::new(added), Arc::new(removed))
-        }
+            return ChainPath::new(Arc::new(added), Arc::new(removed))
+        }   
+        // Use forward chain iterator
+        let max_added_traversal_allowed = max_traversal_allowed - removed.len();
+        let added = self
+            .reachability_service
+            .forward_chain_iterator(common_ancestor, to, true)
+            .skip(1)
+            .take(max_added_traversal_allowed)
+            .collect_vec();
+        ChainPath::new(Arc::new(added), Arc::new(removed))
     }
 
     pub fn anticone(

@@ -274,10 +274,10 @@ impl Consensus {
             storage,
             services,
             pruning_lock,
+            notification_root,
             counters,
             config,
             creation_timestamp,
-            notification_root: notification_root.clone(),
         }
     }
 
@@ -491,8 +491,21 @@ impl ConsensusApi for Consensus {
         // do the calculation against the virtual itself so that we
         // won't later need to remove it from the result.
         let _guard = self.pruning_lock.blocking_read();
-        self.validate_block_exists(hash)?;
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, self.get_sink()))
+
+        self.validate_block_exists(low)?;
+        let sink = self.get_sink();
+        let high = if let Some(high) = high {
+            self.validate_block_exists(high)?;
+            let new_high = self.find_highest_common_chain_block(high, sink)?;
+            if !self.is_chain_ancestor_of(low, new_high)? {
+                return Err(ConsensusError::ExpectedAncestor(low, high));
+            };
+            new_high
+        } else {
+            sink
+        };
+
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(low, high, max_blocks))
     }
 
     /// Returns a Vec of header samples since genesis
@@ -668,19 +681,13 @@ impl ConsensusApi for Consensus {
     }
 
     // max_blocks has to be greater than the merge set size limit
-    fn get_hashes_between(
-        &self,
-        low: Hash,
-        high: Hash,
-        max_blocks: usize,
-        exclude_vspc_hashes: bool,
-    ) -> ConsensusResult<(Vec<Hash>, Hash)> {
+    fn get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
         let _guard = self.pruning_lock.blocking_read();
         assert!(max_blocks as u64 > self.config.mergeset_size_limit);
         self.validate_block_exists(low)?;
         self.validate_block_exists(high)?;
 
-        Ok(self.services.sync_manager.antipast_hashes_between(low, high, Some(max_blocks), exclude_vspc_hashes))
+        Ok(self.services.sync_manager.antipast_hashes_between(low, high, Some(max_blocks)))
     }
 
     fn get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {
@@ -804,24 +811,14 @@ impl ConsensusApi for Consensus {
         self.statuses_store.read().get(hash).unwrap_option()
     }
 
-    fn get_block_acceptance_data(&self, hash: Hash) -> ConsensusResult<Arc<AcceptanceData>> {
-        self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash))
-    }
-
-    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
-        hashes
+    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
+        Ok(Arc::new(hashes
             .iter()
             .copied()
-            .map(|hash| self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash)))
-            .collect::<ConsensusResult<Vec<_>>>()
-        {
-            Ok(ok_res) => Ok(Arc::new(ok_res)),
-            Err(err_res) => Err(err_res),
-        }
-    }
-
-    fn is_chain_block(&self, hash: Hash) -> ConsensusResult<bool> {
-        self.is_chain_ancestor_of(hash, self.get_sink())
+            .map(|hash| self.acceptance_data_store
+                .get(hash)
+                .map_err(|e| ConsensusError::MissingData(hash)))
+            .collect::<ConsensusResult<Vec<_>>>()?))
     }
 
     fn get_missing_block_body_hashes(&self, high: Hash) -> ConsensusResult<Vec<Hash>> {

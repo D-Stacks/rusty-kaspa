@@ -16,12 +16,9 @@ use kaspa_notify::{
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_utils::triggers::SingleTrigger;
 use kaspa_utxoindex::api::UtxoIndexProxy;
-use std::{
-    os::unix::process,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
 
 /// Processor processes incoming consensus UtxosChanged and PruningPointUtxoSetOverride
@@ -66,26 +63,26 @@ impl Processor {
             return;
         }
         tokio::spawn(async move {
-            trace!("[{IDENT}] collecting task starting");
+            trace!("[Index processor] collecting task starting");
 
             while let Ok(notification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
                     Ok(notification) => match notification {
                         Some(notification) => match notifier.notify(notification) {
-                            Ok(_) => trace!("[{IDENT}] sent notification: {notification:?}"),
-                            Err(err) => warn!("[{IDENT}] notification sender error: {err:?}"),
+                            Ok(_) => trace!("[Index processor] sent notification: {notification:?}"),
+                            Err(err) => warn!("[Index processor] notification sender error: {err:?}"),
                         },
-                        None => trace!("[{IDENT}] no op"),
+                        None => trace!("[Index processor] notification was filtered out"),
                     },
                     Err(err) => {
-                        warn!("[{IDENT}] error while processing a consensus notification: {err:?}");
+                        trace!("[Index processor] error while processing a consensus notification: {err:?}");
                     }
                 }
             }
 
-            debug!("[{IDENT}] notification stream ended");
+            debug!("[Index processor] notification stream ended");
             self.collect_shutdown.trigger.trigger();
-            trace!("[{IDENT}] collecting task ended");
+            trace!("[Index processor] collecting task ended");
         });
     }
 
@@ -116,7 +113,7 @@ impl Processor {
         trace!("[{IDENT}]: processing {:?}", notification);
         if let Some(utxoindex) = self.utxoindex.clone() {
             let converted_notification: UtxosChangedNotification =
-                utxoindex.update_via_utxos_changed_notification(notification).await?.into();
+                utxoindex.update(notification).await?.into();
             debug!(
                 "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
                 converted_notification.added.len(),

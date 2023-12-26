@@ -1,10 +1,8 @@
 use crate::{processor::Processor, IDENT};
-use core::panicking::panic;
 use kaspa_consensus_notify::{
     connection::ConsensusChannelConnection, notification::Notification as ConsensusNotification, notifier::ConsensusNotifier,
 };
 use kaspa_core::{
-    panic,
     task::service::{AsyncService, AsyncServiceError, AsyncServiceFuture},
     trace, warn,
 };
@@ -51,7 +49,7 @@ impl IndexService {
             .into(),
             (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
             (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
-            (false, false) => panic!("At least one of utxoindex or txindex must be enabled to run the index processor"),
+            (false, false) => warn!("At least one of utxoindex or txindex should be enabled to run the index processor"),
         };
         let collector = Arc::new(Processor::new(utxoindex.clone(), txindex.clone(), consensus_notify_channel.receiver()));
         let notifier = Arc::new(IndexNotifier::new(INDEX_SERVICE, events, vec![collector], vec![], 1));

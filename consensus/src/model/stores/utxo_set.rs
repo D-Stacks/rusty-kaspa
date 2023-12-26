@@ -5,9 +5,10 @@ use kaspa_consensus_core::{
         utxo_view::UtxoView,
     },
 };
+use kaspa_database::prelude::StoreError;
 use kaspa_database::prelude::StoreResultExtensions;
 use kaspa_database::prelude::DB;
-use kaspa_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter, StoreError};
+use kaspa_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use kaspa_hashes::Hash;
 use rocksdb::WriteBatch;
 use std::{error::Error, fmt::Display, sync::Arc};

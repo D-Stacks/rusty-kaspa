@@ -6,9 +6,6 @@ use crate::{
     BlockHashMap,
 };
 
-// Acceptance data indexed by accepting chain blocks
-pub type ChainAcceptanceData = BlockHashMap<Vec<MergesetBlockAcceptanceData>>;
-
 pub type AcceptanceData = Vec<MergesetBlockAcceptanceData>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

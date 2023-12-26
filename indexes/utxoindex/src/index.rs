@@ -75,7 +75,7 @@ impl UtxoIndexApi for UtxoIndex {
     /// Updates the [UtxoIndex] via the virtual state supplied:
     /// 1) Saves updated utxo differences, virtual parent hashes and circulating supply to the database.
     /// 2) returns an event about utxoindex changes.
-    fn update_via_utxos_changed_notification(
+    fn update(
         &mut self,
         utxo_changed_notification: ConsensusUtxosChangedNotification,
     ) -> UtxoIndexResult<UtxoChanges> {

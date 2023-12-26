@@ -247,14 +247,8 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.is_chain_ancestor_of(low, high)).await
     }
 
-    pub async fn async_get_hashes_between(
-        &self,
-        low: Hash,
-        high: Hash,
-        max_blocks: usize,
-        exclude_vspc_hashes: bool,
-    ) -> ConsensusResult<(Vec<Hash>, Hash)> {
-        self.clone().spawn_blocking(move |c| c.get_hashes_between(low, high, max_blocks, exclude_vspc_hashes)).await
+    pub async fn async_get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
+        self.clone().spawn_blocking(move |c| c.get_hashes_between(low, high, max_blocks)).await
     }
 
     pub async fn async_get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {

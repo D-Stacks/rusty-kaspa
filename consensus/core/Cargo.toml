@@ -35,7 +35,6 @@ wasm-bindgen.workspace = true
 workflow-core.workspace = true
 workflow-log.workspace = true
 workflow-wasm.workspace = true
-indexmap.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

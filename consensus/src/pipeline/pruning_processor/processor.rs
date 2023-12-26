@@ -370,9 +370,9 @@ impl PruningProcessor {
                 let mut statuses_write = self.statuses_store.write();
 
                 // Collect pruned data to be sent over the notifier for external services
-
-                //check if we need to send before expensive operations.
-                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) {
+                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // chekc if there is a subscription
+                && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // chekc if it is chain data being pruned.  
+                {
                     
                     self.notification_root
                         .notify(ConsensusNotification::ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification::new( 
@@ -381,6 +381,7 @@ impl PruningProcessor {
                             new_pruning_point,
                         ))).expect("expecting an open unbounded channel");
                 };
+                
                 // Prune data related to block bodies and UTXO state
                 self.utxo_multisets_store.delete_batch(&mut batch, current).unwrap();
                 self.utxo_diffs_store.delete_batch(&mut batch, current).unwrap();

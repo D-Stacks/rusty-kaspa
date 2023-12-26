@@ -2229,7 +2229,6 @@ dependencies = [
  "faster-hex 0.6.1",
  "futures-util",
  "getrandom 0.2.11",
- "indexmap 2.1.0",
  "itertools 0.11.0",
  "js-sys",
  "kaspa-addresses",

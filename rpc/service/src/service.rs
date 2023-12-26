@@ -358,7 +358,7 @@ impl RpcApi for RpcCoreService {
         // We use +1 because low_hash is also returned
         // max_blocks MUST be >= mergeset_size_limit + 1
         let max_blocks = self.config.mergeset_size_limit as usize + 1;
-        let (block_hashes, high_hash) = session.async_get_hashes_between(low_hash, sink_hash, max_blocks, false).await?;
+        let (block_hashes, high_hash) = session.async_get_hashes_between(low_hash, sink_hash, max_blocks).await?;
 
         // If the high hash is equal to sink it means get_hashes_between didn't skip any hashes, and
         // there's space to add the sink anticone, otherwise we cannot add the anticone because

@@ -16,9 +16,8 @@ use std::{collections::HashMap, sync::Arc};
 full_featured! {
 #[derive(Clone, Debug, Display)]
 pub enum Notification {
-
+    
     // Notifications pertaining to the UTXO index
-
     #[display(fmt = "UtxosChanged notification")]
     UtxosChanged(UtxosChangedNotification),
 
@@ -26,7 +25,6 @@ pub enum Notification {
     PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification),
 
     // Notifications pertaining to the Tx index
-
     #[display(fmt = "VirtualChainChanged notification")]
     VirtualChainChanged(VirtualChainChangedNotification),
 

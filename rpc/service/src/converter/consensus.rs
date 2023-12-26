@@ -163,7 +163,7 @@ impl ConsensusConverter {
         consensus: &ConsensusProxy,
         chain_path: &ChainPath,
     ) -> RpcResult<Vec<RpcAcceptedTransactionIds>> {
-        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.to_vec()).await.unwrap();
+        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.unwrap_or_clone()).await.unwrap();
         Ok(chain_path
             .added
             .iter()

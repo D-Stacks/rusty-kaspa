@@ -490,20 +490,9 @@ impl ConsensusApi for Consensus {
         // sink. Note that we explicitly don't
         // do the calculation against the virtual itself so that we
         // won't later need to remove it from the result.
-        self.validate_block_exists(low)?;
-        let sink = self.get_sink();
-        let high = if let Some(high) = high {
-            self.validate_block_exists(high)?;
-            let new_high = self.find_highest_common_chain_block(high, sink)?;
-            if !self.is_chain_ancestor_of(low, new_high)? {
-                return Err(ConsensusError::ExpectedAncestor(low, high));
-            };
-            new_high
-        } else {
-            sink
-        };
-
-        Ok(self.services.dag_traversal_manager.calculate_chain_path(low, high, max_blocks))
+        let _guard = self.pruning_lock.blocking_read();
+        self.validate_block_exists(hash)?;
+        Ok(self.services.dag_traversal_manager.calculate_chain_path(hash, self.get_sink()))
     }
 
     /// Returns a Vec of header samples since genesis
@@ -665,7 +654,6 @@ impl ConsensusApi for Consensus {
 
         Ok(())
     }
-
     fn find_highest_common_chain_block(&self, low: Hash, high: Hash) -> ConsensusResult<Hash> {
         self.validate_block_exists(low)?;
         self.validate_block_exists(high)?;
@@ -701,11 +689,6 @@ impl ConsensusApi for Consensus {
 
     fn get_headers_selected_tip(&self) -> Hash {
         self.headers_selected_tip_store.read().get().unwrap().hash
-    }
-
-    fn get_none_vspc_merged_blocks(&self) -> ConsensusResult<Vec<Hash>> {
-        let _guard = self.pruning_lock.blocking_read();
-        Ok(self.services.dag_traversal_manager.antipast(self.get_sink(), self.get_tips().into_iter(), None)?)
     }
 
     fn get_antipast_from_pov(&self, hash: Hash, context: Hash, max_traversal_allowed: Option<u64>) -> ConsensusResult<Vec<Hash>> {
@@ -770,7 +753,6 @@ impl ConsensusApi for Consensus {
             transactions: self.block_transactions_store.get(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))?,
         })
     }
-
     fn get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
         if match self.statuses_store.read().get(hash).unwrap_option() {
             Some(status) => !status.has_block_body(),
@@ -826,8 +808,8 @@ impl ConsensusApi for Consensus {
         self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash))
     }
 
-    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
-        match hashes
+    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
+        hashes
             .iter()
             .copied()
             .map(|hash| self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash)))

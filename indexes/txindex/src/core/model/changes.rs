@@ -1,11 +1,10 @@
 use crate::model::{BlockAcceptanceOffset, TxOffset};
-use kaspa_consensus::model::stores::acceptance_data;
 use kaspa_consensus_core::{
     tx::{TransactionId, TransactionIndexType},
     BlockHashMap, BlockHashSet, HashMapCustomHasher,
 };
 use kaspa_hashes::Hash;
-use kaspa_index_core::notification::VirtualChainChangedNotification;
+use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification};
 use kaspa_utils::arc::ArcExtensions;
 use std::{
     collections::{HashMap, HashSet},
@@ -64,8 +63,8 @@ impl TxIndexVSPCCChanges {
     }
 }
 
-impl From<VirtualChainChangedNotification> for TxIndexVSPCCChanges {
-    fn from(vspcc_notification: VirtualChainChangedNotification) -> Self {
+impl From<ConsensusVirtualChainChangedNotification> for TxIndexVSPCCChanges {
+    fn from(vspcc_notification: ConsensusVirtualChainChangedNotification) -> Self {
         let new_sink = match vspcc_notification.added_chain_block_hashes.last() {
             Some(new_sink) => *new_sink,
             None => *vspcc_notification

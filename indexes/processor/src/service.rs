@@ -49,7 +49,10 @@ impl IndexService {
             .into(),
             (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
             (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
-            (false, false) => warn!("At least one of utxoindex or txindex should be enabled to run the index processor"),
+            (false, false) => {
+                warn!("At least one of utxoindex or txindex should be enabled to run the index processor")
+                [].as_ref().into()
+            },
         };
         let collector = Arc::new(Processor::new(utxoindex.clone(), txindex.clone(), consensus_notify_channel.receiver()));
         let notifier = Arc::new(IndexNotifier::new(INDEX_SERVICE, events, vec![collector], vec![], 1));

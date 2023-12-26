@@ -8,7 +8,7 @@ use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler, ConsensusS
 use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
-use kaspa_index_core::notification::{ChainAcceptanceDataPrunedNotification, VirtualChainChangedNotification};
+use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
 use kaspa_utils::as_slice::AsSlice;
 use parking_lot::RwLock;
 use rocksdb::WriteBatch;
@@ -110,7 +110,7 @@ impl TxIndex {
 
             start_hash = *chain_path.checkpoint_hash().expect("chain path should not be empty");
 
-            let vspcc_notification = VirtualChainChangedNotification::new(
+            let vspcc_notification = ConsensusVirtualChainChangedNotification::new(
                 chain_path.added,
                 chain_path.removed,
                 added_chain_blocks_acceptance_data,
@@ -247,7 +247,7 @@ impl TxIndexApi for TxIndex {
     }
 
     // Update methods
-    fn update_via_vspcc_added(&mut self, vspcc_notification: VirtualChainChangedNotification) -> TxIndexResult<()> {
+    fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
         trace!(
             "[{0:?}] Updating db with {1} added chain blocks and {2} removed chain blocks",
             self,
@@ -270,7 +270,7 @@ impl TxIndexApi for TxIndex {
 
     fn update_via_chain_acceptance_data_pruned(
         &mut self,
-        _chain_acceptance_data_pruned: ChainAcceptanceDataPrunedNotification,
+        _chain_acceptance_data_pruned: ConsensusChainAcceptanceDataPrunedNotification,
     ) -> TxIndexResult<()> {
         todo!()
     }

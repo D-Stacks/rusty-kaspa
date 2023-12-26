@@ -10,7 +10,6 @@ use kaspa_notify::{
     collector::{Collector, CollectorNotificationReceiver},
     error::Result,
     events::EventType,
-    notification::Notification as NotificationTrait,
     notifier::DynNotify,
 };
 use kaspa_txindex::api::TxIndexProxy;
@@ -86,20 +85,20 @@ impl Processor {
         });
     }
 
-    async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Option<Notification>> {
+    async fn process_notification(self: &Arc<Self>, notification: kaspa_consensus_notify::Notification) -> IndexResult<Option<kaspa_index_core::notification::Notification>> {
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
-                Ok(Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?))
+                Ok(Some(kaspa_index_core::notification::Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?)))
             }
             ConsensusNotification::PruningPointUtxoSetOverride(_) => {
-                Ok(Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {}))
+                Ok(Some(kaspa_index_core::notification::Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {})))
             }
             ConsensusNotification::VirtualChainChanged(vspcc_notification) => {
                 self.process_virtual_chain_changed_notification(vspcc_notification).await?;
-                Ok(Notification::VirtualChainChanged(vspcc_notification).await?)
+                Ok(Some(kaspa_index_core::notification::Notification::VirtualChainChanged(vspcc_notification.into())))
             }
-            ConsensusNotification::ChainAcceptanceDataPrunedNotification(chain_acceptance_data_pruned) => {
-                self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned).await?;
+            ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned) => {
+                self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned);
                 Ok(None)
             }
             _ => Err(IndexError::NotSupported(notification.event_type())),
@@ -129,8 +128,8 @@ impl Processor {
         notification: consensus_notification::VirtualChainChangedNotification,
     ) -> IndexResult<consensus_notification::VirtualChainChangedNotification> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_vspcc_added(notification.into()).await?.into();
-            return Ok(());
+            txindex.update_via_vspcc_added(consensus_notification.into()).await?.into();
+            return Ok(notification);
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
     }
@@ -140,7 +139,7 @@ impl Processor {
         notification: consensus_notification::ChainAcceptanceDataPrunedNotification,
     ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_chain_acceptance_data_pruned(notification.into()).await?.into();
+            txindex.update_via_chain_acceptance_data_pruned(notification).await?;
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))

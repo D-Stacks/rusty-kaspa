@@ -7,6 +7,9 @@ pub enum IndexError {
     #[error("{0}")]
     UtxoIndexError(#[from] UtxoIndexError),
 
+    #[error("{0}")]
+    TxIndexError(#[from] TxIndexError),
+
     #[error("event type {0:?} is not supported")]
     NotSupported(EventType),
 }

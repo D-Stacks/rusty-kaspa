@@ -114,7 +114,7 @@ impl PruningProcessor {
             ghostdag_managers: services.ghostdag_managers.clone(),
             pruning_point_manager: services.pruning_point_manager.clone(),
             pruning_proof_manager: services.pruning_proof_manager.clone(),
-            notification_root.clone(),
+            notification_root: notification_root.clone(),
             pruning_lock,
             config
         }

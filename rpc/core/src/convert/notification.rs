@@ -152,21 +152,21 @@ impl From<&index_notify::VirtualChainChangedNotification> for VirtualChainChange
             accepted_transaction_ids: Arc::new(item.added_chain_blocks_acceptance_data
                 .iter()
                 .zip(item.added_chain_block_hashes.iter())
-                .flat_map(|(block_mergesets_acceptance, block_hash)| {
+                .flat_map(|(block_mergesets_acceptance, accepting_block_hash)| {
                     block_mergesets_acceptance
                     .iter()
-                    .map(move |mergeset_block_acceptance| {
+                    .map(|mergeset_block_acceptance| {
                         RpcAcceptedTransactionIds {
-                            accepting_block_hash: block_hash.to_owned(),
+                            accepting_block_hash: accepting_block_hash.to_owned(),
                             accepted_transaction_ids: mergeset_block_acceptance.accepted_transactions
-                                .into_iter()
+                                .iter()
                                 .map(|tx_entry| tx_entry.transaction_id)
                                 .collect::<Vec<_>>()
                         }
                     })
                 }).collect::<Vec<_>>()),
-            removed_chain_block_hashes: item.removed_chain_block_hashes,
-            added_chain_block_hashes: item.added_chain_block_hashes,
+            removed_chain_block_hashes: item.removed_chain_block_hashes.clone(),
+            added_chain_block_hashes: item.added_chain_block_hashes.clone(),
         }
     }
 }

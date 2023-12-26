@@ -1,45 +1,39 @@
-use crate::{
-    errors::{TxIndexError, TxIndexResult},
-    model::{TxOffset, BlockAcceptanceOffset},
-};
-use kaspa_consensus::processes::ghostdag::mergeset;
+use crate::model::{TxOffset, BlockAcceptanceOffset};
+use kaspa_consensus::model::stores::acceptance_data;
 use kaspa_consensus_core::{
-    acceptance_data::{AcceptanceData, TxEntry, MergesetBlockAcceptanceData},
-    block::Block,
-    tx::{Transaction, TransactionId, TransactionIndexType},
-    BlockHashMap, HashMapCustomHasher, BlockHashSet, errors::tx,
+    tx::{TransactionId, TransactionIndexType},
+    BlockHashMap, BlockHashSet, HashMapCustomHasher,
 };
-use kaspa_consensus_notify::notification::{VirtualChainChangedNotification, BlockAddedNotification};
+use kaspa_index_core::notification::VirtualChainChangedNotification;
 use kaspa_hashes::Hash;
+use kaspa_utils::arc::ArcExtensions;
 use std::{sync::Arc, collections::{HashMap, HashSet}};
 
-use super::BlockAcceptanceOffset;
-
-pub struct TxIndexBlockRemovedChanges {
-    pub offsets_removed: Arc<Vec<TransactionId>>,
-    pub block_removed: Hash,
-    pub history_root: Hash,
+#[derive(Debug, Clone, Default)]
+pub struct TxOffsetChanges {
+    pub to_add: Arc<HashMap<TransactionId, TxOffset>>,
+    pub to_remove: Arc<HashSet<TransactionId>>,
 }
 
-impl TxIndexBlockRemovedChanges {
-    fn new(offsets_removed: Arc<Vec<TransactionId>>, block_removed: Hash, history_root: Hash) -> Self {
-        Self { offsets_removed, block_removed, history_root }
+impl TxOffsetChanges {
+    pub fn new(to_remove: Arc<HashSet<TransactionId>>, to_add: Arc<HashMap<TransactionId, TxOffset>>) -> Self {
+        Self { to_remove, to_add }
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct TxOffsetChanges {
-    pub to_remove: Arc<HashMap<TransactionId, TxOffset>>,
-    pub to_add: Arc<HashSet<TransactionId>>,
-}
-
-#[derive(Debug, Clone, Default)]
 pub struct BlockAcceptanceOffsetsChanges {
-    pub to_add: Arc<BlockHashMap<Hash, TxOffset>>,
+    pub to_add: Arc<BlockHashMap<BlockAcceptanceOffset>>,
     pub to_remove: Arc<BlockHashSet>,
 }
 
-pub struct TxIndexVSPCCReindexer {
+impl BlockAcceptanceOffsetsChanges {
+    pub fn new(to_add: Arc<BlockHashMap<BlockAcceptanceOffset>>, to_remove: Arc<BlockHashSet>) -> Self {
+        Self { to_add, to_remove }
+    }
+}   
+
+pub struct TxIndexVSPCCChanges {
     pub block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges,
     pub tx_offset_changes: TxOffsetChanges,
     pub new_sink: Hash,
@@ -49,70 +43,78 @@ impl TxIndexVSPCCChanges {
     pub fn new(block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges, tx_offset_changes: TxOffsetChanges, new_sink: Hash) -> Self {
         Self { block_acceptance_offsets_changes, tx_offset_changes, new_sink }
     }
+
+    pub fn block_acceptance_offsets_changes(&self) -> BlockAcceptanceOffsetsChanges {
+        self.block_acceptance_offsets_changes.clone()
+    }
+
+    pub fn tx_offset_changes(&self) -> TxOffsetChanges {
+        self.tx_offset_changes.clone()
+    }
+
+    pub fn new_sink(&self) -> Hash {
+        self.new_sink
+    }
 }
 
 impl From<VirtualChainChangedNotification> for TxIndexVSPCCChanges {
     fn from(vspcc_notification: VirtualChainChangedNotification) -> Self {
-        let tx_offsets_accepted = HashMap::new();
-        let tx_offsets_unaccepted = HashSet::new();
+        
+        let new_sink = match vspcc_notification.added_chain_block_hashes.last() { 
+            Some(new_sink) => *new_sink,
+            None => *vspcc_notification.removed_chain_block_hashes.last().expect("Expected at least one block to be added or removed, i.e. a none_empty chain path"),
+        };
+
+        drop(vspcc_notification.removed_chain_block_hashes); // we do not require this anymore. 
+
+        let mut tx_offsets_to_add = HashMap::new();
+        let mut tx_offsets_to_remove = HashSet::new();
+        let mut block_acceptance_offsets_to_add = BlockHashMap::<BlockAcceptanceOffset>::new();
+        let mut block_acceptance_offsets_to_remove = BlockHashSet::new();
+
+
+        for (accepting_block_hash, acceptance_data) in vspcc_notification
+            .added_chain_block_hashes.unwrap_or_clone()
+            .into_iter()
+            .zip(vspcc_notification.added_chain_blocks_acceptance_data.unwrap_or_clone().into_iter()) {
+                for (i, mergeset) in acceptance_data.unwrap_or_clone().into_iter().enumerate() {
+                    tx_offsets_to_add.extend(
+                        mergeset
+                            .accepted_transactions
+                            .into_iter()
+                            .map(|tx_entry| (tx_entry.transaction_id, TxOffset::new(mergeset.block_hash, i as TransactionIndexType))),
+                    );
+
+                    block_acceptance_offsets_to_add.insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block_hash, i as u16));
+                }
+            };
+        
+        for acceptance_data in vspcc_notification.removed_chain_blocks_acceptance_data.unwrap_or_clone().into_iter() {
+            for mergeset in acceptance_data.unwrap_or_clone().into_iter() {
+                tx_offsets_to_remove.extend(
+                    mergeset
+                        .accepted_transactions
+                        .into_iter()
+                        .filter(|tx_entry| tx_offsets_to_add.contains_key(&tx_entry.transaction_id))
+                        .map(|tx_entry| tx_entry.transaction_id)
+                );
+
+                if !block_acceptance_offsets_to_add.contains_key(&mergeset.block_hash) {
+                    block_acceptance_offsets_to_remove.insert(mergeset.block_hash);
+                };
+            };
+        };
+
         Self { 
-            block_acceptance_offsets_added: BlockAcceptanceOffsetsChanges {
-            
-            to_add: vspcc_notification
-                .added_chain_block_hashes
-                .into_iter()
-                .zip(vspcc_notification.added_chain_blocks_acceptance_data.into_iter())
-                .map(|(accepting_block_hash, acceptance_data)| {
-                    acceptance_data
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, mergeset)| {
-                            tx_offsets_accepted.extend(
-                                mergeset
-                                    .accepted_transactions
-                                    .into_iter()
-                                    .map(|tx_entry| (
-                                        tx_entry.transaction_id,
-                                        TxOffset::new(mergeset.block_hash, tx_entry.index_within_block),
-                                    )),
-                            );
-                            (mergeset.block_hash, (accepting_block_hash, i))
-                        })
-                        .collect()
-                }), 
-            
-            to_remove: vspcc_notification
-                .removed_chain_block_hashes
-                .into_iter()
-                .zip(vspcc_notification.removed_chain_blocks_acceptance_data.into_iter())
-                .map(|(accepting_block_hash, acceptance_data)| {
-                    acceptance_data
-                        .into_iter()
-                        .map(|mergeset| {
-                            tx_offsets_unaccepted.extend(
-                                mergeset
-                                    .accepted_transactions
-                                    .into_iter()
-                                    .filter_map(|tx_entry| {
-                                        if tx_offsets_accepted.contains_key(&tx_entry.transaction_id) {
-                                            None
-                                        } else {
-                                            Some(tx_id)
-                                        }
-                                    }),
-                            );
-                            (mergeset.block_hash, accepting_block_hash)
-                        })
-                        .collect()
-                }),
-        },
-        
-        tx_offset_changes: TxOffsetChanges {
-            to_remove: tx_offsets_accepted,
-            to_add: tx_offsets_unaccepted,
-        },
-        
-        new_sink: vspcc_notification.added_chain_block_hashes.last().unwrap()
-     }
+            new_sink,
+            block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges {
+                to_add: Arc::new(block_acceptance_offsets_to_add),
+                to_remove: Arc::new(block_acceptance_offsets_to_remove),
+            },
+            tx_offset_changes: TxOffsetChanges {
+                to_add: Arc::new(tx_offsets_to_add),
+                to_remove: Arc::new(tx_offsets_to_remove),
+            },
+        }
     }
 }

@@ -2913,7 +2913,6 @@ dependencies = [
  "futures",
  "kaspa-consensus",
  "kaspa-consensus-core",
- "kaspa-consensus-notify",
  "kaspa-consensusmanager",
  "kaspa-core",
  "kaspa-database",

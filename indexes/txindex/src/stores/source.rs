@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use kaspa_database::{
-    prelude::{CachedDbItem, DirectDbWriter, StoreResult, DB},
+    prelude::{CachedDbItem, StoreResult, DB, BatchDbWriter, StoreError},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
+use rocksdb::WriteBatch;
 
 // TODO (when pruning is implemented): Use this store to check sync and resync from earliest header pruning point.
 // TODO: move to db registry
@@ -12,12 +13,12 @@ pub const STORE_PREFIX: &[u8] = b"txindex-source";
 
 /// Reader API for `Source`.
 pub trait TxIndexSourceReader {
-    fn get(&self) -> StoreResult<Hash>;
+    fn get(&self) -> StoreResult<Option<Hash>>;
 }
 
 pub trait TxIndexSourceStore: TxIndexSourceReader {
-    fn set(&mut self, source: Hash) -> StoreResult<()>;
-    fn remove(&mut self) -> StoreResult<()>;
+    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()>;
+    fn remove_batch_via_batch_writer(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
 }
 
 /// A DB + cache implementation of `TxIndexSource` trait, with concurrent readers support.
@@ -38,17 +39,20 @@ impl DbTxIndexSourceStore {
 }
 
 impl TxIndexSourceReader for DbTxIndexSourceStore {
-    fn get(&self) -> StoreResult<Hash> {
+    fn get(&self) -> StoreResult<Option<Hash>> {
         self.access.read()
+        .map(Some)
+        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
 }
 
 impl TxIndexSourceStore for DbTxIndexSourceStore {
-    fn set(&mut self, source: Hash) -> StoreResult<()> {
-        self.access.write(DirectDbWriter::new(&self.db), &source)
+    fn remove_batch_via_batch_writer(&mut self, batch: &mut WriteBatch) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.remove(&mut writer)
     }
-
-    fn remove(&mut self) -> StoreResult<()> {
-        self.access.remove(DirectDbWriter::new(&self.db))
+    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.write(&mut writer, &sink)
     }
 }

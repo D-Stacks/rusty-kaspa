@@ -1,5 +1,5 @@
 use kaspa_consensus_core::errors::consensus::ConsensusError;
-use std::{io, string::FromUtf8Error};
+use std::io;
 use thiserror::Error;
 
 use crate::IDENT;
@@ -15,19 +15,10 @@ pub enum TxIndexError {
     DBResetError(#[from] io::Error),
 
     #[error("[{IDENT}]: {0}")]
-    ByteStringLUtf8ConversionError(#[from] FromUtf8Error),
-
-    #[error("[{IDENT}]: Trying to read from uninitialized store: `{0}`")]
-    DBReadingFromUninitializedStoreError(String),
-
-    #[error("[{IDENT}]: {0}")]
     ConsensusQueryError(#[from] ConsensusError),
 
     #[error("[{IDENT}]: {0}")]
-    NoProcessingPurposeError(String),
-
-    #[error("[{IDENT}]: {0}")]
-    ReindexingError(String),
+    RocksDBError(#[from] rocksdb::Error),
 }
 
 /// Results originating from the [`TxIndex`].

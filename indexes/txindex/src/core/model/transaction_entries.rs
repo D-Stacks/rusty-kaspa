@@ -1,15 +1,11 @@
-use kaspa_consensus::model::stores::{headers::CompactHeaderData, acceptance_data::DbAcceptanceDataStore, block_transactions::DbBlockTransactionsStore};
-use kaspa_consensus_core::{
-    tx::{TransactionIndexType, Transaction}, acceptance_data::MergesetBlockAcceptanceData,
-};
+use kaspa_consensus_core::tx::TransactionIndexType;
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 
 pub struct TxInclusionVerboseData {
     /// This corrosponds to a block hash which includes the transaction 
     /// 
-    /// 1) in cases where the tx is not yet accepted, it will be the last seen block which holds the tx, this is not deterministic between nodes. 
-    /// 2) in cases where the tx is accepted it will corrospond to the block hash which held the tx when it was successfully merged. This is deterministic between nodes.
+    /// corrosponds to the block hash which held the tx when it was successfully merged. This is deterministic between nodes.
     block: Hash,
     daa_score: u64,
     blue_score: u64,
@@ -36,12 +32,14 @@ impl TxAcceptanceVerboseData {
 
     /// When passing the `pov_blue_score`, preference should be to use the blue score of the sink cached by the txindex itself. 
     pub fn new(&self, block: Hash, daa_score: u64, blue_score: u64, timestamp: u64, pov_blue_score: Option<u64>) -> Self {
-        Self { block, daa_score, blue_score, timestamp, confirmations: match pov_blue_score {
-            Some(pov_blue_score) => pov_blue_score.checked_sub(blue_score),
-            None => None,
+        Self { 
+            block, 
+            daa_score, 
+            blue_score, 
+            timestamp, 
+            confirmations: pov_blue_score.map_or(None, move |pov_blue_score| blue_score.checked_sub(pov_blue_score))
         }
     }
-}
 }
 
 pub struct TxIndexEntryCompact {
@@ -74,11 +72,11 @@ impl TxOffset {
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
 pub struct BlockAcceptanceOffset {
     accepting_block: Hash,
-    ordered_mergeset_index: usize,
+    ordered_mergeset_index: u16,
 }
 
 impl BlockAcceptanceOffset {
-    pub fn new(accepting_block: Hash, ordered_mergeset_index: usize) -> Self {
+    pub fn new(accepting_block: Hash, ordered_mergeset_index: u16) -> Self {
         Self { accepting_block, ordered_mergeset_index }
     }
 
@@ -86,7 +84,7 @@ impl BlockAcceptanceOffset {
         self.accepting_block
     }
 
-    pub fn ordered_mergeset_index(&self) -> usize {
+    pub fn ordered_mergeset_index(&self) -> u16 {
         self.ordered_mergeset_index
     }
 }

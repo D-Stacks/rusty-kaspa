@@ -1,27 +1,25 @@
-use crate::model::{TxCompactEntriesById, TxOffset, TxOffsetById};
+use crate::model::{TxOffset, TxOffsetChanges};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{
-    prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB},
+    prelude::{CachedDbAccess, StoreResult, DB, BatchDbWriter, StoreError},
     registry::DatabaseStorePrefixes,
 };
-use kaspa_hashes::Hash;
+use rocksdb::WriteBatch;
 use std::sync::Arc;
 
 // Traits:
 pub trait TxIndexAcceptedTxOffsetsReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
-    fn get(&self, transaction_id: TransactionId) -> StoreResult<TxOffset>;
+    fn get(&self, transaction_id: TransactionId) -> StoreResult<Option<TxOffset>>;
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool>;
 }
 
 pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsReader {
-    fn remove_many(&mut self, transaction_ids: Arc<Vec<TransactionId>>) -> StoreResult<()>;
-    fn insert_many(&mut self, transaction_offsets_by_id: Arc<TxOffsetById>) -> StoreResult<()>;
-
-    fn delete_all(&mut self) -> StoreResult<()>;
+    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetChanges) -> StoreResult<()>;
+    fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
+    
 }
-
 // Implementations:
 
 #[derive(Clone)]
@@ -37,31 +35,29 @@ impl DbTxIndexAcceptedTxOffsetsStore {
 }
 
 impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
-    fn get(&self, transaction_id: TransactionId) -> StoreResult<TxOffset> {
+    fn get(&self, transaction_id: TransactionId) -> StoreResult<Option<TxOffset>> {
         self.access.read(transaction_id)
+        .map(Some)
+        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
-
+    
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool> {
         self.access.has(transaction_id)
     }
 }
 
 impl TxIndexAcceptedTxOffsetsStore for DbTxIndexAcceptedTxOffsetsStore {
-    fn remove_many(&mut self, mut transaction_ids: Arc<Vec<TransactionId>>) -> StoreResult<()> {
-        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
-
-        self.access.delete_many(writer, &mut transaction_ids.into_iter()) // delete_many does "try delete" under the hood.
+    
+    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetChanges) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.delete_many(&mut writer, &mut tx_offset_changes.to_remove.iter().cloned())?;
+        self.access.write_many(&mut writer, &mut tx_offset_changes.to_add.iter().map(|(a, b)| (*a, *b)))?;
+        Ok(())
     }
-
-    fn insert_many(&mut self, transaction_offsets_by_id: Arc<TxOffsetById>) -> StoreResult<()> {
-        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
-
-        self.access.write_many(writer, &mut transaction_entries_by_id.iter())
-    }
-
     /// Removes all [`TxOffsetById`] values and keys from the cache and db.
-    fn delete_all(&mut self) -> StoreResult<()> {
-        let mut writer = DirectDbWriter::new(&self.db);
+    fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
         self.access.delete_all(&mut writer)
     }
+    
 }

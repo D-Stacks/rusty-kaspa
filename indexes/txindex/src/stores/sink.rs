@@ -1,19 +1,20 @@
 use std::sync::Arc;
 
 use kaspa_database::{
-    prelude::{CachedDbItem, DirectDbWriter, StoreResult, DB},
+    prelude::{CachedDbItem, StoreResult, DB, BatchDbWriter, StoreError},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
+use rocksdb::WriteBatch;
 
 /// Reader API for `SinkStore`.
 pub trait TxIndexSinkReader {
-    fn get(&self) -> StoreResult<Hash>;
+    fn get(&self) -> StoreResult<Option<Hash>>;
 }
 
 pub trait TxIndexSinkStore: TxIndexSinkReader {
-    fn set(&mut self, sink: Hash) -> StoreResult<()>;
-    fn remove(&mut self) -> StoreResult<()>;
+    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()>;
+    fn remove_batch_via_batch_writer(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
 }
 
 /// A DB + cache implementation of `SinkStore` trait, with concurrent readers support.
@@ -34,17 +35,21 @@ impl DbTxIndexSinkStore {
 }
 
 impl TxIndexSinkReader for DbTxIndexSinkStore {
-    fn get(&self) -> StoreResult<Hash> {
+    fn get(&self) -> StoreResult<Option<Hash>> {
         self.access.read()
+        .map(Some)
+        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
 }
 
 impl TxIndexSinkStore for DbTxIndexSinkStore {
-    fn set(&mut self, sink: Hash) -> StoreResult<()> {
-        self.access.write(DirectDbWriter::new(&self.db), &sink)
+    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.write(&mut writer, &sink)
     }
 
-    fn remove(&mut self) -> StoreResult<()> {
-        self.access.remove(DirectDbWriter::new(&self.db))
+    fn remove_batch_via_batch_writer(&mut self, batch: &mut WriteBatch) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.remove(&mut writer)
     }
 }

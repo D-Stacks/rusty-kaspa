@@ -10,7 +10,7 @@ use kaspa_index_core::notifier::IndexNotifier;
 use kaspa_notify::{
     connection::ChannelType,
     events::{EventSwitches, EventType},
-    scope::{PruningPointUtxoSetOverrideScope, Scope, UtxosChangedScope, BlockAddedScope, BlockBodyPrunedScope, VirtualChainChangedScope},
+    scope::{PruningPointUtxoSetOverrideScope, Scope, UtxosChangedScope, BlockAddedScope, BlockBodyPrunedScope, VirtualChainChangedScope, ChainAcceptanceDataPrunedScope},
 };
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utxoindex::api::UtxoIndexProxy;
@@ -37,9 +37,9 @@ impl IndexService {
         // Prepare the index-processor notifier
         // No subscriber is defined here because the subscription are manually created during the construction and never changed after that.
         let events: EventSwitches =  match (utxoindex.is_some(), txindex.is_some()) {
-            (true, true) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride, EventType::VirtualChainChanged, EventType::BlockBodyPruned].as_ref().into(),
+            (true, true) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride, EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
             (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
-            (false, true) => [EventType::VirtualChainChanged, EventType::BlockBodyPruned].as_ref().into(),
+            (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
             (false, false) => panic!("At least one of utxoindex or txindex must be enabled to run the index processor"),
         };
         let collector = Arc::new(Processor::new(utxoindex.clone(), txindex.clone(), consensus_notify_channel.receiver()));
@@ -64,7 +64,7 @@ impl IndexService {
                 .try_start_notify(consensus_notify_listener_id, Scope::VirtualChainChanged(VirtualChainChangedScope::new(true)))
                 .expect("the subscription always succeeds");
             consensus_notifier
-            .try_start_notify(consensus_notify_listener_id, Scope::BlockBodyPruned(BlockBodyPrunedScope {}))
+            .try_start_notify(consensus_notify_listener_id, Scope::ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedScope {}))
             .expect("the subscription always succeeds");
         }
 
@@ -79,7 +79,7 @@ impl IndexService {
         self.utxoindex.clone()
     }
 
-    pub fn txindex(&self) -> Option<UtxoIndexProxy> {
+    pub fn txindex(&self) -> Option<TxIndexProxy> {
         self.txindex.clone()
     }
 }

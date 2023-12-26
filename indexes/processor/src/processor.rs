@@ -64,10 +64,13 @@ impl Processor {
 
             while let Ok(notification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
-                    Ok(notification) => match notifier.notify(notification) {
-                        Ok(_) => trace!("[{IDENT}] sent notification: {notification:?}"),
-                        Err(err) => warn!("[{IDENT}] notification sender error: {err:?}"),
-                        },
+                    Ok(notification) => match notification {
+                        Some(notification) => match notifier.notify(notification) {
+                            Ok(_) => trace!("[{IDENT}] sent notification: {notification:?}"),
+                            Err(err) => warn!("[{IDENT}] notification sender error: {err:?}"),
+                            },
+                        None => trace!("[{IDENT}] no op"),
+                    }
                     Err(err) => {
                         warn!("[{IDENT}] error while processing a consensus notification: {err:?}");
                     }
@@ -80,7 +83,7 @@ impl Processor {
         });
     }
 
-    async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Notification> {
+    async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Option<Notification>> {
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
                 Ok(Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?))
@@ -89,12 +92,12 @@ impl Processor {
                 Ok(Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {}))
             },
             ConsensusNotification::VirtualChainChanged(vspcc_notification) => {
-                self.process_block_added_notification(vspcc_notification).await?;
-                Ok(Notification::VirtualChainChanged(vspcc_notification.into()).await?)
+                self.process_virtual_chain_changed_notification(vspcc_notification).await?;
+                Ok(Notification::VirtualChainChanged(vspcc_notification).await?)
             },
             ConsensusNotification::ChainAcceptanceDataPrunedNotification(chain_acceptance_data_pruned) => {
-                self.process_block_added_notification(chain_acceptance_data_pruned).await?;
-                Ok(Notification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned.into()).await?)
+                self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned).await?;
+                Ok(None)
             },
             _ => Err(IndexError::NotSupported(notification.event_type())),
         }
@@ -121,20 +124,20 @@ impl Processor {
     async fn process_virtual_chain_changed_notification(
         self: &Arc<Self>,
         notification: consensus_notification::VirtualChainChangedNotification,
-    ) -> IndexResult<UtxosChangedNotification> {
+    ) -> IndexResult<consensus_notification::VirtualChainChangedNotification> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_vspcc_added(notification).await?;
+            txindex.update_via_vspcc_added(notification.into()).await?.into();
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
     }
 
-    async fn process_block_body_pruned_notification(
+    async fn process_chain_acceptance_data_pruned(
         self: &Arc<Self>,
         notification: consensus_notification::ChainAcceptanceDataPrunedNotification,
-    ) -> IndexResult<UtxosChangedNotification> {
+    ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_block_block_body_pruned(notification).await?;
+            txindex.update_via_chain_acceptance_data_pruned(notification.into()).await?.into();
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))

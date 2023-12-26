@@ -1,23 +1,25 @@
 use kaspa_consensus_core::BlockHasher;
 use kaspa_database::{
-    prelude::{CachedDbAccess, DirectDbWriter, StoreResult, DB},
+    prelude::{CachedDbAccess, StoreResult, DB, BatchDbWriter, StoreError},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
+use rocksdb::WriteBatch;
 use std::sync::Arc;
+
+use crate::model::{BlockAcceptanceOffsetsChanges, BlockAcceptanceOffset};
 
 // Traits:
 
 pub trait TxIndexMergedBlockAcceptanceReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
-    fn get(&self, block_hash: Hash) -> StoreResult<Hash>;
+    fn get(&self, block_hash: Hash) -> StoreResult<Option<BlockAcceptanceOffset>>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
 }
 
-pub trait TxIndexMergedBlockAcceptanceStore: TxIndexMergedBlockAcceptanceReader {
-    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()>;
-    fn insert_many(&mut self, accepting_block_hash: Hash, accepted_hashes: Vec<Hash>) -> StoreResult<()>;
-    fn delete_all(&mut self) -> StoreResult<()>;
+pub trait TxIndexMergedBlockAcceptanceStore {
+    fn write_diff_batch(&mut self, batch: &mut WriteBatch, block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges) -> StoreResult<()>;
+    fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
 }
 
 // Implementations:
@@ -25,7 +27,7 @@ pub trait TxIndexMergedBlockAcceptanceStore: TxIndexMergedBlockAcceptanceReader 
 #[derive(Clone)]
 pub struct DbTxIndexMergedBlockAcceptanceStore {
     db: Arc<DB>,
-    access: CachedDbAccess<Hash, Hash, BlockHasher>,
+    access: CachedDbAccess<Hash, BlockAcceptanceOffset, BlockHasher>,
 }
 
 impl DbTxIndexMergedBlockAcceptanceStore {
@@ -38,8 +40,10 @@ impl DbTxIndexMergedBlockAcceptanceStore {
 }
 
 impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore {
-    fn get(&self, block_hash: Hash) -> StoreResult<Hash> {
+    fn get(&self, block_hash: Hash) -> StoreResult<Option<BlockAcceptanceOffset>> {
         self.access.read(block_hash)
+        .map(Some)
+        .or_else(|e| if let StoreError::KeyNotFound(_) = e { Ok(None) } else { Err(e) })
     }
 
     fn has(&self, block_hash: Hash) -> StoreResult<bool> {
@@ -48,24 +52,21 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
 }
 
 impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
-    fn remove_many(&mut self, block_hashes: Vec<Hash>) -> StoreResult<()> {
-        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
-
-        self.access.delete_many(writer, &mut block_hashes.into_iter())
+    
+    fn write_diff_batch(
+        &mut self, 
+        batch: &mut WriteBatch, 
+        block_acceptance_offset_changes: BlockAcceptanceOffsetsChanges
+    ) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.delete_many(&mut writer, &mut block_acceptance_offset_changes.to_remove.iter().map(|v| *v))?;
+        self.access.write_many(&mut writer, &mut block_acceptance_offset_changes.to_add.iter().map(|(k, v)| (*k, *v)))?;
+        Ok(())
     }
 
-    fn insert_many(&mut self, accepting_block_hash: Hash, accepted_hashes: Vec<Hash>) -> StoreResult<()> {
-        let mut writer: DirectDbWriter = DirectDbWriter::new(&self.db);
-
-        self.access.write_many(
-            writer,
-            &mut accepted_hashes.iter().map(|accepted_hash| (*accepted_hash, accepting_block_hash.into())),
-        )
-    }
-
-    /// Removes all Offset in the cache and db, besides prefixes themselves.
-    fn delete_all(&mut self) -> StoreResult<()> {
-        let mut writer = DirectDbWriter::new(&self.db);
+    /// Removes all [`TxOffsetById`] values and keys from the cache and db.
+    fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
         self.access.delete_all(&mut writer)
     }
-}
+}   

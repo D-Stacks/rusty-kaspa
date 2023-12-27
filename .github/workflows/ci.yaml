@@ -48,44 +48,10 @@ jobs:
           # TODO: use the discussed whitelist feature when available
           large-packages: false
 
-          swap-storage: true
-
-  set-up:
-    name: Set Up
-    needs: clean-up-start
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on:  ${{ matrix.os }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Configure sccache env var
-        run: |
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
-          
+          swap-storage: true    
 
   check:
     name: Check
-    needs: set-up
     runs-on: ubuntu-latest # Okay to just use one here
     steps:
       - name: Run cargo check
@@ -93,7 +59,6 @@ jobs:
 
   tests:
     name: Test Suite
-    needs: set-up
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -113,7 +78,7 @@ jobs:
           echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -197,7 +162,6 @@ jobs:
 
   lints:
     name: Lints
-    needs: set-up
     runs-on: ubuntu-latest # one os is okay for lints
     steps:
 
@@ -210,7 +174,6 @@ jobs:
 
   check-wasm32:
     name: Check Wasm32
-    needs: set-up
     runs-on: ubuntu-latest
     steps:
 
@@ -252,7 +215,6 @@ jobs:
 
   build-wasm32:
     name: Build Wasm32
-    needs: set-up
     runs-on: ubuntu-latest
     steps:
 
@@ -303,7 +265,6 @@ jobs:
         run: cd wasm && wasm-pack build --target nodejs --out-dir nodejs/kaspa --features full
 
   build-release:
-    needs: set-up
     name: Release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -324,7 +285,7 @@ jobs:
           echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -355,7 +316,7 @@ jobs:
         run: ${SCCACHE_PATH} --show-stats
 
   clean-up-end: # clean up after the jobs
-    needs: [set-up, build-wasm32, check-wasm32, tests, lints, check, build-release]
+    needs: [build-wasm32, check-wasm32, tests, lints, check, build-release]
     name: Clean Up end
     runs-on: ${{ matrix.os }}
     strategy:

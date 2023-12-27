@@ -74,10 +74,10 @@ jobs:
       - name: Cache
       - uses: Swatinem/rust-cache@v2
 
-      - name: Configure sccache env var and set build profile to ephemeral build
-        run: | 
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-	        echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+      - name: Configure sccache env var
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3

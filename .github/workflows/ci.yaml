@@ -72,12 +72,12 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache
-      - uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
 
       - name: Configure sccache env var
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3
@@ -96,8 +96,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-        matrix:
-          os: [ ubuntu-latest, macos-latest, windows-latest ]
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
 
       - name: Fix CRLF on Windows
@@ -282,7 +282,7 @@ jobs:
         run: cd wasm && wasm-pack build --target nodejs --out-dir nodejs/kaspa --features full
 
   build-release:
-    needs: [set-up, build-wasm32, check-wasm32, tests, lints, build-release, check]
+    needs: [set-up, build-wasm32, check-wasm32, tests, lints, check]
     name: Build Ubuntu Release
     runs-on: ubuntu-latest
     steps:

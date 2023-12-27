@@ -3,7 +3,7 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  clean-up-start: # clean up before and after the test suite
+  clean-up-start: # clean up before the jobs
     name: Clean Up start
     # runs-on: ${{ matrix.os }}
     runs-on: ubuntu-latest
@@ -101,9 +101,19 @@ jobs:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
 
-      - name: Fix CRLF on Windows
-        if: runner.os == 'Windows'
-        run: git config --global core.autocrlf false
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Configure sccache env var
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.4
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -112,6 +122,10 @@ jobs:
       
       - name: Install cargo-nextest
         run: cargo install cargo-nextest
+
+      - name: Fix CRLF on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
 
       - name: Run cargo build with devnet-prealloc feature
         run: cargo build --release --features devnet-prealloc --workspace --all --tests --benches
@@ -127,6 +141,10 @@ jobs:
 
       - name: Run cargo doc tests with features=no-asm on kaspa-hashes
         run: cargo test --doc --release -p kaspa-hashes --features=no-asm
+      
+      - name: Run sccache stat for check
+        shell: bash
+        run: ${SCCACHE_PATH} --show-stats
 
   # test-release:
   #   name: Test Suite Release
@@ -293,6 +311,25 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
+
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Configure sccache env var
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.4
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
      
       - name: Install zig
         if: runner.os == 'Linux'
@@ -305,8 +342,20 @@ jobs:
           cargo install cargo-zigbuild
           cargo --verbose zigbuild --bin kaspad --bin simpa --bin rothschild --release --target x86_64-unknown-linux-gnu.2.27 # Use an older glibc version
 
-  clean-up-end: # clean up before and after the test suite
-    needs: [set-up, build-wasm32, check-wasm32, tests, lints, check]
+      - name: Build on MacOS
+        if: runner.os == 'MacOS'
+        run: cargo build --release --target x86_64-apple-darwin
+      
+      - name: Build on Windows
+        if: runner.os == 'Windows'
+        run: cargo build --release --target x86_64-pc-windows-msvc
+      
+      - name: Run sccache stat for check
+        shell: bash
+        run: ${SCCACHE_PATH} --show-stats
+
+  clean-up-end: # clean up after the jobs
+    needs: [set-up, build-wasm32, check-wasm32, tests, lints, check, build-release]
     name: Clean Up end
     runs-on: ${{ matrix.os }}
     strategy:

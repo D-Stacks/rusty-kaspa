@@ -1,5 +1,4 @@
 name: Tests
-uses: mozilla-actions/sccache-action@v0.0.3
 
 on: [push, pull_request]
 

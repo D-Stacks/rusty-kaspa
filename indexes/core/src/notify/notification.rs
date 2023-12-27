@@ -1,6 +1,7 @@
-use crate::indexed_utxos::{UtxoChanges, UtxoSetByScriptPublicKey};
-use derive_more::Display;
+use crate::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey};
+use derive_more::{Display, From};
 use kaspa_consensus_core::acceptance_data::AcceptanceData;
+use kaspa_consensus_notify::notification::Notification as ConsensusNotification;
 use kaspa_hashes::Hash;
 use kaspa_notify::{
     events::EventType,
@@ -60,7 +61,7 @@ impl NotificationTrait for Notification {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From)]
 pub struct ChainAcceptanceDataPrunedNotification {
     pub chain_hash_pruned: Hash,
     pub mergeset_block_acceptance_data_pruned: AcceptanceData,
@@ -73,7 +74,7 @@ impl ChainAcceptanceDataPrunedNotification {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From)]
 pub struct VirtualChainChangedNotification {
     pub added_chain_block_hashes: Arc<Vec<Hash>>,
     pub removed_chain_block_hashes: Arc<Vec<Hash>>,
@@ -95,10 +96,10 @@ impl VirtualChainChangedNotification {
         }
     }
 }
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, From, Default)]
 pub struct PruningPointUtxoSetOverrideNotification {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From)]
 pub struct UtxosChangedNotification {
     pub added: Arc<UtxoSetByScriptPublicKey>,
     pub removed: Arc<UtxoSetByScriptPublicKey>,
@@ -149,5 +150,23 @@ impl UtxosChangedNotification {
             );
         }
         result
+    }
+}
+
+impl From<ConsensusNotification> for Notification {
+    fn from(item: ConsensusNotification) -> Self {
+        match item {
+            // we comment out below as we expect the untxoindex to convert it implicitly, in the index porcessor, but better structure and refactoring should make this available none-the-less.
+            // ConsensusNotification::UtxosChanged(utxos_changed_notification) => Self::UtxosChanged(utxos_changed_notification.into()),
+            ConsensusNotification::PruningPointUtxoSetOverride(_) => Self::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification::default()),
+
+            ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification) => {
+                Self::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification.into())
+            }
+            ConsensusNotification::VirtualChainChanged(virtual_chain_changed_notification) => {
+                Self::VirtualChainChanged(virtual_chain_changed_notification.into())
+            }
+            _ => unreachable!("Unexpected consensus notification type: {:?} for kaspa_index_core notification", item),
+        }
     }
 }

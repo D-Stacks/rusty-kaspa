@@ -1,3 +1,3 @@
-use crate::notification::Notification;
+use crate::notify::notification::Notification;
 
 pub type IndexChannelConnection = kaspa_notify::connection::ChannelConnection<Notification>;

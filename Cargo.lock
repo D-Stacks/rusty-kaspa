@@ -2492,19 +2492,13 @@ dependencies = [
 name = "kaspa-index-core"
 version = "0.13.1"
 dependencies = [
- "async-channel 2.1.1",
- "async-trait",
  "derive_more",
- "futures",
  "kaspa-consensus-core",
+ "kaspa-consensus-notify",
  "kaspa-hashes",
  "kaspa-notify",
  "kaspa-utils",
- "log",
- "paste",
  "serde",
- "thiserror",
- "triggered",
 ]
 
 [[package]]
@@ -2913,7 +2907,6 @@ dependencies = [
  "futures",
  "kaspa-consensus",
  "kaspa-consensus-core",
- "kaspa-consensus-notify",
  "kaspa-consensusmanager",
  "kaspa-core",
  "kaspa-database",
@@ -3010,7 +3003,6 @@ dependencies = [
  "futures",
  "kaspa-consensus",
  "kaspa-consensus-core",
- "kaspa-consensus-notify",
  "kaspa-consensusmanager",
  "kaspa-core",
  "kaspa-database",

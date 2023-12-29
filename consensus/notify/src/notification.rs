@@ -88,6 +88,8 @@ impl NotificationTrait for Notification {
 }
 
 #[derive(Debug, Clone)]
+#[test]
+
 pub struct BlockAddedNotification {
     pub block: Block,
 }

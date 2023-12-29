@@ -1,7 +1,7 @@
 use crate::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey};
 use derive_more::{Display, From};
 use kaspa_consensus_core::acceptance_data::AcceptanceData;
-use kaspa_consensus_notify::notification::Notification as ConsensusNotification;
+use kaspa_consensus_notify::notification::{Notification as ConsensusNotification, VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification, PruningPointUtxoSetOverrideNotification as ConsensusPruningPointUtxoSetOverrideNotification};
 use kaspa_hashes::Hash;
 use kaspa_notify::{
     events::EventType,
@@ -9,10 +9,10 @@ use kaspa_notify::{
     notification::Notification as NotificationTrait,
     subscription::{
         single::{OverallSubscription, UtxosChangedSubscription, VirtualChainChangedSubscription},
-        Subscription,
+        Subscription, AsAny,
     },
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, iter::FromFn};
 
 full_featured! {
 #[derive(Clone, Debug, Display)]
@@ -74,13 +74,24 @@ impl ChainAcceptanceDataPrunedNotification {
     }
 }
 
+impl From<ConsensusChainAcceptanceDataPrunedNotification> for ChainAcceptanceDataPrunedNotification {
+    fn from(value: ConsensusChainAcceptanceDataPrunedNotification) -> Self {
+        Self {
+            chain_hash_pruned: value.chain_hash_pruned,
+            mergeset_block_acceptance_data_pruned: value.mergeset_block_acceptance_data_pruned,
+            history_root: value.history_root,
+        }
+    }  
+}
+
 #[derive(Debug, Clone, From)]
 pub struct VirtualChainChangedNotification {
     pub added_chain_block_hashes: Arc<Vec<Hash>>,
     pub removed_chain_block_hashes: Arc<Vec<Hash>>,
     pub added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
     pub removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
-}
+};
+
 impl VirtualChainChangedNotification {
     pub fn new(
         added_chain_block_hashes: Arc<Vec<Hash>>,
@@ -96,8 +107,25 @@ impl VirtualChainChangedNotification {
         }
     }
 }
+
+impl From<ConsensusVirtualChainChangedNotification> for VirtualChainChangedNotification {
+    fn from(value: ConsensusVirtualChainChangedNotification) -> Self {
+        Self {
+            added_chain_block_hashes: value.added_chain_block_hashes,
+            removed_chain_block_hashes:value.removed_chain_block_hashes,
+            added_chain_blocks_acceptance_data: value.added_chain_blocks_acceptance_data,
+            removed_chain_blocks_acceptance_data: value.removed_chain_blocks_acceptance_data,
+        }
+    }
+}
 #[derive(Debug, Clone, From, Default)]
 pub struct PruningPointUtxoSetOverrideNotification {}
+
+impl From<ConsensusPruningPointUtxoSetOverrideNotification> for PruningPointUtxoSetOverrideNotification {
+    fn from(value: _value) -> Self {
+        PruningPointUtxoSetOverrideNotification {}
+    }
+}
 
 #[derive(Debug, Clone, From)]
 pub struct UtxosChangedNotification {
@@ -153,20 +181,9 @@ impl UtxosChangedNotification {
     }
 }
 
-impl From<ConsensusNotification> for Notification {
-    fn from(item: ConsensusNotification) -> Self {
-        match item {
-            // we comment out below as we expect the untxoindex to convert it implicitly, in the index porcessor, but better structure and refactoring should make this available none-the-less.
-            // ConsensusNotification::UtxosChanged(utxos_changed_notification) => Self::UtxosChanged(utxos_changed_notification.into()),
-            ConsensusNotification::PruningPointUtxoSetOverride(_) => Self::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification::default()),
 
-            ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification) => {
-                Self::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification.into())
-            }
-            ConsensusNotification::VirtualChainChanged(virtual_chain_changed_notification) => {
-                Self::VirtualChainChanged(virtual_chain_changed_notification.into())
-            }
-            _ => unreachable!("Unexpected consensus notification type: {:?} for kaspa_index_core notification", item),
-        }
-    }
+pub mod test {
+    /// Below checks tha we do not add fields to the Consensus notifications without adding them to the Index notifications as well.
+    fn check_same 
 }
+

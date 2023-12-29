@@ -1,1 +1,1 @@
-pub mod txindex
+pub mod txindex;

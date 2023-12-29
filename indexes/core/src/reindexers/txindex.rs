@@ -1,4 +1,6 @@
-use crate::models::{BlockAcceptanceOffsetDiff, TxOffsetDiff};
+use crate::models::{
+    BlockAcceptanceOffsetDiff, TxOffsetDiff, BlockAcceptanceOffsetByHash, BlockAcceptanceOffset, TxOffsetByTyId, TransactionHashSet, TxOffset, TransactionHashMap,
+};
 use kaspa_consensus_core::{
     tx::{TransactionId, TransactionIndexType},
     BlockHashMap, BlockHashSet, HashMapCustomHasher,
@@ -33,9 +35,9 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
 
         drop(vspcc_notification.removed_chain_block_hashes); // we do not require this anymore.
 
-        let mut tx_offsets_to_add = HashMap::new();
-        let mut tx_offsets_to_remove = HashSet::new();
-        let mut block_acceptance_offsets_to_add = BlockHashMap::<BlockAcceptanceOffset>::new();
+        let mut tx_offsets_to_add = TxOffsetByTyId::new();
+        let mut tx_offsets_to_remove = TransactionHashSet::new();
+        let mut block_acceptance_offsets_to_add = BlockAcceptanceOffsetByHash::new();
         let mut block_acceptance_offsets_to_remove = BlockHashSet::new();
 
         for (accepting_block_hash, acceptance_data) in vspcc_notification
@@ -53,7 +55,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
                 );
 
                 block_acceptance_offsets_to_add
-                    .insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block_hash, i as u16));
+                    .insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block_hash, i as MergeSetIDX));
             }
         }
 
@@ -91,7 +93,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
 impl From<ConsensusChainAcceptanceDataPrunedNotification> for TxIndexReindexer {
     fn from(notification: ConsensusChainAcceptanceDataPrunedNotification) -> Self {
         let source = notification.new_pruning_point;
-        let mut tx_offsets_to_remove = HashSet::new();
+        let mut tx_offsets_to_remove = TransactionHashSet::new();
         let mut block_acceptance_offsets_to_remove = BlockHashSet::new();
 
         for acceptance_data in notification.chain_blocks_acceptance_data.unwrap_or_clone().into_iter() {
@@ -110,10 +112,10 @@ impl From<ConsensusChainAcceptanceDataPrunedNotification> for TxIndexReindexer {
         Self {
             new_sink: None,
             source,
-            block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges {
+            block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges::new(
                 Arc::new(BlockHashMap::default()),
                 Arc::new(block_acceptance_offsets_to_remove),
-            },
+            ),
             tx_offset_changes: TxOffsetChanges::new(
                 Arc::new(HashMap::default()), 
                 Arc::new(tx_offsets_to_remove) 

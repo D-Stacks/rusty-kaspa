@@ -1,4 +1,4 @@
-use crate::notify::notification::Notification;
+use crate::notify::notification::Notification as IndexNotification;
 use kaspa_notify::{connection::ChannelConnection, notifier::Notifier};
 
-pub type IndexNotifier = Notifier<Notification, ChannelConnection<Notification>>;
+pub type IndexNotifier = Notifier<IndexNotification, ChannelConnection<IndexNotification>>;

@@ -5,7 +5,7 @@ use crate::{
 use async_trait::async_trait;
 use kaspa_consensus_notify::{notification as consensus_notification, notification::Notification as ConsensusNotification};
 use kaspa_core::{debug, trace, warn};
-use kaspa_index_core::notification::{Notification, PruningPointUtxoSetOverrideNotification, UtxosChangedNotification};
+use kaspa_index_core::notification::{Notification as IndexNotification, PruningPointUtxoSetOverrideNotification, UtxosChangedNotification};
 use kaspa_notify::{
     collector::{Collector, CollectorNotificationReceiver},
     error::Result,
@@ -56,7 +56,7 @@ impl Processor {
         }
     }
 
-    fn spawn_collecting_task(self: Arc<Self>, notifier: DynNotify<Notification>) {
+    fn spawn_collecting_task(self: Arc<Self>, notifier: DynNotify<IndexNotification>) {
         // The task can only be spawned once
         if self.is_started.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
             return;
@@ -64,7 +64,7 @@ impl Processor {
         tokio::spawn(async move {
             trace!("[Index processor] collecting task starting");
 
-            while let Ok(notification) = self.recv_channel.recv().await {
+            while let Ok(notification: ConsensusNotification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
                     Ok(notification) => match notification {
                         Some(notification) => match notifier.notify(notification) {
@@ -85,19 +85,23 @@ impl Processor {
         });
     }
 
-    async fn process_notification(self: &Arc<Self>, notification: kaspa_consensus_notify::Notification) -> IndexResult<Option<kaspa_index_core::notification::Notification>> {
+    async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Option<IndexNotification>> {
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
-                Ok(Some(kaspa_index_core::notification::Notification::UtxosChanged(self.process_utxos_changed(utxos_changed_notification).await?)))
+                let utxos_changed_notification = self.process_utxos_changed(utxos_changed_notification).await?;// Converts to `kaspa_index_core::notification::Notification` here
+                Ok(Some(kaspa_index_core::notification::IndexNotification::UtxosChanged(utxos_changed_notification)))
             }
             ConsensusNotification::PruningPointUtxoSetOverride(_) => {
-                Ok(Some(kaspa_index_core::notification::Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {})))
+                // Convert to `kaspa_index_core::notification::Notification`
+                Ok(Some(kaspa_index_core::notification::IndexNotification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {})))
             }
-            ConsensusNotification::VirtualChainChanged(vspcc_notification) => {
-                self.process_virtual_chain_changed_notification(vspcc_notification).await?;
-                Ok(Some(kaspa_index_core::notification::Notification::VirtualChainChanged(vspcc_notification.into())))
+            ConsensusNotification::VirtualChainChanged(virtual_chain_chainged_notification) => {
+                let virtual_chain_chainged_notification = virtual_chain_chainged_notification.into(); // Convert to `kaspa_index_core::notification::Notification`.
+                self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?; 
+                Ok(Some(kaspa_index_core::notification::IndexNotification::VirtualChainChanged(virtual_chain_chainged_notification)))
             }
             ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned) => {
+                let chain_acceptance_data_pruned = chain_acceptance_data_pruned.into();  // Convert to `kaspa_index_core::notification::Notification`
                 self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned);
                 Ok(None)
             }
@@ -288,5 +292,16 @@ mod tests {
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");
+    }
+
+    #[tokio::test]
+    async fn test_virtual_chain_changed_notification() {
+        todo!()
+    }
+
+
+    #[tokio::test]
+    async fn test_chain_acceptance_daa_pruned_notification() {
+        todo!()
     }
 }

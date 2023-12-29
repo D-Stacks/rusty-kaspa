@@ -1,21 +1,24 @@
-use kaspa_consensus_core::tx::TransactionIndexType;
+use std::{collections::{HashSet, HashMap}, sync::Arc};
+
+use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, BlockHashSet};
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 
-pub type TxIdSet = HashSet<TransactionId>;
-pub type TxOffsetsByTxId = HashMap<TransactionId, TxOffset>;
+pub type TransactionHashSet = HashSet<TransactionId>;
+pub type TxOffsetByTyId = HashMap<TransactionId, TxOffset>;
+pub type BlockAcceptanceOffsetByHash = BlockHashMap<BlockAcceptanceOffset>;
 pub type MergeSetIDX = u16;
 
 
 /// A struct holding tx diffs to be committed to the txindex via `added` and `removed`. 
 #[derive(Debug, Clone, Default)]
 pub struct TxOffsetDiff {
-    pub added: Arc<HashMap<TransactionId, TxOffset>>,
-    pub removed: Arc<HashSet<TransactionId>>,
+    pub added: Arc<TxOffsetByTyId>,
+    pub removed: Arc<TransactionHashSet>,
 }
 
 impl TxOffsetDiff {
-    pub fn new(added: Arc<HashMap<TransactionId, TxOffset>>, removed: Arc<HashSet<TransactionId>>, ) -> Self {
+    pub fn new(added: Arc<TxOffsetByTyId>, removed: Arc<TransactionHashSet>, ) -> Self {
         Self { added, removed }
     }
 }
@@ -23,12 +26,12 @@ impl TxOffsetDiff {
 /// A struct holding block accepted diffs to be committed to the txindex via `added` and `removed`. 
 #[derive(Debug, Clone, Default)]
 pub struct BlockAcceptanceOffsetDiff {
-    pub added: Arc<BlockHashMap<BlockAcceptanceOffset>>,
+    pub added: Arc<BlockAcceptanceOffsetByHash>,
     pub removed: Arc<BlockHashSet>,
 }
 
 impl BlockAcceptanceOffsetDiff {
-    pub fn new(added: Arc<BlockHashMap<BlockAcceptanceOffset>>, removed: Arc<BlockHashSet>) -> Self {
+    pub fn new(added: Arc<BlockAcceptanceOffsetByHash>, removed: Arc<BlockHashSet>) -> Self {
         Self { added, removed }
     }
 }

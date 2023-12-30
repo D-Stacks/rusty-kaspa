@@ -4,8 +4,11 @@ extern crate self as consensus_core;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
+use std::ops::BitXor;
+use std::sync::Arc;
 
 pub use kaspa_hashes::Hash;
+use kaspa_hashes::ZERO_HASH;
 
 pub mod acceptance_data;
 pub mod api;
@@ -50,6 +53,10 @@ pub type BlockHashMap<V> = HashMap<Hash, V, BlockHasher>;
 /// Same as `BlockHashMap` but a `HashSet`.
 pub type BlockHashSet = HashSet<Hash, BlockHasher>;
 
+pub type TxHashMap<V> = HashMap<Hash, V, TxHasher>;
+
+pub type TxHashSet = HashSet<Hash, TxHasher>;
+
 pub trait HashMapCustomHasher {
     fn new() -> Self;
     fn with_capacity(capacity: usize) -> Self;
@@ -68,6 +75,33 @@ impl<V> HashMapCustomHasher for BlockHashMap<V> {
     }
 }
 
+pub trait HashMapCustomHasher2 {
+    fn new(block_hash: Hash) -> Self;
+    fn with_capacity(block_hash: Hash, capacity: usize) -> Self;
+}
+
+impl HashMapCustomHasher2 for TxHashSet {
+    #[inline(always)]
+    fn new(block_hash: Hash) -> Self {
+        Self::with_hasher(TxHasher::new(block_hash))
+    }
+    #[inline(always)]
+    fn with_capacity(block_hash: Hash, capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, TxHasher::new(block_hash))
+    }
+}
+
+impl <V> HashMapCustomHasher2 for TxHashMap<V> {
+    #[inline(always)]
+    fn new(block_hash: Hash) -> Self {
+        Self::with_hasher(TxHasher::new(block_hash))
+    }
+    #[inline(always)]
+    fn with_capacity(block_hash: Hash, capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, TxHasher::new(block_hash))
+    }
+}
+
 impl HashMapCustomHasher for BlockHashSet {
     #[inline(always)]
     fn new() -> Self {
@@ -83,6 +117,49 @@ impl HashMapCustomHasher for BlockHashSet {
 pub struct ChainPath {
     pub added: Vec<Hash>,
     pub removed: Vec<Hash>,
+}
+
+impl ChainPath {
+    pub fn new(added: Vec<Hash>, removed: Vec<Hash>) -> Self {
+        Self { added, removed }
+    }
+
+    // Retrieves the checkpoint [],
+    pub fn checkpoint_hash(&self) -> Option<&Hash> {
+        self.added.last().or(self.removed.last())
+    }
+}
+
+pub struct TxHasher{
+    block_hash_uint64: u64,
+    tx_block_hash_uint64: u64,
+}
+
+impl TxHasher {
+    #[inline(always)]
+    pub fn new(block_hash: Hash) -> Self {
+        Self {
+            block_hash_uint64: block_hash.to_le_u64()[0],
+            tx_block_hash_uint64: 0u64,
+        }
+    }
+}
+
+impl Hasher for TxHasher {
+
+    #[inline(always)]
+    fn finish(&self) -> u64 {
+        self.tx_block_hash_uint64
+    }
+    #[inline(always)]
+    fn write_u64(&mut self, v: u64) {
+        self.tx_block_hash_uint64 = v.bitxor(self.block_hash_uint64);
+    }
+
+    #[cold]
+    fn write(&mut self, _: &[u8]) {
+        unimplemented!("use write_u64")
+    }
 }
 
 /// `hashes::Hash` writes 4 u64s so we just use the last one as the hash here
@@ -108,6 +185,15 @@ impl Hasher for BlockHasher {
     #[cold]
     fn write(&mut self, _: &[u8]) {
         unimplemented!("use write_u64")
+    }
+}
+
+impl BuildHasher for TxHasher {
+    type Hasher = Self;
+
+    #[inline(always)]
+    fn build_hasher(&self) -> Self::Hasher {
+        Self::new(ZERO_HASH)
     }
 }
 

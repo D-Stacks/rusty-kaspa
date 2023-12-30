@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
 };
 
-/// Reindexes a [`ConsensusNotification`] to txindex diffs, alongside new source and sink [`Hash`], this includes the calculated [`BlockAcceptanceOffsetDiff`] and [`TxOffsetDiff`]. 
+/// Reindexes a [`ConsensusVirtualChainChangedNotification`] to txindex diffs, alongside new source and sink [`Hash`], this includes the calculated [`BlockAcceptanceOffsetDiff`] and [`TxOffsetDiff`]. 
 #[derive(Clone, Debug, Default)]
 pub struct TxIndexReindexer {
     pub new_sink: Option<Hash>,

@@ -2,6 +2,8 @@ pub mod ctl;
 pub mod factory;
 pub mod services;
 pub mod storage;
+
+#[test]
 pub mod test_consensus;
 
 #[cfg(feature = "devnet-prealloc")]

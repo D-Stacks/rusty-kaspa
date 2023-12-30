@@ -1,5 +1,5 @@
 use crate::model::{CirculatingSupply, CirculatingSupplyDiff};
-use kaspa_consensus::test_helpers::*;
+use kaspa_consensus::testutils::{utxo::{generate_random_utxos_from_script_public_key_pool, generate_random_p2pk_script_public_key}, block::generate_random_hashes};
 use kaspa_consensus_core::{
     tx::ScriptPublicKey,
     utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff},

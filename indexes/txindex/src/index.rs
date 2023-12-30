@@ -12,6 +12,8 @@ use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as Co
 use kaspa_utils::as_slice::AsSlice;
 use parking_lot::RwLock;
 use rocksdb::WriteBatch;
+use kaspa_index_core::reindexers, ;, 
+
 
 use crate::{
     core::api::TxIndexApi,
@@ -110,7 +112,7 @@ impl TxIndex {
 
             start_hash = *chain_path.checkpoint_hash().expect("chain path should not be empty");
 
-            let vspcc_notification = ConsensusVirtualChainChangedNotification::new(
+            vspcc_notification = ConsensusVirtualChainChangedNotification::new(
                 chain_path.added,
                 chain_path.removed,
                 added_chain_blocks_acceptance_data,

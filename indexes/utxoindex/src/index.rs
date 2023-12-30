@@ -1,7 +1,9 @@
+use kaspa_index_core::models::utxoindex::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
+
+
 use crate::{
     api::UtxoIndexApi,
     errors::{UtxoIndexError, UtxoIndexResult},
-    model::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
     stores::store_manager::Store,
     update_container::UtxoIndexChanges,
     IDENT,

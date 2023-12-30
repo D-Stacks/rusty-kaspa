@@ -1,4 +1,4 @@
-use crate::model::{TxOffset, TxOffsetChanges};
+use kaspa_index_core::models::txindex::{TxOffset, TxOffsetChanges};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{

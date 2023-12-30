@@ -11,7 +11,7 @@ use rocksdb::WriteBatch;
 // Local imports
 use crate::{
     errors::TxIndexResult,
-    perf::perf::TxIndexPerfParams,
+    config::perf::TxIndexPerfParams,
     stores::{
         accepted_tx_offsets::DbTxIndexAcceptedTxOffsetsStore, merged_block_acceptance::DbTxIndexMergedBlockAcceptanceStore,
         sink::DbTxIndexSinkStore, source::DbTxIndexSourceStore, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceStore,

@@ -4,8 +4,8 @@ mod sink;
 mod source;
 pub mod stores;
 
-pub use accepted_tx_offsets::{TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore};
-pub use merged_block_acceptance::{TxIndexMergedBlockAcceptanceReader, TxIndexMergedBlockAcceptanceStore};
-pub use sink::{TxIndexSinkReader, TxIndexSinkStore};
-pub use source::{TxIndexSourceReader, TxIndexSourceStore};
+pub use accepted_tx_offsets::TxIndexAcceptedTxOffsetsStore;
+pub use merged_block_acceptance::TxIndexMergedBlockAcceptanceStore};
+pub use sink::TxIndexSinkStore;
+pub use source::TxIndexSourceStore;
 pub use stores::TxIndexStores;

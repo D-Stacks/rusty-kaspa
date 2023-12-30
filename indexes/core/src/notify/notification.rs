@@ -1,7 +1,7 @@
 use crate::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey};
-use derive_more::{Display, From};
+use derive_more::Display;
 use kaspa_consensus_core::acceptance_data::AcceptanceData;
-use kaspa_consensus_notify::notification::{Notification as ConsensusNotification, VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification, PruningPointUtxoSetOverrideNotification as ConsensusPruningPointUtxoSetOverrideNotification};
+use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification, PruningPointUtxoSetOverrideNotification as ConsensusPruningPointUtxoSetOverrideNotification};
 use kaspa_hashes::Hash;
 use kaspa_notify::{
     events::EventType,
@@ -9,10 +9,10 @@ use kaspa_notify::{
     notification::Notification as NotificationTrait,
     subscription::{
         single::{OverallSubscription, UtxosChangedSubscription, VirtualChainChangedSubscription},
-        Subscription, AsAny,
+        Subscription,
     },
 };
-use std::{collections::HashMap, sync::Arc, iter::FromFn};
+use std::{collections::HashMap, sync::Arc};
 
 full_featured! {
 #[derive(Clone, Debug, Display)]
@@ -61,15 +61,15 @@ impl NotificationTrait for Notification {
     }
 }
 
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone)]
 pub struct ChainAcceptanceDataPrunedNotification {
     pub chain_hash_pruned: Hash,
-    pub mergeset_block_acceptance_data_pruned: AcceptanceData,
+    pub mergeset_block_acceptance_data_pruned: Arc<AcceptanceData>,
     pub history_root: Hash,
 }
 
 impl ChainAcceptanceDataPrunedNotification {
-    pub fn new(chain_hash_pruned: Hash, mergeset_block_acceptance_data_pruned: AcceptanceData, history_root: Hash) -> Self {
+    pub fn new(chain_hash_pruned: Hash, mergeset_block_acceptance_data_pruned: Arc<AcceptanceData>, history_root: Hash) -> Self {
         Self { chain_hash_pruned, mergeset_block_acceptance_data_pruned, history_root }
     }
 }
@@ -84,13 +84,13 @@ impl From<ConsensusChainAcceptanceDataPrunedNotification> for ChainAcceptanceDat
     }  
 }
 
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone)]
 pub struct VirtualChainChangedNotification {
     pub added_chain_block_hashes: Arc<Vec<Hash>>,
     pub removed_chain_block_hashes: Arc<Vec<Hash>>,
     pub added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
     pub removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
-};
+}
 
 impl VirtualChainChangedNotification {
     pub fn new(
@@ -118,16 +118,16 @@ impl From<ConsensusVirtualChainChangedNotification> for VirtualChainChangedNotif
         }
     }
 }
-#[derive(Debug, Clone, From, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PruningPointUtxoSetOverrideNotification {}
 
 impl From<ConsensusPruningPointUtxoSetOverrideNotification> for PruningPointUtxoSetOverrideNotification {
-    fn from(value: _value) -> Self {
+    fn from(_: ConsensusPruningPointUtxoSetOverrideNotification) -> Self {
         PruningPointUtxoSetOverrideNotification {}
     }
 }
 
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone)]
 pub struct UtxosChangedNotification {
     pub added: Arc<UtxoSetByScriptPublicKey>,
     pub removed: Arc<UtxoSetByScriptPublicKey>,
@@ -180,10 +180,3 @@ impl UtxosChangedNotification {
         result
     }
 }
-
-
-pub mod test {
-    /// Below checks tha we do not add fields to the Consensus notifications without adding them to the Index notifications as well.
-    fn check_same 
-}
-

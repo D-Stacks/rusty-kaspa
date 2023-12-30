@@ -32,7 +32,7 @@ use crate::{
     },
     params::Params,
     pipeline::{body_processor::BlockBodyProcessor, virtual_processor::VirtualStateProcessor, ProcessingCounters},
-    test_helpers::header_from_precomputed_hash,
+    testutils::generate::from_precomputed::block::header_from_precomputed_hash,
 };
 
 use super::services::{DbDagTraversalManager, DbGhostdagManager, DbWindowManager};

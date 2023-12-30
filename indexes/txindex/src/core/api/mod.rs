@@ -11,16 +11,22 @@ use crate::{
 };
 
 pub trait TxIndexApi: Send + Sync + Debug {
-    // Resync methods.
+    // Resyncers.
+    
     fn resync(&mut self) -> TxIndexResult<()>;
 
-    // Sync state methods
+    // Sync state
+    
     fn is_synced(&self) -> TxIndexResult<bool>;
+    
+    // Getters
 
     fn get_merged_block_acceptance_offset(&self, hashes: Vec<Hash>) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>>;
 
     fn get_tx_offsets(&self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>>;
 
+    // Updates
+    
     fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()>;
 
     fn update_via_chain_acceptance_data_pruned(

@@ -2498,6 +2498,7 @@ dependencies = [
  "kaspa-hashes",
  "kaspa-notify",
  "kaspa-utils",
+ "paste",
  "serde",
 ]
 
@@ -3003,6 +3004,7 @@ dependencies = [
  "futures",
  "kaspa-consensus",
  "kaspa-consensus-core",
+ "kaspa-consensus-notify",
  "kaspa-consensusmanager",
  "kaspa-core",
  "kaspa-database",

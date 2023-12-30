@@ -49,6 +49,7 @@ impl TxIndexSourceStore for DbTxIndexSourceStore {
         let mut writer = BatchDbWriter::new(batch);
         self.access.remove(&mut writer)
     }
+
     fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
         self.access.write(&mut writer, &sink)

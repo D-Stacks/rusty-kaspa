@@ -96,12 +96,12 @@ impl Processor {
                 Ok(Some(kaspa_index_core::notification::IndexNotification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {})))
             }
             ConsensusNotification::VirtualChainChanged(virtual_chain_chainged_notification) => {
-                let virtual_chain_chainged_notification = virtual_chain_chainged_notification.into(); // Convert to `kaspa_index_core::notification::Notification`.
+                let virtual_chain_chainged_notification = virtual_chain_chainged_notification.into(); // Converts to `kaspa_index_core::notification::Notification` here.
                 self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?; 
                 Ok(Some(kaspa_index_core::notification::IndexNotification::VirtualChainChanged(virtual_chain_chainged_notification)))
             }
             ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned) => {
-                let chain_acceptance_data_pruned = chain_acceptance_data_pruned.into();  // Convert to `kaspa_index_core::notification::Notification`
+                let chain_acceptance_data_pruned = chain_acceptance_data_pruned.into();  // Convert to `kaspa_index_core::notification::Notification` here.
                 self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned);
                 Ok(None)
             }
@@ -133,6 +133,11 @@ impl Processor {
     ) -> IndexResult<consensus_notification::VirtualChainChangedNotification> {
         if let Some(txindex) = self.txindex.clone() {
             txindex.update_via_vspcc_added(consensus_notification.into()).await?.into();
+            debug!(
+                "IDXPRC, updated txindex with {} added and {} removed chain blocks"
+                notification.added_chain_block_hashes.len(),
+                notification.removed_chain_block_hashes.len()
+            );
             return Ok(notification);
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
@@ -144,6 +149,10 @@ impl Processor {
     ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
             txindex.update_via_chain_acceptance_data_pruned(notification).await?;
+            debug!(
+                "IDXPRC, updated txindex with {} pruned chain blocks"
+                notification.chain_hash_pruned.len(),
+            );
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
@@ -296,7 +305,64 @@ mod tests {
 
     #[tokio::test]
     async fn test_virtual_chain_changed_notification() {
-        todo!()
+        let pipeline = NotifyPipeline::new();
+        let rng = &mut SmallRng::seed_from_u64(42);
+
+        let mut to_add_collection = UtxoCollection::new();
+        let mut to_remove_collection = UtxoCollection::new();
+        for _ in 0..2 {
+            to_add_collection.insert(generate_random_outpoint(rng), generate_random_utxo(rng));
+            to_remove_collection.insert(generate_random_outpoint(rng), generate_random_utxo(rng));
+        }
+
+        let test_notification = consensus_notification::UtxosChangedNotification::new(
+            Arc::new(UtxoDiff { add: to_add_collection, remove: to_remove_collection }),
+            Arc::new(generate_random_hashes(rng, 2)),
+        );
+
+        pipeline.consensus_sender.send(ConsensusNotification::UtxosChanged(test_notification.clone())).await.expect("expected send");
+
+        match pipeline.processor_receiver.recv().await.expect("receives a notification") {
+            Notification::UtxosChanged(utxo_changed_notification) => {
+                let mut notification_utxo_added_count = 0;
+                for (script_public_key, compact_utxo_collection) in utxo_changed_notification.added.iter() {
+                    for (transaction_outpoint, compact_utxo) in compact_utxo_collection.iter() {
+                        let test_utxo = test_notification
+                            .accumulated_utxo_diff
+                            .add
+                            .get(transaction_outpoint)
+                            .expect("expected transaction outpoint to be in test event");
+                        assert_eq!(test_utxo.script_public_key, *script_public_key);
+                        assert_eq!(test_utxo.amount, compact_utxo.amount);
+                        assert_eq!(test_utxo.block_daa_score, compact_utxo.block_daa_score);
+                        assert_eq!(test_utxo.is_coinbase, compact_utxo.is_coinbase);
+                        notification_utxo_added_count += 1;
+                    }
+                }
+                assert_eq!(test_notification.accumulated_utxo_diff.add.len(), notification_utxo_added_count);
+
+                let mut notification_utxo_removed_count = 0;
+                for (script_public_key, compact_utxo_collection) in utxo_changed_notification.removed.iter() {
+                    for (transaction_outpoint, compact_utxo) in compact_utxo_collection.iter() {
+                        let test_utxo = test_notification
+                            .accumulated_utxo_diff
+                            .remove
+                            .get(transaction_outpoint)
+                            .expect("expected transaction outpoint to be in test event");
+                        assert_eq!(test_utxo.script_public_key, *script_public_key);
+                        assert_eq!(test_utxo.amount, compact_utxo.amount);
+                        assert_eq!(test_utxo.block_daa_score, compact_utxo.block_daa_score);
+                        assert_eq!(test_utxo.is_coinbase, compact_utxo.is_coinbase);
+                        notification_utxo_removed_count += 1;
+                    }
+                }
+                assert_eq!(test_notification.accumulated_utxo_diff.remove.len(), notification_utxo_removed_count);
+            }
+            unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
+        }
+        assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
+        pipeline.consensus_sender.close();
+        pipeline.processor.clone().join().await.expect("stopping the processor must succeed");
     }
 
 

@@ -7,7 +7,7 @@ use kaspa_hashes::Hash;
 use rocksdb::WriteBatch;
 use std::sync::Arc;
 
-use crate::model::{BlockAcceptanceOffset, BlockAcceptanceOffsetsChanges};
+use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, BlockAcceptanceOffsetsChanges};
 
 // Traits:
 

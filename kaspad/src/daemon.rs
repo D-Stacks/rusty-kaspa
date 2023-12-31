@@ -31,6 +31,7 @@ use kaspa_p2p_flows::{flow_context::FlowContext, service::P2pService};
 
 use kaspa_perf_monitor::builder::Builder as PerfMonitorBuilder;
 use kaspa_utxoindex::{api::UtxoIndexProxy, UtxoIndex};
+use kaspa_txindex::{api::TxIndexProxy, TxIndex};
 use kaspa_wrpc_server::service::{Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService};
 
 /// Desired soft FD limit that needs to be configured
@@ -47,6 +48,7 @@ use crate::args::Args;
 const DEFAULT_DATA_DIR: &str = "datadir";
 const CONSENSUS_DB: &str = "consensus";
 const UTXOINDEX_DB: &str = "utxoindex";
+const TXINDEX_DB: &str = "utxoindex";
 const META_DB: &str = "meta";
 const META_DB_FILE_LIMIT: i32 = 5;
 const DEFAULT_LOG_DIR: &str = "logs";
@@ -189,13 +191,17 @@ pub fn create_core(args: Args, fd_total_budget: i32) -> (Arc<Core>, Arc<RpcCoreS
 pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget: i32) -> (Arc<Core>, Arc<RpcCoreService>) {
     let network = args.network();
     let mut fd_remaining = fd_total_budget;
-    let utxo_files_limit = if args.utxoindex {
-        let utxo_files_limit = fd_remaining * 10 / 100;
-        fd_remaining -= utxo_files_limit;
-        utxo_files_limit
+    let num_of_active_indexes = [args.utxoindex, args.txindex].iter().filter(|x| **x).count() as i32;
+    let index_budget = if num_of_active_indexes > 0 {
+        let index_budget = fd_remaining / 20 / 100;
+        fd_remaining -= index_budget;
+        index_budget
     } else {
         0
     };
+    let utxo_files_limit = if args.utxoindex { index_budget / num_of_active_indexes} else { 0 };
+    let tx_files_limit = if args.txindex { index_budget / num_of_active_indexes} else { 0 };
+    
     // Make sure args forms a valid set of properties
     if let Err(err) = validate_args(args) {
         println!("{}", err);
@@ -231,6 +237,7 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
 
     let consensus_db_dir = db_dir.join(CONSENSUS_DB);
     let utxoindex_db_dir = db_dir.join(UTXOINDEX_DB);
+    let txindex_db_dir = db_dir.join(TXINDEX_DB);
     let meta_db_dir = db_dir.join(META_DB);
 
     let mut is_db_reset_needed = args.reset_db;
@@ -249,6 +256,11 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     if args.utxoindex {
         info!("Utxoindex Data directory {}", utxoindex_db_dir.display());
         fs::create_dir_all(utxoindex_db_dir.as_path()).unwrap();
+    }
+
+    if args.txindex {
+        info!("Txindex Data directory {}", txindex_db_dir.display());
+        fs::create_dir_all(txindex_db_dir.as_path()).unwrap();
     }
 
     // DB used for addresses store and for multi-consensus management
@@ -322,6 +334,10 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
             fs::create_dir_all(utxoindex_db_dir.as_path()).unwrap();
         }
 
+        if args.txindex {
+            fs::create_dir_all(txindex_db_dir.as_path()).unwrap();
+        }
+
         // Reopen the DB
         meta_db = kaspa_database::prelude::ConnBuilder::default()
             .with_db_path(meta_db_dir)
@@ -388,15 +404,31 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     };
 
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv));
-    let index_service: Option<Arc<IndexService>> = if args.utxoindex {
+    let index_service: Option<Arc<IndexService>> = if args.utxoindex || args.txindex {
         // Use only a single thread for none-consensus databases
-        let utxoindex_db = kaspa_database::prelude::ConnBuilder::default()
+        let utxoindex = if args.utxoindex { 
+            let utxoindex_db =  kaspa_database::prelude::ConnBuilder::default()
             .with_db_path(utxoindex_db_dir)
             .with_files_limit(utxo_files_limit)
             .build()
             .unwrap();
-        let utxoindex = UtxoIndexProxy::new(UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap());
-        let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(utxoindex)));
+            Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap()))
+        } else {
+            None
+        };
+
+        let txindex = if args.txindex { 
+            let txindex_db = kaspa_database::prelude::ConnBuilder::default()
+                .with_db_path(db_dir.join("txindex"))
+                .with_files_limit(tx_files_limit)
+                .build()
+                .unwrap();
+                Some(TxIndexProxy::new(TxIndex::new(consensus_manager.clone(), txindex_db, config.clone()).unwrap()))
+        } else {
+            None
+        };
+
+        let index_service = Arc::new(IndexService::new(&notify_service.notifier(), utxoindex, txindex));
         Some(index_service)
     } else {
         None
@@ -441,6 +473,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         mining_manager,
         flow_context,
         index_service.as_ref().map(|x| x.utxoindex().unwrap()),
+        index_service.as_ref().map(|x| x.txindex().unwrap()),
         config.clone(),
         core.clone(),
         processing_counters,

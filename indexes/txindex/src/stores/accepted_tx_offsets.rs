@@ -1,4 +1,4 @@
-use kaspa_index_core::models::txindex::{TxOffset, TxOffsetChanges};
+use kaspa_index_core::models::txindex::{TxOffset, TxOffsetDiff, TxHashSet};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{
@@ -16,7 +16,8 @@ pub trait TxIndexAcceptedTxOffsetsReader {
 }
 
 pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsReader {
-    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetChanges) -> StoreResult<()>;
+    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetDiff) -> StoreResult<()>;
+    fn remove_many(&mut self, batch: &mut WriteBatch, tx_offsets_to_remove: TxHashSet) -> StoreResult<()>;
     fn delete_all_batched(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
 }
 // Implementations:
@@ -44,10 +45,16 @@ impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
 }
 
 impl TxIndexAcceptedTxOffsetsStore for DbTxIndexAcceptedTxOffsetsStore {
-    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetChanges) -> StoreResult<()> {
+    fn write_diff_batch(&mut self, batch: &mut WriteBatch, tx_offset_changes: TxOffsetDiff) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
-        self.access.delete_many(&mut writer, &mut tx_offset_changes.to_remove.iter().cloned())?;
-        self.access.write_many(&mut writer, &mut tx_offset_changes.to_add.iter().map(|(a, b)| (*a, *b)))?;
+        self.access.delete_many(&mut writer, &mut tx_offset_changes.removed.iter().cloned())?;
+        self.access.write_many(&mut writer, &mut tx_offset_changes.added.iter().map(|(k, v)| (*k, *v)))?;
+        Ok(())
+    }
+
+    fn remove_many(&mut self, batch: &mut WriteBatch, tx_offsets_to_remove: TxHashSet) -> StoreResult<()> {
+        let mut writer = BatchDbWriter::new(batch);
+        self.access.delete_many(&mut writer, &mut tx_offsets_to_remove.iter().cloned())?;
         Ok(())
     }
     /// Removes all [`TxOffsetById`] values and keys from the cache and db.

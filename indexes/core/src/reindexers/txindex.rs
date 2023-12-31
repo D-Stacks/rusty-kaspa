@@ -1,17 +1,13 @@
-use crate::models::{
-    BlockAcceptanceOffsetDiff, TxOffsetDiff, BlockAcceptanceOffsetByHash, BlockAcceptanceOffset, TxOffsetByTyId, TransactionHashSet, TxOffset, TransactionHashMap,
+use std::sync::Arc;
+
+use crate::models::txindex::{
+    BlockAcceptanceOffsetDiff, TxOffsetDiff, TxOffsetById, TxOffset, TxHashSet, BlockAcceptanceOffset, MergeSetIDX,
 };
-use kaspa_consensus_core::{
-    tx::{TransactionId, TransactionIndexType},
-    BlockHashMap, BlockHashSet, HashMapCustomHasher,
-};
+use kaspa_consensus_core::{BlockHashMap, BlockHashSet, HashMapCustomHasher, tx::TransactionIndexType};
 use kaspa_hashes::Hash;
-use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification, Notification as ConsensusNotification};
+use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
 use kaspa_utils::arc::ArcExtensions;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+
 
 /// Reindexes a [`ConsensusVirtualChainChangedNotification`] to txindex diffs, alongside new source and sink [`Hash`], this includes the calculated [`BlockAcceptanceOffsetDiff`] and [`TxOffsetDiff`]. 
 #[derive(Clone, Debug, Default)]
@@ -25,20 +21,21 @@ pub struct TxIndexReindexer {
 
 impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
     fn from(vspcc_notification: ConsensusVirtualChainChangedNotification) -> Self {
+        
         let new_sink = match vspcc_notification.added_chain_block_hashes.last() {
-            Some(new_sink) => *new_sink,
-            None => *vspcc_notification
-                .removed_chain_block_hashes
-                .last()
-                .expect("Expected at least one block to be added or removed, i.e. a none_empty chain path"),
+            Some(hash) => Some(hash.clone()),
+            None => match vspcc_notification.removed_chain_block_hashes.last() {
+                Some(hash) => Some(hash.clone()),
+                None => None,
+            }
         };
-
+        
         drop(vspcc_notification.removed_chain_block_hashes); // we do not require this anymore.
-
-        let mut tx_offsets_to_add = TxOffsetByTyId::new();
-        let mut tx_offsets_to_remove = TransactionHashSet::new();
-        let mut block_acceptance_offsets_to_add = BlockAcceptanceOffsetByHash::new();
-        let mut block_acceptance_offsets_to_remove = BlockHashSet::new();
+    
+        let mut tx_offsets_to_add = TxOffsetById::new();
+        let mut tx_offsets_to_remove = TxHashSet::new();
+        let mut block_acceptance_offsets_to_add = BlockHashMap::<BlockAcceptanceOffset>::with_capacity(vspcc_notification.added_chain_blocks_acceptance_data.len());
+        let mut block_acceptance_offsets_to_remove = BlockHashSet::with_capacity(vspcc_notification.removed_chain_blocks_acceptance_data.len());
 
         for (accepting_block_hash, acceptance_data) in vspcc_notification
             .added_chain_block_hashes
@@ -76,15 +73,15 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
         }
 
         Self {
-            new_sink,
+            new_sink: new_sink,
             source: None,
-            block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges::new(
-                Arc::new(block_acceptance_offsets_to_add),
-                Arc::new(block_acceptance_offsets_to_remove),
+            block_acceptance_offsets_changes: BlockAcceptanceOffsetDiff::new(
+                block_acceptance_offsets_to_add,
+                block_acceptance_offsets_to_remove,
             ),
-            tx_offset_changes: TxOffsetChanges::new(
-                Arc::new(tx_offsets_to_add), 
-                Arc::new(tx_offsets_to_remove)
+            tx_offset_changes: TxOffsetDiff::new(
+                tx_offsets_to_add, 
+                tx_offsets_to_remove
             ),
         }
     }
@@ -92,34 +89,25 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
 
 impl From<ConsensusChainAcceptanceDataPrunedNotification> for TxIndexReindexer {
     fn from(notification: ConsensusChainAcceptanceDataPrunedNotification) -> Self {
-        let source = notification.new_pruning_point;
-        let mut tx_offsets_to_remove = TransactionHashSet::new();
-        let mut block_acceptance_offsets_to_remove = BlockHashSet::new();
+        drop(notification.chain_hash_pruned); // we do not require this. 
+        let mut tx_offsets_to_remove = TxHashSet::new();
+        let mut block_acceptance_offsets_to_remove = BlockHashSet::with_capacity(notification.mergeset_block_acceptance_data_pruned.len());
 
-        for acceptance_data in notification.chain_blocks_acceptance_data.unwrap_or_clone().into_iter() {
-            for mergeset in acceptance_data.unwrap_or_clone().into_iter() {
-                tx_offsets_to_remove.extend(
-                    mergeset
-                        .accepted_transactions
-                        .into_iter()
-                        .map(|tx_entry| tx_entry.transaction_id),
-                );
-
-                block_acceptance_offsets_to_remove.insert(mergeset.block_hash);
-            }
-        }
+        for mergeset in notification.mergeset_block_acceptance_data_pruned.unwrap_or_clone().into_iter() {
+            tx_offsets_to_remove.extend(
+                mergeset
+                    .accepted_transactions
+                    .into_iter()
+                    .map(|tx_entry| tx_entry.transaction_id),
+            );
+            block_acceptance_offsets_to_remove.insert(mergeset.block_hash);
+        };
 
         Self {
             new_sink: None,
-            source,
-            block_acceptance_offsets_changes: BlockAcceptanceOffsetsChanges::new(
-                Arc::new(BlockHashMap::default()),
-                Arc::new(block_acceptance_offsets_to_remove),
-            ),
-            tx_offset_changes: TxOffsetChanges::new(
-                Arc::new(HashMap::default()), 
-                Arc::new(tx_offsets_to_remove) 
-            ),
+            source: Some(notification.history_root),
+            block_acceptance_offsets_changes: BlockAcceptanceOffsetDiff::new(BlockHashMap::new(), block_acceptance_offsets_to_remove),
+            tx_offset_changes: TxOffsetDiff::new(TxOffsetById::new(), tx_offsets_to_remove),
         }
     }
 }

@@ -4,10 +4,11 @@ use kaspa_hashes::Hash;
 use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
 use parking_lot::RwLock;
 use std::{fmt::Debug, sync::Arc};
+use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
+
 
 use crate::{
     errors::TxIndexResult,
-    model::{BlockAcceptanceOffset, TxOffset},
 };
 
 pub trait TxIndexApi: Send + Sync + Debug {

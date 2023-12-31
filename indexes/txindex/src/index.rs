@@ -9,22 +9,18 @@ use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
 use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
-use kaspa_utils::as_slice::AsSlice;
 use parking_lot::RwLock;
 use rocksdb::WriteBatch;
-use kaspa_index_core::reindexers, ;, 
-
+use kaspa_index_core::{models::txindex::{TxOffset, BlockAcceptanceOffset}, reindexers::txindex::TxIndexReindexer};
 
 use crate::{
     core::api::TxIndexApi,
     core::errors::TxIndexResult,
-    core::model::BlockAcceptanceOffset,
-    errors::TxIndexError,
-    model::{TxIndexVSPCCChanges, TxOffset},
-    perf::perf::TxIndexPerfParams,
+    core::errors::TxIndexError,
+    core::config::perf::TxIndexPerfParams,
     stores::{
         TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
-        TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores,
+        TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores, TxIndexSourceStore,
     },
 };
 
@@ -35,12 +31,12 @@ pub struct TxIndex {
 }
 
 impl TxIndex {
-    fn new(
+    pub fn new(
         consensus_manager: Arc<ConsensusManager>,
         txindex_db: Arc<DB>,
-        consensus_config: &ConsensusConfig,
+        consensus_config: Arc<ConsensusConfig>,
     ) -> TxIndexResult<Arc<RwLock<Self>>> {
-        let txindex_perf = TxIndexPerfParams::new(consensus_config);
+        let txindex_perf = TxIndexPerfParams::new(&consensus_config);
         let mut txindex = Self {
             stores: TxIndexStores::new(txindex_db, &txindex_perf)?,
             consensus_manager: consensus_manager.clone(),
@@ -79,7 +75,6 @@ impl TxIndex {
         let split_daa_score = session.get_header(split_hash)?.daa_score;
         let total_blocks_to_remove = session.get_header(start_hash)?.daa_score - split_daa_score; // start_daa_score - split_daa_score;
         let total_blocks_to_add = session.get_header(end_hash)?.daa_score - split_daa_score; // end_daa_score - split_daa_score;
-        drop(split_daa_score);
 
         let mut total_blocks_removed: u64 = 0u64;
         let mut total_blocks_added: u64 = 0u64;
@@ -91,18 +86,19 @@ impl TxIndex {
 
             // We switch added to removed, and clear removed, as we have no use for the removed data.
             if unsync_segment {
-                chain_path.added = chain_path.removed;
-                chain_path.removed = Arc::new(vec![])
-            };
+                chain_path.removed = chain_path.added;
+                chain_path.added = Arc::new(vec![]);
+            }
 
             let removed_chain_blocks_acceptance_data = if !chain_path.removed.is_empty() {
-                session.get_blocks_acceptance_data(chain_path.added.as_slice())?
+                session.get_blocks_acceptance_data(chain_path.added.clone())?
             } else {
                 Arc::new(vec![])
             };
+            removed_processed_in_batch += chain_path.added.len() as u64;
 
             let added_chain_blocks_acceptance_data = if !chain_path.added.is_empty() {
-                session.get_blocks_acceptance_data(chain_path.removed.as_slice())?
+                session.get_blocks_acceptance_data(chain_path.removed.clone())?
             } else {
                 Arc::new(vec![])
             };
@@ -112,7 +108,7 @@ impl TxIndex {
 
             start_hash = *chain_path.checkpoint_hash().expect("chain path should not be empty");
 
-            vspcc_notification = ConsensusVirtualChainChangedNotification::new(
+            let vspcc_notification = ConsensusVirtualChainChangedNotification::new(
                 chain_path.added,
                 chain_path.removed,
                 added_chain_blocks_acceptance_data,
@@ -177,6 +173,8 @@ impl TxIndexApi for TxIndex {
                 consensus_source,
             );
             self.stores.delete_all()?; // we reset the txindex
+            // We can set the source anew after clearing db
+            self.stores.source_store.set(consensus_source)?;
             consensus_source 
         });
 
@@ -257,24 +255,34 @@ impl TxIndexApi for TxIndex {
             vspcc_notification.removed_chain_blocks_acceptance_data.len()
         );
 
-        let txindex_vspcc_changes = TxIndexVSPCCChanges::from(vspcc_notification);
+        let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
 
         let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
 
-        self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_vspcc_changes.tx_offset_changes())?;
+        self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_reindexer.tx_offset_changes)?;
         self.stores
             .merged_block_acceptance_store
-            .write_diff_batch(&mut batch, txindex_vspcc_changes.block_acceptance_offsets_changes())?;
-        self.stores.sink_store.set_via_batch_writer(&mut batch, txindex_vspcc_changes.new_sink())?;
+            .write_diff_batch(&mut batch, txindex_reindexer.block_acceptance_offsets_changes)?;
+        self.stores.sink_store.set_via_batch_writer(&mut batch, txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
 
         self.stores.write_batch(batch)
     }
 
     fn update_via_chain_acceptance_data_pruned(
         &mut self,
-        _chain_acceptance_data_pruned: ConsensusChainAcceptanceDataPrunedNotification,
+        chain_acceptance_data_pruned: ConsensusChainAcceptanceDataPrunedNotification,
     ) -> TxIndexResult<()> {
-        todo!()
+        let txindex_reindexer = TxIndexReindexer::from(chain_acceptance_data_pruned);
+
+        let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
+
+        self.stores.accepted_tx_offsets_store.remove_many(&mut batch, txindex_reindexer.tx_offset_changes.removed)?;
+        self.stores
+            .merged_block_acceptance_store
+            .remove_many(&mut batch, txindex_reindexer.block_acceptance_offsets_changes.removed)?;
+        self.stores.source_store.replace_if_new(&mut batch, txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
+
+        self.stores.write_batch(batch)
     }
 }
 

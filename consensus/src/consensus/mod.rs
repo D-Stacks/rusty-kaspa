@@ -813,7 +813,7 @@ impl ConsensusApi for Consensus {
         self.statuses_store.read().get(hash).unwrap_option()
     }
 
-    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
+    fn get_blocks_acceptance_data(&self, hashes: Arc<Vec<Hash>>) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
         Ok(Arc::new(hashes
             .iter()
             .copied()

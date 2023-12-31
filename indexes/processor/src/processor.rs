@@ -5,12 +5,12 @@ use crate::{
 use async_trait::async_trait;
 use kaspa_consensus_notify::{notification as consensus_notification, notification::Notification as ConsensusNotification};
 use kaspa_core::{debug, trace, warn};
-use kaspa_index_core::notification::{Notification as IndexNotification, PruningPointUtxoSetOverrideNotification, UtxosChangedNotification};
+use kaspa_index_core::notify::{notification as index_notification, notification::Notification as IndexNotification};
 use kaspa_notify::{
     collector::{Collector, CollectorNotificationReceiver},
     error::Result,
     events::EventType,
-    notifier::DynNotify,
+    notifier::DynNotify, notification::Notification,
 };
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_utils::triggers::SingleTrigger;
@@ -64,11 +64,11 @@ impl Processor {
         tokio::spawn(async move {
             trace!("[Index processor] collecting task starting");
 
-            while let Ok(notification: ConsensusNotification) = self.recv_channel.recv().await {
+            while let Ok(notification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
                     Ok(notification) => match notification {
                         Some(notification) => match notifier.notify(notification) {
-                            Ok(_) => trace!("[Index processor] sent notification: {notification:?}"),
+                            Ok(notification) => trace!("[Index processor] sent notification: {notification:?}"),
                             Err(err) => warn!("[Index processor] notification sender error: {err:?}"),
                         },
                         None => trace!("[Index processor] notification was filtered out"),
@@ -85,24 +85,21 @@ impl Processor {
         });
     }
 
-    async fn process_notification(self: &Arc<Self>, notification: ConsensusNotification) -> IndexResult<Option<IndexNotification>> {
+    async fn process_notification(self: &Arc<Self>, notification: consensus_notification::Notification) -> IndexResult<Option<IndexNotification>> {
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
                 let utxos_changed_notification = self.process_utxos_changed(utxos_changed_notification).await?;// Converts to `kaspa_index_core::notification::Notification` here
-                Ok(Some(kaspa_index_core::notification::IndexNotification::UtxosChanged(utxos_changed_notification)))
+                Ok(Some(IndexNotification::UtxosChanged(utxos_changed_notification)))
             }
-            ConsensusNotification::PruningPointUtxoSetOverride(_) => {
+            ConsensusNotification::PruningPointUtxoSetOverride(prunging_point_utxo_set_override_notification) => {
                 // Convert to `kaspa_index_core::notification::Notification`
-                Ok(Some(kaspa_index_core::notification::IndexNotification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {})))
+                Ok(Some(IndexNotification::PruningPointUtxoSetOverride(prunging_point_utxo_set_override_notification.into())))
             }
             ConsensusNotification::VirtualChainChanged(virtual_chain_chainged_notification) => {
-                let virtual_chain_chainged_notification = virtual_chain_chainged_notification.into(); // Converts to `kaspa_index_core::notification::Notification` here.
-                self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?; 
-                Ok(Some(kaspa_index_core::notification::IndexNotification::VirtualChainChanged(virtual_chain_chainged_notification)))
+                Ok(Some(IndexNotification::VirtualChainChanged(self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?)))
             }
             ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned) => {
-                let chain_acceptance_data_pruned = chain_acceptance_data_pruned.into();  // Convert to `kaspa_index_core::notification::Notification` here.
-                self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned);
+                self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned).await?;
                 Ok(None)
             }
             _ => Err(IndexError::NotSupported(notification.event_type())),
@@ -112,10 +109,10 @@ impl Processor {
     async fn process_utxos_changed(
         self: &Arc<Self>,
         notification: consensus_notification::UtxosChangedNotification,
-    ) -> IndexResult<UtxosChangedNotification> {
+    ) -> IndexResult<index_notification::UtxosChangedNotification> {
         trace!("[{IDENT}]: processing {:?}", notification);
         if let Some(utxoindex) = self.utxoindex.clone() {
-            let converted_notification: UtxosChangedNotification =
+            let converted_notification: index_notification::UtxosChangedNotification =
                 utxoindex.update(notification).await?.into();
             debug!(
                 "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
@@ -130,15 +127,15 @@ impl Processor {
     async fn process_virtual_chain_changed_notification(
         self: &Arc<Self>,
         notification: consensus_notification::VirtualChainChangedNotification,
-    ) -> IndexResult<consensus_notification::VirtualChainChangedNotification> {
+    ) -> IndexResult<index_notification::VirtualChainChangedNotification> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_vspcc_added(consensus_notification.into()).await?.into();
+            txindex.update_via_vspcc_added(notification.clone()).await?;
             debug!(
-                "IDXPRC, updated txindex with {} added and {} removed chain blocks"
+                "IDXPRC, updated txindex with {0} added and {1} removed chain blocks",
                 notification.added_chain_block_hashes.len(),
                 notification.removed_chain_block_hashes.len()
             );
-            return Ok(notification);
+            return Ok(notification.into())
         };
         Err(IndexError::NotSupported(EventType::UtxosChanged))
     }
@@ -148,10 +145,10 @@ impl Processor {
         notification: consensus_notification::ChainAcceptanceDataPrunedNotification,
     ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_chain_acceptance_data_pruned(notification).await?;
+            txindex.update_via_chain_acceptance_data_pruned(notification.clone()).await?;
             debug!(
-                "IDXPRC, updated txindex with {} pruned chain blocks"
-                notification.chain_hash_pruned.len(),
+                "IDXPRC, updated txindex with {0} pruned chain blocks",
+                notification.mergeset_block_acceptance_data_pruned.len(),
             );
             return Ok(());
         };
@@ -167,8 +164,8 @@ impl Processor {
 }
 
 #[async_trait]
-impl Collector<Notification> for Processor {
-    fn start(self: Arc<Self>, notifier: DynNotify<Notification>) {
+impl Collector<IndexNotification> for Processor {
+    fn start(self: Arc<Self>, notifier: DynNotify<IndexNotification>) {
         self.spawn_collecting_task(notifier);
     }
 
@@ -198,7 +195,7 @@ mod tests {
     struct NotifyPipeline {
         consensus_sender: Sender<ConsensusNotification>,
         processor: Arc<Processor>,
-        processor_receiver: Receiver<Notification>,
+        processor_receiver: Receiver<IndexNotification>,
         test_consensus: TestConsensus,
         utxoindex_db_lifetime: DbLifetime,
         txindex_db_lifetime: DbLifetime,
@@ -214,7 +211,7 @@ mod tests {
             tc.init();
             let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
             let utxoindex = Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager, utxoindex_db).unwrap()));
-            let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db).unwrap()));
+            let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db, config.clone()).unwrap()));
             let processor = Arc::new(Processor::new(utxoindex, txindex, consensus_receiver));
             let (processor_sender, processor_receiver) = unbounded();
             let notifier = Arc::new(NotifyMock::new(processor_sender));

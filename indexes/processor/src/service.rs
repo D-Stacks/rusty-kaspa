@@ -6,12 +6,12 @@ use kaspa_core::{
     task::service::{AsyncService, AsyncServiceError, AsyncServiceFuture},
     trace, warn,
 };
-use kaspa_index_core::notifier::IndexNotifier;
+use kaspa_index_core::notify::notifier::IndexNotifier;
 use kaspa_notify::{
     connection::ChannelType,
     events::{EventSwitches, EventType},
     scope::{
-        BlockAddedScope, BlockBodyPrunedScope, ChainAcceptanceDataPrunedScope, PruningPointUtxoSetOverrideScope, Scope,
+        ChainAcceptanceDataPrunedScope, PruningPointUtxoSetOverrideScope, Scope,
         UtxosChangedScope, VirtualChainChangedScope,
     },
 };
@@ -50,7 +50,7 @@ impl IndexService {
             (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
             (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
             (false, false) => {
-                warn!("At least one of utxoindex or txindex should be enabled to run the index processor")
+                warn!("At least one of utxoindex or txindex should be enabled to run the index processor");
                 [].as_ref().into()
             },
         };

@@ -370,8 +370,8 @@ impl PruningProcessor {
                 let mut statuses_write = self.statuses_store.write();
 
                 // Collect pruned data to be sent over the notifier for external services
-                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // chekc if there is a subscription
-                && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // chekc if it is chain data being pruned.  
+                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // check if there is a subscription
+                && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // check if it is chain data being pruned.  
                 {
                     
                     self.notification_root

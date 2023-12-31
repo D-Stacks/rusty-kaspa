@@ -1,15 +1,11 @@
 use std::sync::Arc;
 
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbItem, StoreError, StoreResult, DB},
+    prelude::{BatchDbWriter, CachedDbItem, StoreError, StoreResult, DB, DirectDbWriter},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
 use rocksdb::WriteBatch;
-
-// TODO (when pruning is implemented): Use this store to check sync and resync from earliest header pruning point.
-// TODO: move to db registry
-pub const STORE_PREFIX: &[u8] = b"txindex-source";
 
 /// Reader API for `Source`.
 pub trait TxIndexSourceReader {
@@ -17,8 +13,9 @@ pub trait TxIndexSourceReader {
 }
 
 pub trait TxIndexSourceStore: TxIndexSourceReader {
-    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()>;
+    fn set(&mut self, source: Hash) -> StoreResult<()>;
     fn remove_batch_via_batch_writer(&mut self, batch: &mut WriteBatch) -> StoreResult<()>;
+    fn replace_if_new(&mut self, batch: &mut WriteBatch, new_source: Hash) -> StoreResult<()>;
 }
 
 /// A DB + cache implementation of `TxIndexSource` trait, with concurrent readers support.
@@ -31,10 +28,6 @@ pub struct DbTxIndexSourceStore {
 impl DbTxIndexSourceStore {
     pub fn new(db: Arc<DB>) -> Self {
         Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSource.into()) }
-    }
-
-    pub fn clone_with_new_cache(&self) -> Self {
-        Self::new(Arc::clone(&self.db))
     }
 }
 
@@ -50,8 +43,18 @@ impl TxIndexSourceStore for DbTxIndexSourceStore {
         self.access.remove(&mut writer)
     }
 
-    fn set_via_batch_writer(&mut self, batch: &mut WriteBatch, sink: Hash) -> StoreResult<()> {
+    fn set(&mut self, source: Hash) -> StoreResult<()> {
+        let mut writer = DirectDbWriter::new(&self.db);
+        self.access.write(&mut writer, &source)
+    }
+
+    fn replace_if_new(&mut self, batch: &mut WriteBatch, new_source: Hash) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
-        self.access.write(&mut writer, &sink)
+        if let Some(old_source) = self.get()? { 
+            if old_source == new_source {
+                return Ok(());
+            };
+        };
+        Ok(self.access.write(&mut writer, &new_source)?)
     }
 }

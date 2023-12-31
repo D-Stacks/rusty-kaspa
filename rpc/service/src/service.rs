@@ -28,9 +28,10 @@ use kaspa_core::{
     task::tick::TickService,
     trace, warn,
 };
-use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
-use kaspa_index_core::{
-    connection::IndexChannelConnection, indexed_utxos::UtxoSetByScriptPublicKey, notification::Notification as IndexNotification,
+use kaspa_index_core::models::utxoindex::{BalanceByScriptPublicKey, UtxoSetByScriptPublicKey};
+use kaspa_index_core::notify::{
+    connection::IndexChannelConnection, 
+    notification::Notification as IndexNotification,
     notifier::IndexNotifier,
 };
 use kaspa_mining::model::tx_query::TransactionQuery;
@@ -55,6 +56,7 @@ use kaspa_rpc_core::{
     notify::connection::ChannelConnection,
     Notification, RpcError, RpcResult,
 };
+use kaspa_txindex::api::TxIndexProxy;
 use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script};
 use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
@@ -91,6 +93,7 @@ pub struct RpcCoreService {
     mining_manager: MiningManagerProxy,
     flow_context: Arc<FlowContext>,
     utxoindex: Option<UtxoIndexProxy>,
+    txindex: Option<TxIndexProxy>,
     config: Arc<Config>,
     consensus_converter: Arc<ConsensusConverter>,
     index_converter: Arc<IndexConverter>,
@@ -116,6 +119,7 @@ impl RpcCoreService {
         mining_manager: MiningManagerProxy,
         flow_context: Arc<FlowContext>,
         utxoindex: Option<UtxoIndexProxy>,
+        txindex: Option<TxIndexProxy>,
         config: Arc<Config>,
         core: Arc<Core>,
         processing_counters: Arc<ProcessingCounters>,
@@ -153,8 +157,22 @@ impl RpcCoreService {
             let index_notify_listener_id = index_notifier
                 .clone()
                 .register_new_listener(IndexChannelConnection::new(index_notify_channel.sender(), ChannelType::Closable));
+            let index_events: EventSwitches = match (utxoindex.is_some(), txindex.is_some()) {
+                (true, true) => [
+                    EventType::UtxosChanged,
+                    EventType::PruningPointUtxoSetOverride,
+                    EventType::VirtualChainChanged,
+                    EventType::ChainAcceptanceDataPruned,
+                ]
+                .as_ref()
+                .into(),
+                (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
+                (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
+                (false, false) => {
+                    panic!("At least one of utxoindex or txindex should be enabled to run the index processor");
+                }
+            };
 
-            let index_events: EventSwitches = [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into();
             let index_collector =
                 Arc::new(CollectorFromIndex::new("rpc-core <= index", index_notify_channel.receiver(), index_converter.clone()));
             let index_subscriber =
@@ -176,6 +194,7 @@ impl RpcCoreService {
             mining_manager,
             flow_context,
             utxoindex,
+            txindex,
             config,
             consensus_converter,
             index_converter,
@@ -487,7 +506,7 @@ impl RpcApi for RpcCoreService {
         let session = self.consensus_manager.consensus().session().await;
         let virtual_chain = session.async_get_virtual_chain_from_block(request.start_hash).await?;
         let accepted_transaction_ids = if request.include_accepted_transaction_ids {
-            self.consensus_converter.get_virtual_chain_accepted_transaction_ids(&session, &virtual_chain).await?
+            self.consensus_converter.get_virtual_chain_accepted_transaction_ids(&session, virtual_chain.clone()).await?
         } else {
             vec![]
         };

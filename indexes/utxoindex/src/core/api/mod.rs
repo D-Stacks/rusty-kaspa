@@ -5,12 +5,12 @@ use kaspa_consensus_core::{
 use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use kaspa_consensusmanager::spawn_blocking;
 use kaspa_database::prelude::StoreResult;
-use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
+use kaspa_index_core::models::utxoindex::BalanceByScriptPublicKey;
 use parking_lot::RwLock;
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
 use crate::errors::UtxoIndexResult;
-use kaspa_index_core::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey},
+use kaspa_index_core::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey};
 
 ///Utxoindex API targeted at retrieval calls.
 pub trait UtxoIndexApi: Send + Sync + Debug {

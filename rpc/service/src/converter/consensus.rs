@@ -160,10 +160,9 @@ impl ConsensusConverter {
     pub async fn get_virtual_chain_accepted_transaction_ids(
         &self,
         consensus: &ConsensusProxy,
-        chain_path: &ChainPath,
+        chain_path: ChainPath,
     ) -> RpcResult<Vec<RpcAcceptedTransactionIds>> {
-        Arc::try_unwrap(this)
-        let acceptance_data = consensus.async_get_blocks_acceptance_data(Arc::try_unwrap(chain_path.added).unwrap_or(chain_path.added.to_vec())).await.unwrap();
+        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.clone()).await?;
         Ok(chain_path
             .added
             .iter()

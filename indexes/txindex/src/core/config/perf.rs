@@ -1,4 +1,4 @@
-use std::{cmp::max, mem};
+use std::{cmp::max, mem, sync::Arc};
 
 use kaspa_consensus_core::{
     acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
@@ -6,10 +6,10 @@ use kaspa_consensus_core::{
     tx::TransactionId,
     Hash,
 };
+use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
 
 use crate::{
-    model::{BlockAcceptanceOffset, TxOffset},
-    perf::constants::{
+    core::config::constants::{
         STANDARD_SCHNORR_SCRIPT_PUBLIC_KEY_LEN, STANDARD_TRANSACTION_HEADER_SIZE, STANDARD_TRANSACTION_INPUT_SIZE,
         STANDARD_TRANSACTION_OUTPUT_SIZE,
     },
@@ -22,7 +22,7 @@ pub fn calculate_approx_std_transaction_size_in_bytes(number_of_inputs: u64, num
 }
 
 pub fn calculate_approx_std_transaction_mass(
-    consensus_config: &ConsensusConfig,
+    consensus_config: &Arc<ConsensusConfig>,
     number_of_inputs: u64,
     number_of_outputs: u64,
 ) -> u64 {
@@ -42,7 +42,7 @@ pub struct TxIndexPerfParams {
 }
 
 impl TxIndexPerfParams {
-    pub fn new(consensus_config: &ConsensusConfig) -> Self {
+    pub fn new(consensus_config: &Arc<ConsensusConfig>) -> Self {
         let unit_size_offset = (mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) as u64;
         let unit_size_merged_block = (mem::size_of::<BlockAcceptanceOffset>() + mem::size_of::<Hash>() + mem::size_of::<u32>()) as u64;
 

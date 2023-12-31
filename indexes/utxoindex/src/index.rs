@@ -1,8 +1,8 @@
-use kaspa_index_core::models::utxoindex::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey},
+use kaspa_index_core::models::utxoindex::{CirculatingSupply, UtxoChanges, UtxoSetByScriptPublicKey};
 
 
 use crate::{
-    api::UtxoIndexApi,
+    core::api::UtxoIndexApi,
     errors::{UtxoIndexError, UtxoIndexResult},
     stores::store_manager::Store,
     update_container::UtxoIndexChanges,
@@ -14,7 +14,7 @@ use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use kaspa_core::{info, trace};
 use kaspa_database::prelude::{StoreError, StoreResult, DB};
 use kaspa_hashes::Hash;
-use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
+use kaspa_index_core::models::utxoindex::BalanceByScriptPublicKey;
 use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;
 use std::{

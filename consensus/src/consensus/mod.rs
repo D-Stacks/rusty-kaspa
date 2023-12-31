@@ -1,3 +1,4 @@
+pub mod cache_policy_builder;
 pub mod ctl;
 pub mod factory;
 pub mod services;
@@ -76,12 +77,15 @@ use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
 use kaspa_txscript::caches::TxScriptCacheCounters;
 
-use std::thread::{self, JoinHandle};
 use std::{
     future::Future,
     iter::once,
     ops::Deref,
     sync::{atomic::Ordering, Arc},
+};
+use std::{
+    sync::atomic::AtomicBool,
+    thread::{self, JoinHandle},
 };
 use tokio::sync::oneshot;
 
@@ -124,6 +128,9 @@ pub struct Consensus {
 
     // Other
     creation_timestamp: u64,
+
+    // Signals
+    is_consensus_exiting: Arc<AtomicBool>,
 }
 
 impl Deref for Consensus {
@@ -146,6 +153,7 @@ impl Consensus {
     ) -> Self {
         let params = &config.params;
         let perf_params = &config.perf;
+        let is_consensus_exiting: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
         //
         // Storage layer
@@ -157,7 +165,13 @@ impl Consensus {
         // Services and managers
         //
 
-        let services = ConsensusServices::new(db.clone(), storage.clone(), config.clone(), tx_script_cache_counters);
+        let services = ConsensusServices::new(
+            db.clone(),
+            storage.clone(),
+            config.clone(),
+            tx_script_cache_counters,
+            is_consensus_exiting.clone(),
+        );
 
         //
         // Processor channels
@@ -280,6 +294,7 @@ impl Consensus {
             counters,
             config,
             creation_timestamp,
+            is_consensus_exiting,
         }
     }
 
@@ -335,6 +350,7 @@ impl Consensus {
     }
 
     pub fn signal_exit(&self) {
+        self.is_consensus_exiting.store(true, Ordering::Relaxed);
         self.block_sender.send(BlockProcessingMessage::Exit).unwrap();
     }
 

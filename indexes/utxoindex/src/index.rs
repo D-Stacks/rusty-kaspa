@@ -8,12 +8,12 @@ use crate::{
     update_container::UtxoIndexChanges,
     IDENT,
 };
-use kaspa_consensus_core::{tx::ScriptPublicKeys, utxo::utxo_diff::UtxoDiff, BlockHashSet};
+use kaspa_consensus_core::{tx::ScriptPublicKeys, BlockHashSet};
 use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use kaspa_core::{info, trace};
 use kaspa_database::prelude::{StoreError, StoreResult, DB};
-use kaspa_hashes::Hash;
+
 use kaspa_index_core::models::utxoindex::BalanceByScriptPublicKey;
 use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;

@@ -178,7 +178,7 @@ impl Collector<IndexNotification> for Processor {
 mod tests {
     use super::*;
     use async_channel::{unbounded, Receiver, Sender};
-    use kaspa_consensus::{config::Config, consensus::test_consensus::TestConsensus, params::DEVNET_PARAMS, test_helpers::*};
+    use kaspa_consensus::{config::Config, consensus::test_consensus::TestConsensus, params::DEVNET_PARAMS, testutils::generate::from_rand::{utxo::{generate_random_outpoint, generate_random_utxo}, hash::generate_random_hashes}};
     use kaspa_consensus_core::utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff};
     use kaspa_consensusmanager::ConsensusManager;
     use kaspa_database::create_temp_db;

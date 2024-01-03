@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     tx::{TransactionId, TransactionIndexType},
-    BlockHashMap,
 };
 
 pub type AcceptanceData = Vec<MergesetBlockAcceptanceData>;

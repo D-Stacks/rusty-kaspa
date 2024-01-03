@@ -16,7 +16,7 @@ use kaspa_consensus_core::{
     tx::{Transaction, TransactionOutpoint, UtxoEntry},
     BlockHashSet, BlueWorkType, ChainPath, Hash,
 };
-use kaspa_utils::{sync::rwlock::*, as_slice::AsSlice};
+use kaspa_utils::sync::rwlock::*;
 use std::{ops::Deref, sync::Arc};
 
 pub use tokio::task::spawn_blocking;

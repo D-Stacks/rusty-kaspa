@@ -1,4 +1,4 @@
-use std::sync::Arc;
+
 
 use crate::models::txindex::{
     BlockAcceptanceOffsetDiff, TxOffsetDiff, TxOffsetById, TxOffset, TxHashSet, BlockAcceptanceOffset, MergeSetIDX,
@@ -89,7 +89,6 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
 
 impl From<ConsensusChainAcceptanceDataPrunedNotification> for TxIndexReindexer {
     fn from(notification: ConsensusChainAcceptanceDataPrunedNotification) -> Self {
-        drop(notification.chain_hash_pruned); // we do not require this. 
         let mut tx_offsets_to_remove = TxHashSet::new();
         let mut block_acceptance_offsets_to_remove = BlockHashSet::with_capacity(notification.mergeset_block_acceptance_data_pruned.len());
 

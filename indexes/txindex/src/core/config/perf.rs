@@ -1,15 +1,13 @@
-use std::{cmp::max, mem::{self, size_of}, sync::Arc};
+use std::{cmp::max, mem::size_of, sync::Arc};
 
-use kaspa_consensus::params::Params as ConsensusParams;
 use kaspa_consensus_core::{
     acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
     config::Config as ConsensusConfig,
     tx::TransactionId,
     Hash,
 };
-use kaspa_database::{cache_policy_builder::{CachePolicyBuilder, noise, bounded_size}, prelude::CachePolicy};
+use kaspa_database::cache_policy_builder::bounded_size;
 use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
-use kaspa_utils::mem_size::MemSizeEstimator;
 
 use crate::core::config::{constants::DEFAULT_TXINDEX_EXTRA_FD_BUDGET, params::TxIndexParams, };
 

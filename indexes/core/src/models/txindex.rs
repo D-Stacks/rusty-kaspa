@@ -1,4 +1,4 @@
-use std::{collections::{HashSet, HashMap}, sync::Arc};
+use std::{collections::{HashSet, HashMap}};
 
 use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, BlockHashSet};
 use kaspa_hashes::Hash;

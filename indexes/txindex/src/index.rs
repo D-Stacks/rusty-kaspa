@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use kaspa_consensus_core::{config::Config as ConsensusConfig, tx::TransactionId};
+use kaspa_consensus_core::tx::TransactionId;
 use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler, ConsensusSessionBlocking};
 use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
@@ -17,7 +17,6 @@ use crate::{
     core::api::TxIndexApi,
     core::errors::TxIndexResult,
     core::errors::TxIndexError,
-    core::config::perf::TxIndexPerfParams,
     stores::{
         TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
         TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores, TxIndexSourceStore,

@@ -137,7 +137,7 @@ impl Processor {
             );
             return Ok(notification.into())
         };
-        Err(IndexError::NotSupported(EventType::UtxosChanged))
+        Err(IndexError::NotSupported(EventType::VirtualChainChanged))
     }
 
     async fn process_chain_acceptance_data_pruned(
@@ -152,7 +152,7 @@ impl Processor {
             );
             return Ok(());
         };
-        Err(IndexError::NotSupported(EventType::UtxosChanged))
+        Err(IndexError::NotSupported(EventType::ChainAcceptanceDataPruned))
     }
 
     async fn join_collecting_task(&self) -> Result<()> {
@@ -202,7 +202,7 @@ mod tests {
     #[allow(dead_code)]
     struct NotifyPipeline {
         consensus_sender: Sender<ConsensusNotification>,
-        processor: Arc<Processor>,
+        pub processor: Arc<Processor>,
         processor_receiver: Receiver<IndexNotification>,
         test_consensus: TestConsensus,
         utxoindex_db_lifetime: DbLifetime,
@@ -280,10 +280,11 @@ mod tests {
                         assert_eq!(test_utxo.block_daa_score, compact_utxo.block_daa_score);
                         assert_eq!(test_utxo.is_coinbase, compact_utxo.is_coinbase);
                         notification_utxo_removed_count += 1;
+                        // Assert data is added to the db:
                     }
                 }
                 assert_eq!(test_notification.accumulated_utxo_diff.remove.len(), notification_utxo_removed_count);
-            }
+            },
             unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
         }
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
@@ -402,29 +403,8 @@ mod tests {
         );
 
         pipeline.consensus_sender.send(ConsensusNotification::ChainAcceptanceDataPruned(test_notification.clone())).await.expect("expected send");
-
-        match pipeline.processor_receiver.recv().await.expect("receives a notification") {
-            IndexNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification) => {
-                assert_eq!(test_notification.chain_hash_pruned, chain_acceptance_data_pruned_notification.chain_hash_pruned);
-
-                assert_eq!(test_notification.mergeset_block_acceptance_data_pruned.len(), chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.len());
-                for (test_mergeset, notification_mergeset) in test_notification.mergeset_block_acceptance_data_pruned.iter().zip(chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.iter()) {
-                    assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
-                    assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
-                    assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
-                    for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
-                        assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
-                        assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
-                    }
-                    for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
-                        assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
-                        assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
-                    }
-                }
-                assert_eq!(test_notification.history_root, chain_acceptance_data_pruned_notification.history_root);
-            },
-            unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
-        }
+    
+        // we expect no index notification to be sent, so below is enough for the test.  
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");

@@ -1,7 +1,7 @@
 use kaspa_consensus_core::tx::{ScriptPublicKey, TransactionOutpoint, UtxoEntry};
 use kaspa_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, mem::size_of};
 
 /// Type for circulating supply
 pub type CirculatingSupply = u64;
@@ -37,6 +37,10 @@ impl CompactUtxoEntry {
 impl MemSizeEstimator for CompactUtxoEntry {
     fn estimate_mem_units(&self) -> usize {
         1
+    }
+
+    fn estimate_mem_bytes(&self) -> usize {
+        size_of::<Self>()
     }
 }
 

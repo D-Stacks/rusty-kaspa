@@ -1,4 +1,4 @@
-use std::{collections::{HashSet, HashMap}};
+use std::{collections::{HashSet, HashMap}, mem::size_of};
 
 use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, BlockHashSet};
 use kaspa_hashes::Hash;
@@ -19,7 +19,7 @@ pub struct TxOffsetDiff {
 }
 
 impl TxOffsetDiff {
-    pub fn new(added: TxOffsetById, removed: TxHashSet, ) -> Self {
+    pub fn new(added: TxOffsetById, removed: TxHashSet) -> Self {
         Self { added, removed }
     }
 }
@@ -62,6 +62,10 @@ impl MemSizeEstimator for TxOffset {
     fn estimate_mem_units(&self) -> usize {
         1   
     }
+
+    fn estimate_mem_bytes(&self) -> usize {
+        size_of::<Self>()
+    }
 }
 
 /// Holds a Block's accepting [`Hash`] and [`MergeSetIDX`] of a block, for reference to the block's [`MergesetBlockAcceptanceData`] of a [`DbAcceptanceDataStore`].
@@ -74,6 +78,10 @@ pub struct BlockAcceptanceOffset {
 impl MemSizeEstimator for BlockAcceptanceOffset {
     fn estimate_mem_units(&self) -> usize {
         1   
+    }
+
+    fn estimate_mem_bytes(&self) -> usize {
+        size_of::<Self>()
     }
 }
 

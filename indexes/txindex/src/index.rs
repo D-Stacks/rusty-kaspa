@@ -278,7 +278,7 @@ impl TxIndexApi for TxIndex {
         self.stores
             .merged_block_acceptance_store
             .remove_many(&mut batch, txindex_reindexer.block_acceptance_offsets_changes.removed)?;
-        self.stores.source_store.replace_if_new(&mut batch, txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
+        self.stores.source_store.replace_if_new(&mut batch, txindex_reindexer.source.expect("a source with each new CADP notification"))?;
 
         self.stores.write_batch(batch)
     }

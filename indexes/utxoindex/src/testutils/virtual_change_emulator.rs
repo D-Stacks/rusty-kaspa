@@ -1,3 +1,4 @@
+use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use kaspa_index_core::models::txindex::{CirculatingSupply, CirculatingSupplyDiff};
 use kaspa_consensus::testutils::{utxo::{generate_random_utxos_from_script_public_key_pool, generate_random_p2pk_script_public_key}, block::generate_random_hashes};
 use kaspa_consensus_core::{
@@ -88,6 +89,13 @@ impl VirtualChangeEmulator {
         self.virtual_parents = Arc::new(vec![]);
         self.selected_parent_blue_score = 0;
         self.daa_score = 0;
+    }
+
+    pub fn generate_consensus_utxo_changed_notiication(&self) -> UtxosChangedNotification {
+        UtxosChangedNotification {
+            accumulated_utxo_diff: self.accumulated_utxo_diff,
+            virtual_parents: self.virtual_parents,
+        }
     }
 }
 

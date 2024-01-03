@@ -946,7 +946,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
     let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
-    let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone()))));
+    let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone())), None));
 
     let async_runtime = Arc::new(AsyncRuntime::new(2));
     async_runtime.register(tick_service.clone());

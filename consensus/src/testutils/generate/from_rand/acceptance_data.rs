@@ -1,10 +1,6 @@
 use itertools::Itertools;
 use kaspa_consensus_core::{
-    block::Block,
-    header::Header,
-    subnets::SubnetworkId,
-    tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
-    utxo::utxo_collection::UtxoCollection,
+    tx::TransactionIndexType,
     acceptance_data::{AcceptanceData, MergesetBlockAcceptanceData, TxEntry},
 };
 use rand::{rngs::SmallRng, seq::SliceRandom};
@@ -17,7 +13,7 @@ pub fn generate_random_acceptance_data(rng: &mut SmallRng, len: usize, txs_per_b
         acceptance_data.push(
             generate_random_mergeset_block_acceptance(
                 rng, 
-                txs_per_block_mean,
+                txs_per_block ,
                 unaccepted_tx_ratio;
             )
         );
@@ -25,7 +21,7 @@ pub fn generate_random_acceptance_data(rng: &mut SmallRng, len: usize, txs_per_b
     acceptance_data
 }
 
-pub fn generate_random_mergeset_block_acceptance(rng: &mut SmallRng, tx_amount: usize, unaccepted_ratio: f64) -> MergesetBlockAcceptance {
+pub fn generate_random_mergeset_block_acceptance(rng: &mut SmallRng, tx_amount: TransactionIndexType, unaccepted_ratio: f64) -> MergesetBlockAcceptanceData {
     let indexes = (0..tx_amount).collect_vec();
     indexes.shuffle(rng);
     let unaccepted_amount = (tx_amount as f64 * unaccepted_ratio) as usize;
@@ -38,7 +34,7 @@ pub fn generate_random_mergeset_block_acceptance(rng: &mut SmallRng, tx_amount: 
     }
 }
 
-pub fn generate_random_tx_entries(rng: &mut SmallRng, indexes: &[usize]) -> Vec<TxEntry> {
+pub fn generate_random_tx_entries(rng: &mut SmallRng, indexes: &[TransactionIndexType]) -> Vec<TxEntry> {
     let mut tx_entries = Vec::with_capacity(indexes.len());
     for i in indexes.into_iter() {
         tx_entries.push(generate_random_tx_entry_with_index(rng, *i));
@@ -46,6 +42,6 @@ pub fn generate_random_tx_entries(rng: &mut SmallRng, indexes: &[usize]) -> Vec<
     tx_entries
 }
 
-pub fn generate_random_tx_entry_with_index(rng: &mut SmallRng, index: usize) -> TxEntry {
-    TxEntry { transaction_id: generate_random_hash(rng), index_within_block: index as TransactionIndexType }
+pub fn generate_random_tx_entry_with_index(rng: &mut SmallRng, index: TransactionIndexType) -> TxEntry {
+    TxEntry { transaction_id: generate_random_hash(rng), index_within_block: index }
 }

@@ -834,7 +834,7 @@ impl ConsensusApi for Consensus {
             .copied()
             .map(|hash| self.acceptance_data_store
                 .get(hash)
-                .map_err(|e| ConsensusError::MissingData(hash)))
+                .map_err(|_| ConsensusError::MissingData(hash)))
             .collect::<ConsensusResult<Vec<_>>>()?))
     }
 

@@ -1,11 +1,7 @@
 use kaspa_consensus_core::{
-    block::Block,
-    header::Header,
-    subnets::SubnetworkId,
-    tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
+    tx::{ScriptPublicKey, ScriptVec, TransactionOutpoint, TransactionOutput, UtxoEntry},
     utxo::utxo_collection::UtxoCollection,
 };
-use kaspa_hashes::{Hash, HASH_SIZE};
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng};
 use crate::testutils::generate::from_rand::hash::generate_random_hash;
 

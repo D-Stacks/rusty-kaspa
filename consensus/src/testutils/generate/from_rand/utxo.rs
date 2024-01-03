@@ -25,7 +25,7 @@ pub fn generate_random_utxos_from_script_public_key_pool(
 }
 
 pub fn generate_random_outpoint(rng: &mut SmallRng) -> TransactionOutpoint {
-    TransactionOutpoint::new(generate_random_utxo(rng), rng.gen::<u32>())
+    TransactionOutpoint::new(generate_random_hash(rng), rng.gen::<u32>())
 }
 
 pub fn generate_random_utxo_from_script_public_key_pool(

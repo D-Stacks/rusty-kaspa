@@ -178,13 +178,21 @@ impl Collector<IndexNotification> for Processor {
 mod tests {
     use super::*;
     use async_channel::{unbounded, Receiver, Sender};
-    use kaspa_consensus::{config::Config, consensus::test_consensus::TestConsensus, params::DEVNET_PARAMS, testutils::generate::from_rand::{utxo::{generate_random_outpoint, generate_random_utxo}, hash::generate_random_hashes}};
+    use kaspa_consensus::{
+        config::Config, 
+        consensus::test_consensus::TestConsensus, 
+        params::DEVNET_PARAMS, 
+        testutils::generate::{from_rand::{
+            utxo::{generate_random_outpoint, generate_random_utxo}, 
+            hash::generate_random_hashes, acceptance_data::generate_random_acceptance_data,
+        }, self}};
     use kaspa_consensus_core::utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff};
     use kaspa_consensusmanager::ConsensusManager;
     use kaspa_database::create_temp_db;
     use kaspa_database::prelude::ConnBuilder;
     use kaspa_database::utils::DbLifetime;
-    use kaspa_notify::notifier::test_helpers::NotifyMock;
+    use kaspa_notify::{notifier::test_helpers::NotifyMock, notification};
+    use kaspa_txindex::{config::TxIndexConfig, TxIndex};
     use kaspa_utxoindex::UtxoIndex;
     use rand::{rngs::SmallRng, SeedableRng};
     use std::sync::Arc;
@@ -206,12 +214,13 @@ mod tests {
             let (consensus_sender, consensus_receiver) = unbounded();
             let (utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
             let (txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
-            let config = Arc::new(Config::new(DEVNET_PARAMS));
-            let tc = TestConsensus::new(&config);
+            let consensus_config = Arc::new(Config::new(DEVNET_PARAMS));
+            let tc = TestConsensus::new(&consensus_config);
             tc.init();
             let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
             let utxoindex = Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager, utxoindex_db).unwrap()));
-            let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db, config.clone()).unwrap()));
+            let txindex_config = Arc::new(TxIndexConfig::new(&consensus_config));
+            let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db, txindex_config).unwrap()));
             let processor = Arc::new(Processor::new(utxoindex, txindex, consensus_receiver));
             let (processor_sender, processor_receiver) = unbounded();
             let notifier = Arc::new(NotifyMock::new(processor_sender));
@@ -240,7 +249,7 @@ mod tests {
         pipeline.consensus_sender.send(ConsensusNotification::UtxosChanged(test_notification.clone())).await.expect("expected send");
 
         match pipeline.processor_receiver.recv().await.expect("receives a notification") {
-            Notification::UtxosChanged(utxo_changed_notification) => {
+            ConsensusNotification::UtxosChanged(utxo_changed_notification) => {
                 let mut notification_utxo_added_count = 0;
                 for (script_public_key, compact_utxo_collection) in utxo_changed_notification.added.iter() {
                     for (transaction_outpoint, compact_utxo) in compact_utxo_collection.iter() {
@@ -292,7 +301,7 @@ mod tests {
             .await
             .expect("expected send");
         match pipeline.processor_receiver.recv().await.expect("expected recv") {
-            Notification::PruningPointUtxoSetOverride(_) => (),
+            ConsensusNotification::PruningPointUtxoSetOverride(_) => (),
             unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
         }
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
@@ -305,56 +314,70 @@ mod tests {
         let pipeline = NotifyPipeline::new();
         let rng = &mut SmallRng::seed_from_u64(42);
 
-        let mut to_add_collection = UtxoCollection::new();
-        let mut to_remove_collection = UtxoCollection::new();
-        for _ in 0..2 {
-            to_add_collection.insert(generate_random_outpoint(rng), generate_random_utxo(rng));
-            to_remove_collection.insert(generate_random_outpoint(rng), generate_random_utxo(rng));
-        }
+        let to_add_acceptance_data = generate_random_acceptance_data(rng, 18, 200, 1.0 / 3.0);
+        let to_add_hashes = generate_random_hashes(rng, to_add_acceptance_data.len() - 1);
+        let to_remove_acceptance_data = generate_random_acceptance_data(rng, 18, 200, 2.0 / 3.0);
+        let to_remove_hashes = generate_random_hashes(rng, to_remove_acceptance_data.len() - 1);
 
-        let test_notification = consensus_notification::UtxosChangedNotification::new(
-            Arc::new(UtxoDiff { add: to_add_collection, remove: to_remove_collection }),
-            Arc::new(generate_random_hashes(rng, 2)),
+        let test_notification = consensus_notification::VirtualChainChangedNotification::new(
+            Arc::new(to_add_hashes.clone()),
+            Arc::new(to_remove_hashes.clone()),
+            Arc::new(to_add_acceptance_data.clone()),
+            Arc::new(to_remove_acceptance_data.clone()),
         );
 
-        pipeline.consensus_sender.send(ConsensusNotification::UtxosChanged(test_notification.clone())).await.expect("expected send");
+        pipeline.consensus_sender.send(ConsensusNotification::VirtualChainChanged(test_notification.clone())).await.expect("expected send");
 
         match pipeline.processor_receiver.recv().await.expect("receives a notification") {
-            Notification::UtxosChanged(utxo_changed_notification) => {
-                let mut notification_utxo_added_count = 0;
-                for (script_public_key, compact_utxo_collection) in utxo_changed_notification.added.iter() {
-                    for (transaction_outpoint, compact_utxo) in compact_utxo_collection.iter() {
-                        let test_utxo = test_notification
-                            .accumulated_utxo_diff
-                            .add
-                            .get(transaction_outpoint)
-                            .expect("expected transaction outpoint to be in test event");
-                        assert_eq!(test_utxo.script_public_key, *script_public_key);
-                        assert_eq!(test_utxo.amount, compact_utxo.amount);
-                        assert_eq!(test_utxo.block_daa_score, compact_utxo.block_daa_score);
-                        assert_eq!(test_utxo.is_coinbase, compact_utxo.is_coinbase);
-                        notification_utxo_added_count += 1;
+            ConsensusNotification::VirtualChainChanged(virtual_chain_changed_notification) => {
+                // Assert length of added and removed match 
+                assert_eq!(test_notification.added_chain_block_hashes.len(), virtual_chain_changed_notification.added_chain_block_hashes.len());
+                assert_eq!(test_notification.removed_chain_block_hashes.len(), virtual_chain_changed_notification.removed_chain_block_hashes.len());
+                assert_eq!(test_notification.added_chain_blocks_acceptance_data.len(), virtual_chain_changed_notification.added_chain_blocks_acceptance_data.len());
+                assert_eq!(test_notification.removed_chain_blocks_acceptance_data.len(), virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.len());
+                // Assert added hashes match
+                for (test_hash, notification_hash) in test_notification.added_chain_block_hashes.iter().zip(virtual_chain_changed_notification.added_chain_block_hashes.iter()) {
+                    assert_eq!(test_hash, notification_hash);
+                }
+                // Assert removed hashes match
+                for (test_hash, notification_hash) in test_notification.removed_chain_block_hashes.iter().zip(virtual_chain_changed_notification.removed_chain_block_hashes.iter()) {
+                    assert_eq!(test_hash, notification_hash);
+                }
+                // Assert added acceptance data match
+                for (test_mergesets, notification_mergesets) in test_notification.added_chain_blocks_acceptance_data.iter().zip(virtual_chain_changed_notification.added_chain_blocks_acceptance_data.iter()) {
+                    assert_eq!(test_mergesets.len(), notification_mergesets.len());
+                    for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
+                        assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
+                        assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
+                        assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
                     }
                 }
-                assert_eq!(test_notification.accumulated_utxo_diff.add.len(), notification_utxo_added_count);
-
-                let mut notification_utxo_removed_count = 0;
-                for (script_public_key, compact_utxo_collection) in utxo_changed_notification.removed.iter() {
-                    for (transaction_outpoint, compact_utxo) in compact_utxo_collection.iter() {
-                        let test_utxo = test_notification
-                            .accumulated_utxo_diff
-                            .remove
-                            .get(transaction_outpoint)
-                            .expect("expected transaction outpoint to be in test event");
-                        assert_eq!(test_utxo.script_public_key, *script_public_key);
-                        assert_eq!(test_utxo.amount, compact_utxo.amount);
-                        assert_eq!(test_utxo.block_daa_score, compact_utxo.block_daa_score);
-                        assert_eq!(test_utxo.is_coinbase, compact_utxo.is_coinbase);
-                        notification_utxo_removed_count += 1;
+                // Assert removed acceptance data match
+                for (test_mergesets, notification_mergesets) in test_notification.removed_chain_blocks_acceptance_data.iter().zip(virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.iter()) {
+                    assert_eq!(test_mergesets.len(), notification_mergesets.len());
+                    for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
+                        assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
+                        assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
+                        assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
                     }
-                }
-                assert_eq!(test_notification.accumulated_utxo_diff.remove.len(), notification_utxo_removed_count);
-            }
+                };
+            },
             unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
         }
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
@@ -365,6 +388,48 @@ mod tests {
 
     #[tokio::test]
     async fn test_chain_acceptance_daa_pruned_notification() {
-        todo!()
+        let pipeline = NotifyPipeline::new();
+        let rng = &mut SmallRng::seed_from_u64(42);
+
+        let chain_hash_pruned = generate_random_hash(rng);
+        let mergeset_block_acceptance_data_pruned = generate_random_acceptance_data(rng, 18, 200, 1.0 / 3.0);
+        let history_root = generate_random_hash(rng);
+
+        let test_notification = consensus_notification::ChainAcceptanceDataPrunedNotification::new(
+            chain_hash_pruned,
+            mergeset_block_acceptance_data_pruned.clone(),
+            history_root,
+        );
+
+        pipeline.consensus_sender.send(ConsensusNotification::ChainAcceptanceDataPruned(test_notification.clone())).await.expect("expected send");
+
+        match pipeline.processor_receiver.recv().await.expect("receives a notification") {
+            IndexNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned_notification) => {
+                assert_eq!(test_notification.chain_hash_pruned, chain_acceptance_data_pruned_notification.chain_hash_pruned);
+
+                assert_eq!(test_notification.mergeset_block_acceptance_data_pruned.len(), chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.len());
+                for (test_mergesets, notification_mergesets) in test_notification.mergeset_block_acceptance_data_pruned.iter().zip(chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.iter()) {
+                    assert_eq!(test_mergesets.len(), notification_mergesets.len());
+                    for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
+                        assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
+                        assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
+                        assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
+                        for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
+                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
+                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
+                        }
+                    }
+                }
+                assert_eq!(test_notification.history_root, chain_acceptance_data_pruned_notification.history_root);
+            },
+            unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
+        }
+        assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
+        pipeline.consensus_sender.close();
+        pipeline.processor.clone().join().await.expect("stopping the processor must succeed");
     }
 }

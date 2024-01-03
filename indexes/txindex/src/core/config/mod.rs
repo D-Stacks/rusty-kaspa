@@ -6,20 +6,20 @@ use std::sync::Arc;
 
 use kaspa_consensus_core::config::Config as ConsensusConfig;
 
-use crate::core::config::{perf::TxIndexPerfParams, params::TxIndexParams};
+use crate::core::config::{perf::PerfParams, params::Params};
 
 #[derive(Clone, Debug)]
-pub struct TxIndexConfig {
-    pub txindex_perf_params: TxIndexPerfParams,
-    pub txindex_params: TxIndexParams,
+pub struct Config {
+    pub perf: PerfParams,
+    pub params: Params,
 }
 
-impl TxIndexConfig {
+impl Config {
     pub fn new(consensus_config: &Arc<ConsensusConfig>) -> Self {
-        let txindex_params = TxIndexParams::new(consensus_config);
+        let params = Params::new(consensus_config);
         Self {
-            txindex_params: txindex_params.clone(),
-            txindex_perf_params: TxIndexPerfParams::new(consensus_config, &txindex_params),
+            params: params.clone(),
+            perf: PerfParams::new(consensus_config, &params),
         }
     }
 }

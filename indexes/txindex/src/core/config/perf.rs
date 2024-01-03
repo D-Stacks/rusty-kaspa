@@ -9,12 +9,12 @@ use kaspa_consensus_core::{
 use kaspa_database::cache_policy_builder::bounded_size;
 use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
 
-use crate::core::config::{constants::DEFAULT_TXINDEX_EXTRA_FD_BUDGET, params::TxIndexParams, };
+use crate::core::config::{constants::DEFAULT_TXINDEX_EXTRA_FD_BUDGET, params::Params};
 
 use super::constants::{DEFAULT_TXINDEX_MEMORY_BUDGET, DEFAULT_TXINDEX_DB_PARALLELISM};
 
 #[derive(Clone, Debug)]
-pub struct TxIndexPerfParams {
+pub struct PerfParams {
     pub mem_budget_total: usize,
     pub resync_chunksize: usize,
     pub extra_fd_budget: usize,
@@ -22,22 +22,22 @@ pub struct TxIndexPerfParams {
     unit_ratio_tx_offset_to_block_acceptance_offset: usize,
 }
 
-impl TxIndexPerfParams {
-    pub fn new(consensus_config: &Arc<ConsensusConfig>, txindex_params: &TxIndexParams) -> Self {
+impl PerfParams {
+    pub fn new(consensus_config: &Arc<ConsensusConfig>, params: &Params) -> Self {
         
         let resync_chunksize = bounded_size(
-                txindex_params.max_blocks_in_mergeset_depth as usize, 
+                params.max_blocks_in_mergeset_depth as usize, 
                 DEFAULT_TXINDEX_EXTRA_FD_BUDGET, 
                 max( //per chain block
                 (
                     (size_of::<TransactionId>() + size_of::<TxOffset>()
                     ) 
-                    * txindex_params.max_default_txs_per_block as usize
+                    * params.max_default_txs_per_block as usize
                     + (size_of::<BlockAcceptanceOffset>() + size_of::<Hash>())
                 ) * consensus_config.params.mergeset_size_limit  as usize, 
                 (
                     size_of::<TxEntry>() 
-                    * txindex_params.max_default_txs_per_block as usize
+                    * params.max_default_txs_per_block as usize
                     + size_of::<MergesetBlockAcceptanceData>() 
                     + size_of::<Hash>()
                 ) * consensus_config.params.mergeset_size_limit as usize
@@ -45,7 +45,7 @@ impl TxIndexPerfParams {
         );
 
         Self {
-            unit_ratio_tx_offset_to_block_acceptance_offset: txindex_params.max_default_txs_per_block as usize, 
+            unit_ratio_tx_offset_to_block_acceptance_offset: params.max_default_txs_per_block as usize, 
             resync_chunksize,
             mem_budget_total: DEFAULT_TXINDEX_MEMORY_BUDGET,
             extra_fd_budget: DEFAULT_TXINDEX_EXTRA_FD_BUDGET,

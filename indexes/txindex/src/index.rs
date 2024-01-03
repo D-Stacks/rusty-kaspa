@@ -20,25 +20,25 @@ use crate::{
     stores::{
         TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
         TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores, TxIndexSourceStore,
-    }, config::TxIndexConfig,
+    }, config::Config,
 };
 
 pub struct TxIndex {
     stores: TxIndexStores,
     consensus_manager: Arc<ConsensusManager>,
-    txindex_config: Arc<TxIndexConfig>, // move into config, once txindex is configurable.
+    config: Arc<Config>, // move into config, once txindex is configurable.
 }
 
 impl TxIndex {
     pub fn new(
         consensus_manager: Arc<ConsensusManager>,
-        txindex_db: Arc<DB>,
-        txindex_config: Arc<TxIndexConfig>,
+        db: Arc<DB>,
+        config: Arc<Config>,
     ) -> TxIndexResult<Arc<RwLock<Self>>> {
         let mut txindex = Self {
-            stores: TxIndexStores::new(txindex_db, &txindex_config)?,
+            stores: TxIndexStores::new(db, &config)?,
             consensus_manager: consensus_manager.clone(),
-            txindex_config,
+            config,
         };
 
         if !txindex.is_synced()? {
@@ -80,7 +80,7 @@ impl TxIndex {
         let mut added_processed_in_batch = 0u64;
         while start_hash != end_hash {
             let mut chain_path =
-                session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.txindex_config.txindex_perf_params.resync_chunksize as usize))?;
+                session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.config.perf.resync_chunksize as usize))?;
 
             // We switch added to removed, and clear removed, as we have no use for the removed data.
             if unsync_segment {

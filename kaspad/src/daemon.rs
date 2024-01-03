@@ -32,7 +32,7 @@ use kaspa_p2p_flows::{flow_context::FlowContext, service::P2pService};
 
 use kaspa_perf_monitor::{builder::Builder as PerfMonitorBuilder, counters::CountersSnapshot};
 use kaspa_utxoindex::{api::UtxoIndexProxy, UtxoIndex};
-use kaspa_txindex::{api::TxIndexProxy, TxIndex, core::config::TxIndexConfig};
+use kaspa_txindex::{api::TxIndexProxy, TxIndex, core::config::Config as TxIndexConfig};
 use kaspa_wrpc_server::service::{Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService};
 
 /// Desired soft FD limit that needs to be consensus_configured
@@ -218,8 +218,8 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
 
     let txindex_config = if args.txindex {
         let txindex_config = TxIndexConfig::new(&consensus_config); 
-        tx_files_limit += txindex_config.txindex_perf_params.extra_fd_budget as i32;
-        fd_remaining -= txindex_config.txindex_perf_params.extra_fd_budget as i32;
+        tx_files_limit += txindex_config.perf.extra_fd_budget as i32;
+        fd_remaining -= txindex_config.perf.extra_fd_budget as i32;
         Some(Arc::new(txindex_config))
     } else {None};
 
@@ -432,7 +432,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
             let txindex_db = kaspa_database::prelude::ConnBuilder::default()
                 .with_db_path(txindex_db_dir)
                 .with_files_limit(tx_files_limit)
-                .with_parallelism(1 + txindex_config.txindex_perf_params.db_parallelism as usize)
+                .with_parallelism(1 + txindex_config.perf.db_parallelism as usize)
                 .build()
                 .unwrap();
                 Some(TxIndexProxy::new(TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap()))

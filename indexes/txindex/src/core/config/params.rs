@@ -5,12 +5,12 @@ use crate::core::config::constants::{
 };
 
 #[derive(Clone, Debug)]
-pub struct TxIndexParams {
+pub struct Params {
     pub max_default_txs_per_block: u64,
     pub max_blocks_in_mergeset_depth: u64,
 }
 
-impl TxIndexParams {
+impl Params {
     pub fn new(consensus_config: &Arc<ConsensusConfig>) -> Self {
         Self {
             max_default_txs_per_block: consensus_config.params.max_block_mass / (

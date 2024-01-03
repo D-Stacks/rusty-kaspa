@@ -179,7 +179,7 @@ mod tests {
     use super::*;
     use async_channel::{unbounded, Receiver, Sender};
     use kaspa_consensus::{
-        config::Config, 
+        config::Config as ConsensusConfig, 
         consensus::test_consensus::TestConsensus, 
         params::DEVNET_PARAMS, 
         testutils::generate::{from_rand::{
@@ -192,7 +192,7 @@ mod tests {
     use kaspa_database::prelude::ConnBuilder;
     use kaspa_database::utils::DbLifetime;
     use kaspa_notify::{notifier::test_helpers::NotifyMock};
-    use kaspa_txindex::{config::TxIndexConfig, TxIndex};
+    use kaspa_txindex::{config::Config as TxIndexConfig, TxIndex};
     use kaspa_utxoindex::UtxoIndex;
     use rand::{rngs::SmallRng, SeedableRng};
     use std::sync::Arc;
@@ -214,7 +214,7 @@ mod tests {
             let (consensus_sender, consensus_receiver) = unbounded();
             let (utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
             let (txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
-            let consensus_config = Arc::new(Config::new(DEVNET_PARAMS));
+            let consensus_config = Arc::new(ConsensusConfig::new(DEVNET_PARAMS));
             let tc = TestConsensus::new(&consensus_config);
             tc.init();
             let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
@@ -404,7 +404,7 @@ mod tests {
 
         pipeline.consensus_sender.send(ConsensusNotification::ChainAcceptanceDataPruned(test_notification.clone())).await.expect("expected send");
     
-        // we expect no index notification to be sent, so below is enough for the test.  
+        // we expect no index notification response to be sent, so below is enough for the test.  
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");

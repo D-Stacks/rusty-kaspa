@@ -1,4 +1,3 @@
-pub mod cache_policy_builder;
 pub mod ctl;
 pub mod factory;
 pub mod services;
@@ -266,7 +265,7 @@ impl Consensus {
         ));
 
         let pruning_processor =
-            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, notification_root.clone(), pruning_lock.clone(), config.clone()));
+            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, notification_root.clone(), pruning_lock.clone(), config.clone(), is_consensus_exiting.clone()));
 
         // Ensure the relations stores are initialized
         header_processor.init();

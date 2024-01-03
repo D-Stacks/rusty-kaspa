@@ -1,6 +1,6 @@
 // External imports
 use kaspa_core::trace;
-use kaspa_database::prelude::{StoreError, DB};
+use kaspa_database::{prelude::{StoreError, DB}, cache_policy_builder::CachePolicyBuilder};
 use std::{
     fmt::{self, Debug, Formatter},
     sync::Arc,
@@ -11,7 +11,7 @@ use rocksdb::WriteBatch;
 // Local imports
 use crate::{
     errors::TxIndexResult,
-    config::perf::TxIndexPerfParams,
+    config::{perf::TxIndexPerfParams, TxIndexConfig},
     stores::{
         accepted_tx_offsets::DbTxIndexAcceptedTxOffsetsStore, merged_block_acceptance::DbTxIndexMergedBlockAcceptanceStore,
         sink::DbTxIndexSinkStore, source::DbTxIndexSourceStore, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceStore,
@@ -29,12 +29,29 @@ pub struct TxIndexStores {
 }
 
 impl TxIndexStores {
-    pub fn new(txindex_db: Arc<DB>, txindex_perf: &TxIndexPerfParams) -> Result<Self, StoreError> {
+    pub fn new(txindex_db: Arc<DB>, txindex_config: &Arc<TxIndexConfig>) -> Result<Self, StoreError> {
+
+        // Build cache policies
+        let tx_offset_cache_policy = CachePolicyBuilder::new()
+        .bytes_budget(txindex_config.txindex_perf_params.mem_budget_tx_offset())
+        .unit_bytes(txindex_config.txindex_perf_params.mem_size_tx_offset())
+        .tracked_bytes()
+        .build();
+        
+        let block_acceptance_cache_policy = CachePolicyBuilder::new()
+        .bytes_budget(txindex_config.txindex_perf_params.mem_budget_block_acceptance_offset())
+        .unit_bytes(txindex_config.txindex_perf_params.mem_size_block_acceptance_offset())
+        .tracked_bytes()
+        .build(); 
+
         Ok(Self {
-            accepted_tx_offsets_store: DbTxIndexAcceptedTxOffsetsStore::new(txindex_db.clone(), txindex_perf.offset_cache_size),
+            accepted_tx_offsets_store: DbTxIndexAcceptedTxOffsetsStore::new(
+                txindex_db.clone(), 
+                tx_offset_cache_policy
+            ),
             merged_block_acceptance_store: DbTxIndexMergedBlockAcceptanceStore::new(
                 txindex_db.clone(),
-                txindex_perf.block_acceptance_cache_size,
+                block_acceptance_cache_policy,
             ),
             source_store: DbTxIndexSourceStore::new(txindex_db.clone()),
             sink_store: DbTxIndexSinkStore::new(txindex_db.clone()),

@@ -2,7 +2,7 @@ use kaspa_index_core::models::txindex::{TxOffset, TxOffsetDiff, TxHashSet};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB},
+    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB, CachePolicy},
     registry::DatabaseStorePrefixes,
 };
 use rocksdb::WriteBatch;
@@ -29,8 +29,8 @@ pub struct DbTxIndexAcceptedTxOffsetsStore {
 }
 
 impl DbTxIndexAcceptedTxOffsetsStore {
-    pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexAcceptedOffsets.into()) }
+    pub fn new(db: Arc<DB>, cache_policy: CachePolicy) -> Self {
+        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::TxIndexAcceptedOffsets.into()) }
     }
 }
 

@@ -121,8 +121,9 @@ impl Default for Args {
 }
 
 impl Args {
-    pub fn apply_to_config(&self, config: &mut Config) {
+    pub fn apply_to_consensus_config(&self, config: &mut Config) {
         config.utxoindex = self.utxoindex;
+        config.txindex = self.utxoindex;
         config.disable_upnp = self.disable_upnp;
         config.unsafe_rpc = self.unsafe_rpc;
         config.enable_unsynced_mining = self.enable_unsynced_mining;
@@ -284,6 +285,7 @@ pub fn cli() -> Command {
                 .help("Allow mainnet mining (do not use unless you know what you are doing)"),
         )
         .arg(arg!(--utxoindex "Enable the UTXO index"))
+        .arg(arg!(--txindex "Enable the TX index"))           
         .arg(arg!(--testnet "Use the test network"))
         .arg(
             Arg::new("netsuffix")
@@ -324,6 +326,7 @@ pub fn cli() -> Command {
         )
         .arg(arg!(--"disable-upnp" "Disable upnp"))
         .arg(arg!(--"nodnsseed" "Disable DNS seeding for peers"))
+
         ;
 
     #[cfg(feature = "devnet-prealloc")]
@@ -477,6 +480,7 @@ impl Args {
       --maxutxocachesize=                   Max size of loaded UTXO into ram from the disk in bytes (default:
                                             5000000000)
       --utxoindex                           Enable the UTXO index
+      --txindex                             Enable the TX index
       --archival                            Run as an archival node: don't delete old block data when moving the
                                             pruning point (Warning: heavy disk usage)'
       --protocol-version=                   Use non default p2p protocol version (default: 5)

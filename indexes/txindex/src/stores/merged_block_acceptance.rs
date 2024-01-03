@@ -1,6 +1,6 @@
 use kaspa_consensus_core::{BlockHasher, BlockHashSet};
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB},
+    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB, CachePolicy},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
@@ -36,10 +36,10 @@ pub struct DbTxIndexMergedBlockAcceptanceStore {
 }
 
 impl DbTxIndexMergedBlockAcceptanceStore {
-    pub fn new(db: Arc<DB>, cache_size: u64) -> Self {
+    pub fn new(db: Arc<DB>, cache_policy: CachePolicy) -> Self {
         Self {
             db: Arc::clone(&db),
-            access: CachedDbAccess::new(db, cache_size, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()),
+            access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()),
         }
     }
 }

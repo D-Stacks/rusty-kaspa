@@ -2,6 +2,7 @@ use std::{collections::{HashSet, HashMap}, sync::Arc};
 
 use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, BlockHashSet};
 use kaspa_hashes::Hash;
+use kaspa_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
 
 pub type TxHashSet = HashSet<TransactionId>;
@@ -57,11 +58,23 @@ impl TxOffset {
     }
 }
 
+impl MemSizeEstimator for TxOffset {
+    fn estimate_mem_units(&self) -> usize {
+        1   
+    }
+}
+
 /// Holds a Block's accepting [`Hash`] and [`MergeSetIDX`] of a block, for reference to the block's [`MergesetBlockAcceptanceData`] of a [`DbAcceptanceDataStore`].
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, Hash)]
 pub struct BlockAcceptanceOffset {
     accepting_block: Hash,
     ordered_mergeset_index: MergeSetIDX,
+}
+
+impl MemSizeEstimator for BlockAcceptanceOffset {
+    fn estimate_mem_units(&self) -> usize {
+        1   
+    }
 }
 
 impl BlockAcceptanceOffset {

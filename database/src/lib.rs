@@ -9,6 +9,7 @@ mod writer;
 pub mod registry;
 mod set_access;
 pub mod utils;
+pub mod cache_policy_builder;
 
 pub mod prelude {
     use crate::{db, errors};

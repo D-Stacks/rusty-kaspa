@@ -1,85 +1,80 @@
-use std::{cmp::max, mem, sync::Arc};
+use std::{cmp::max, mem::{self, size_of}, sync::Arc};
 
+use kaspa_consensus::params::Params as ConsensusParams;
 use kaspa_consensus_core::{
     acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
-    config::{constants::perf::bounded_cache_size, Config as ConsensusConfig},
+    config::Config as ConsensusConfig,
     tx::TransactionId,
     Hash,
 };
+use kaspa_database::{cache_policy_builder::{CachePolicyBuilder, noise, bounded_size}, prelude::CachePolicy};
 use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
+use kaspa_utils::mem_size::MemSizeEstimator;
 
-use crate::{
-    core::config::constants::{
-        STANDARD_SCHNORR_SCRIPT_PUBLIC_KEY_LEN, STANDARD_TRANSACTION_HEADER_SIZE, STANDARD_TRANSACTION_INPUT_SIZE,
-        STANDARD_TRANSACTION_OUTPUT_SIZE,
-    },
-};
+use crate::core::config::{constants::DEFAULT_TXINDEX_EXTRA_FD_BUDGET, params::TxIndexParams, };
 
-pub fn calculate_approx_std_transaction_size_in_bytes(number_of_inputs: u64, number_of_outputs: u64) -> u64 {
-    STANDARD_TRANSACTION_HEADER_SIZE
-        + number_of_inputs * STANDARD_TRANSACTION_INPUT_SIZE
-        + number_of_outputs * STANDARD_TRANSACTION_OUTPUT_SIZE
-}
+use super::constants::{DEFAULT_TXINDEX_MEMORY_BUDGET, DEFAULT_TXINDEX_DB_PARALLELISM};
 
-pub fn calculate_approx_std_transaction_mass(
-    consensus_config: &Arc<ConsensusConfig>,
-    number_of_inputs: u64,
-    number_of_outputs: u64,
-) -> u64 {
-    let byte_mass =
-        calculate_approx_std_transaction_size_in_bytes(number_of_inputs, number_of_outputs) * consensus_config.mass_per_tx_byte;
-    let signature_op_mass = number_of_inputs * consensus_config.mass_per_sig_op; // OP_CHECKSIG per input
-    let script_public_key_mass = ((number_of_inputs + number_of_outputs) * STANDARD_SCHNORR_SCRIPT_PUBLIC_KEY_LEN)
-        * consensus_config.mass_per_script_pub_key_byte;
-    byte_mass + signature_op_mass + script_public_key_mass
-}
-
-pub const DEFAULT_TXINDEX_MEMORY_BUDGET: u64 = 750_000_000; // 750mb
+#[derive(Clone, Debug)]
 pub struct TxIndexPerfParams {
-    pub offset_cache_size: u64,
-    pub block_acceptance_cache_size: u64,
-    pub resync_chunksize: u64,
+    pub mem_budget_total: usize,
+    pub resync_chunksize: usize,
+    pub extra_fd_budget: usize,
+    pub db_parallelism: usize,
+    unit_ratio_tx_offset_to_block_acceptance_offset: usize,
 }
 
 impl TxIndexPerfParams {
-    pub fn new(consensus_config: &Arc<ConsensusConfig>) -> Self {
-        let unit_size_offset = (mem::size_of::<TxOffset>() + mem::size_of::<TransactionId>()) as u64;
-        let unit_size_merged_block = (mem::size_of::<BlockAcceptanceOffset>() + mem::size_of::<Hash>() + mem::size_of::<u32>()) as u64;
+    pub fn new(consensus_config: &Arc<ConsensusConfig>, txindex_params: &TxIndexParams) -> Self {
+        
+        let resync_chunksize = bounded_size(
+                txindex_params.max_blocks_in_mergeset_depth as usize, 
+                DEFAULT_TXINDEX_EXTRA_FD_BUDGET, 
+                max( //per chain block
+                (
+                    (size_of::<TransactionId>() + size_of::<TxOffset>()
+                    ) 
+                    * txindex_params.max_default_txs_per_block as usize
+                    + (size_of::<BlockAcceptanceOffset>() + size_of::<Hash>())
+                ) * consensus_config.params.mergeset_size_limit  as usize, 
+                (
+                    size_of::<TxEntry>() 
+                    * txindex_params.max_default_txs_per_block as usize
+                    + size_of::<MergesetBlockAcceptanceData>() 
+                    + size_of::<Hash>()
+                ) * consensus_config.params.mergeset_size_limit as usize
+            )
+        );
 
-        let expected_higher_bound_std_transactions_per_block =
-            consensus_config.max_block_mass / calculate_approx_std_transaction_mass(consensus_config, 1, 1);
-        let ratio_for_merged_block_acceptance = (unit_size_merged_block as f64
-            / (unit_size_offset as f64 * expected_higher_bound_std_transactions_per_block as f64))
-            .floor() as u64;
-
-        let memory_budget_merged_blocks = DEFAULT_TXINDEX_MEMORY_BUDGET * ratio_for_merged_block_acceptance;
-        let memory_budget_offsets = DEFAULT_TXINDEX_MEMORY_BUDGET - memory_budget_merged_blocks;
         Self {
-            offset_cache_size: bounded_cache_size(
-                expected_higher_bound_std_transactions_per_block * consensus_config.merge_depth,
-                memory_budget_offsets,
-                unit_size_offset as usize,
-            ),
-            block_acceptance_cache_size: bounded_cache_size(
-                consensus_config.merge_depth,
-                memory_budget_merged_blocks,
-                unit_size_merged_block as usize,
-            ),
-            resync_chunksize: bounded_cache_size(
-                consensus_config.merge_depth,
-                DEFAULT_TXINDEX_MEMORY_BUDGET,
-                max(
-                    // we load both into mem, we use higher unit size for bounding
-                    ((((unit_size_offset * expected_higher_bound_std_transactions_per_block) * consensus_config.mergeset_size_limit)
-                        + unit_size_merged_block) as f64)
-                        .floor() as u64, // reindexed overhead, under worst case assumptions, per block.
-                    ((((mem::size_of::<MergesetBlockAcceptanceData>() as u64
-                        + (mem::size_of::<TxEntry>() as u64 * expected_higher_bound_std_transactions_per_block))
-                        * consensus_config.mergeset_size_limit)
-                        + mem::size_of::<Hash>() as u64) as f64)
-                        .floor() as u64, // pre-indexed overhead, under worst case assumptions, per block.
-                ) as usize,
-            ),
+            unit_ratio_tx_offset_to_block_acceptance_offset: txindex_params.max_default_txs_per_block as usize, 
+            resync_chunksize,
+            mem_budget_total: DEFAULT_TXINDEX_MEMORY_BUDGET,
+            extra_fd_budget: DEFAULT_TXINDEX_EXTRA_FD_BUDGET,
+            db_parallelism: DEFAULT_TXINDEX_DB_PARALLELISM,
         }
+    }
+
+    pub fn mem_size_tx_offset(&self) -> usize {
+        size_of::<TransactionId>() + size_of::<TxOffset>()
+    }
+
+    pub fn mem_size_block_acceptance_offset(&self) -> usize {
+        size_of::<BlockAcceptanceOffset>() + size_of::<Hash>()
+    }
+
+    pub fn mem_budget_tx_offset(&self) -> usize {
+        self.mem_budget_total - self.mem_budget_block_acceptance_offset()
+    }
+
+    pub fn mem_budget_block_acceptance_offset(&self) -> usize {
+        self.mem_budget_total / (
+            (
+                size_of::<TransactionId>() + size_of::<TxOffset>()
+            ) * self.unit_ratio_tx_offset_to_block_acceptance_offset 
+            / (
+                size_of::<Hash>() + size_of::<BlockAcceptanceOffset>() 
+            )
+        )
     }
 }

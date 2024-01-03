@@ -11,5 +11,4 @@ pub mod params;
 pub mod pipeline;
 pub mod processes;
 
-#[test]
 pub mod testutils;

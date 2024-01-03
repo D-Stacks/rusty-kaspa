@@ -219,7 +219,8 @@ impl ConsensusResetHandler for UtxoIndexConsensusResetHandler {
 
 #[cfg(test)]
 mod tests {
-    use crate::{api::UtxoIndexApi, model::CirculatingSupply, testutils::virtual_change_emulator::VirtualChangeEmulator, UtxoIndex};
+    use crate::{api::UtxoIndexApi, testutils::virtual_change_emulator::VirtualChangeEmulator, UtxoIndex};
+    use kaspa_index_core::models::utxoindex::CirculatingSupply;
     use kaspa_consensus::{
         config::Config,
         consensus::test_consensus::TestConsensus,
@@ -313,7 +314,7 @@ mod tests {
         let now = Instant::now();
         let utxo_changes = utxoindex
             .write()
-            .update(virtual_change_emulator.accumulated_utxo_diff.clone(), virtual_change_emulator.virtual_parents)
+            .update(virtual_change_emulator.generate_consensus_utxo_changed_notiication())
             .expect("expected utxoindex utxo changes");
         let bench_time = now.elapsed().as_millis();
         // TODO: move over to proper benching eventually.

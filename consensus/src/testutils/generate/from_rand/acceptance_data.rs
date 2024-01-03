@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use itertools::Itertools;
 use kaspa_consensus_core::{
     tx::TransactionIndexType,
@@ -7,14 +9,28 @@ use rand::{rngs::SmallRng, seq::SliceRandom};
 
 use crate::testutils::generate::from_rand::{hash::generate_random_hash};
 
+
+
+pub fn generate_random_acceptance_data_vec(rng: &mut SmallRng, len: usize, mergeset_size: usize, txs_per_block: TransactionIndexType, unaccepted_tx_ratio: f64) -> Vec<Arc<AcceptanceData>> {
+    let mut acceptance_data_vec = Vec::with_capacity(len);
+    for _ in 0..(len - 1) {
+        acceptance_data_vec.push(
+            Arc::new(
+                generate_random_acceptance_data(rng, mergeset_size, txs_per_block, unaccepted_tx_ratio)
+            )
+        );
+    };
+    acceptance_data_vec
+}
+
 pub fn generate_random_acceptance_data(rng: &mut SmallRng, len: usize, txs_per_block: TransactionIndexType, unaccepted_tx_ratio: f64) -> AcceptanceData {
     let mut acceptance_data = AcceptanceData::with_capacity(len);
     for _ in 0..(len - 1) {
         acceptance_data.push(
             generate_random_mergeset_block_acceptance(
                 rng, 
-                txs_per_block ,
-                unaccepted_tx_ratio;
+                txs_per_block,
+                unaccepted_tx_ratio,
             )
         );
     };
@@ -22,11 +38,10 @@ pub fn generate_random_acceptance_data(rng: &mut SmallRng, len: usize, txs_per_b
 }
 
 pub fn generate_random_mergeset_block_acceptance(rng: &mut SmallRng, tx_amount: TransactionIndexType, unaccepted_ratio: f64) -> MergesetBlockAcceptanceData {
-    let indexes = (0..tx_amount).collect_vec();
+    let mut indexes = (0..tx_amount-1).collect_vec();
     indexes.shuffle(rng);
-    let unaccepted_amount = (tx_amount as f64 * unaccepted_ratio) as usize;
-    let unaccepted_indexes = &indexes[..unaccepted_amount];
-    let accepted_indexes = &indexes[unaccepted_amount..];
+    let split_point = (tx_amount as f64 * unaccepted_ratio) as usize;
+    let (unaccepted_indexes, accepted_indexes) = indexes.as_mut_slice().split_at(split_point);
     MergesetBlockAcceptanceData {
         block_hash: generate_random_hash(rng),
         accepted_transactions: generate_random_tx_entries(rng, &accepted_indexes),

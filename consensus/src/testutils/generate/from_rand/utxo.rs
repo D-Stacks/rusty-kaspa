@@ -1,5 +1,5 @@
 use kaspa_consensus_core::{
-    tx::{ScriptPublicKey, ScriptVec, TransactionOutpoint, TransactionOutput, UtxoEntry},
+    tx::{ScriptPublicKey, ScriptVec, TransactionOutpoint, UtxoEntry},
     utxo::utxo_collection::UtxoCollection,
 };
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng};

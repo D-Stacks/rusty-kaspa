@@ -2880,6 +2880,7 @@ dependencies = [
  "kaspa-notify",
  "kaspa-pow",
  "kaspa-rpc-core",
+ "kaspa-txindex",
  "kaspa-txscript",
  "kaspa-txscript-errors",
  "kaspa-utils",

@@ -41,7 +41,7 @@ use kaspa_consensus_notify::{
     root::ConsensusNotificationRoot,
 };
 use kaspa_consensusmanager::SessionLock;
-use kaspa_core::{debug, info, warn};
+use kaspa_core::{debug, info, warn, trace};
 use kaspa_database::prelude::{BatchDbWriter, MemoryWriter, StoreResultExtensions, DB};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
@@ -381,21 +381,7 @@ impl PruningProcessor {
                 let mut reachability_relations_write = self.reachability_relations_store.write();
                 let mut staging_relations = StagingRelationsStore::new(&mut reachability_relations_write);
                 let mut staging_reachability = StagingReachabilityStore::new(reachability_read);
-                let mut statuses_write = self.statuses_store.write();
-
-                // Collect pruned data to be sent over the notifier for external services
-                if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // check if there is a subscription
-                && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // check if it is chain data being pruned.  
-                {
-                    
-                    self.notification_root
-                        .notify(ConsensusNotification::ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification::new( 
-                            current, 
-                            self.acceptance_data_store.get(current).unwrap(),
-                            new_pruning_point,
-                        ))).expect("expecting an open unbounded channel");
-                };
-                
+                let mut statuses_write = self.statuses_store.write();                
                 // Prune data related to block bodies and UTXO state
                 self.utxo_multisets_store.delete_batch(&mut batch, current).unwrap();
                 self.utxo_diffs_store.delete_batch(&mut batch, current).unwrap();

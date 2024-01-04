@@ -9,9 +9,7 @@ use kaspa_consensus_core::{
 use kaspa_database::cache_policy_builder::bounded_size;
 use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
 
-use crate::core::config::{constants::DEFAULT_TXINDEX_EXTRA_FD_BUDGET, params::Params};
-
-use super::constants::{DEFAULT_TXINDEX_MEMORY_BUDGET, DEFAULT_TXINDEX_DB_PARALLELISM};
+use crate::core::config::{constants::{DEFAULT_TXINDEX_EXTRA_FD_BUDGET, DEFAULT_TXINDEX_MEMORY_BUDGET, DEFAULT_TXINDEX_DB_PARALLELISM}, params::Params};
 
 #[derive(Clone, Debug)]
 pub struct PerfParams {

@@ -5,11 +5,7 @@ use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as Co
 use parking_lot::RwLock;
 use std::{fmt::Debug, sync::Arc};
 use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
-
-
-use crate::{
-    errors::TxIndexResult,
-};
+use crate::core::errors::TxIndexResult;
 
 pub trait TxIndexApi: Send + Sync + Debug {
     // Resyncers.
@@ -26,6 +22,14 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     fn get_tx_offsets(&self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>>;
 
+    fn get_sink(&self) -> TxIndexResult<Option<Hash>>;
+
+    fn get_source(&self) -> TxIndexResult<Option<Hash>>;
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize>; 
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_merged_blocks(&self) -> TxIndexResult<usize>;
+    
     // Updates
     
     fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()>;
@@ -41,8 +45,6 @@ pub trait TxIndexApi: Send + Sync + Debug {
 pub struct TxIndexProxy {
     inner: Arc<RwLock<dyn TxIndexApi>>,
 }
-
-pub type DynTxIndexApi = Option<Arc<RwLock<dyn TxIndexApi>>>;
 
 impl TxIndexProxy {
     pub fn new(inner: Arc<RwLock<dyn TxIndexApi>>) -> Self {

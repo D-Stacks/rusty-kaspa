@@ -22,7 +22,6 @@ use crate::{
         TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores, TxIndexSourceStore,
     }, config::Config,
 };
-
 pub struct TxIndex {
     stores: TxIndexStores,
     consensus_manager: Arc<ConsensusManager>,
@@ -55,7 +54,7 @@ impl TxIndex {
         };
 
         let txindex = Arc::new(RwLock::new(txindex));
-        consensus_manager.register_consensus_reset_handler(Arc::new(TxIndexConsensusResetHandler::new(Arc::downgrade(&txindex))));
+        //consensus_manager.register_consensus_reset_handler(Arc::new(TxIndexConsensusResetHandler::new(Arc::downgrade(&txindex))));
         Ok(txindex)
     }
 
@@ -247,11 +246,16 @@ impl TxIndexApi for TxIndex {
     // Update methods
     fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
         trace!(
-            "[{0:?}] Updating db with {1} added chain blocks and {2} removed chain blocks",
+            "[{0:?}] Updating db with {1} added chain blocks and {2} removed chain blocks via virtual chain changed notification",
             self,
             vspcc_notification.added_chain_block_hashes.len(),
             vspcc_notification.removed_chain_blocks_acceptance_data.len()
         );
+
+        if vspcc_notification.added_chain_block_hashes.is_empty() && vspcc_notification.removed_chain_blocks_acceptance_data.is_empty() {
+            // This shouldn't really happen, but it happens in integration tests 🤷.
+            return Ok(());
+        }
 
         let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
 
@@ -270,6 +274,11 @@ impl TxIndexApi for TxIndex {
         &mut self,
         chain_acceptance_data_pruned: ConsensusChainAcceptanceDataPrunedNotification,
     ) -> TxIndexResult<()> {
+        trace!(
+            "[{0:?}] Updating db with {1} removed chain blocks via chain acceptance data pruned notification",
+            self,
+            chain_acceptance_data_pruned.mergeset_block_acceptance_data_pruned.len()
+        );
         let txindex_reindexer = TxIndexReindexer::from(chain_acceptance_data_pruned);
 
         let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
@@ -282,28 +291,28 @@ impl TxIndexApi for TxIndex {
 
         self.stores.write_batch(batch)
     }
+
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize> {
+        Ok(self.stores.accepted_tx_offsets_store.count_all_keys()?)    
+    }
+
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_merged_blocks(&self) -> TxIndexResult<usize> {
+        Ok(self.stores.merged_block_acceptance_store.count_all_keys()?)
+    }
+
+    fn get_sink(&self) -> TxIndexResult<Option<Hash>> {
+        Ok(self.stores.sink_store.get()?)
+    }
+
+    fn get_source(&self) -> TxIndexResult<Option<Hash>> {
+        Ok(self.stores.source_store.get()?)
+    }
 }
 
 impl Debug for TxIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TxIndex").finish()
-    }
-}
-
-struct TxIndexConsensusResetHandler {
-    txindex: Weak<RwLock<TxIndex>>,
-}
-
-impl TxIndexConsensusResetHandler {
-    fn new(txindex: Weak<RwLock<TxIndex>>) -> Self {
-        Self { txindex }
-    }
-}
-
-impl ConsensusResetHandler for TxIndexConsensusResetHandler {
-    fn handle_consensus_reset(&self) {
-        if let Some(txindex) = self.txindex.upgrade() {
-            txindex.write().resync().unwrap();
-        }
     }
 }

@@ -13,6 +13,8 @@ pub trait TxIndexAcceptedTxOffsetsReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
     fn get(&self, transaction_id: TransactionId) -> StoreResult<Option<TxOffset>>;
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool>;
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_keys(&self) -> StoreResult<usize>;
 }
 
 pub trait TxIndexAcceptedTxOffsetsStore: TxIndexAcceptedTxOffsetsReader {
@@ -41,6 +43,13 @@ impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
 
     fn has(&self, transaction_id: TransactionId) -> StoreResult<bool> {
         self.access.has(transaction_id)
+    }
+
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_keys(&self) -> StoreResult<usize> {
+        Ok(self.access
+            .iterator()
+            .count())
     }
 }
 

@@ -28,7 +28,6 @@ event_type_enum! {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum EventType {
     BlockAdded = 0,
-    ChainAcceptanceDataPruned,
     VirtualChainChanged,
     FinalityConflict,
     FinalityConflictResolved,
@@ -37,6 +36,7 @@ pub enum EventType {
     VirtualDaaScoreChanged,
     PruningPointUtxoSetOverride,
     NewBlockTemplate,
+    ChainAcceptanceDataPruned,
 }
 }
 

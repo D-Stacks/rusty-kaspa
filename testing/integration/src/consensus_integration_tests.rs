@@ -47,7 +47,7 @@ use itertools::Itertools;
 use kaspa_core::core::Core;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
-use kaspa_core::{assert_match, info};
+use kaspa_core::{assert_match, info, warn};
 use kaspa_database::create_temp_db;
 use kaspa_database::prelude::{CachePolicy, ConnBuilder};
 use kaspa_index_processor::service::IndexService;
@@ -55,12 +55,17 @@ use kaspa_math::Uint256;
 use kaspa_muhash::MuHash;
 use kaspa_txscript::caches::TxScriptCacheCounters;
 use kaspa_utxoindex::api::{UtxoIndexApi, UtxoIndexProxy};
+use kaspa_txindex::api::{TxIndexApi, TxIndexProxy};
 use kaspa_utxoindex::UtxoIndex;
+use kaspa_txindex::TxIndex;
+use kaspa_txindex::config::Config as TxIndexConfig;
 use serde::{Deserialize, Serialize};
+use tokio::time::sleep;
 use std::cmp::{max, Ordering};
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     fs::File,
@@ -905,7 +910,7 @@ fn gzip_file_lines(path: &Path) -> impl Iterator<Item = String> {
 }
 
 async fn json_test(file_path: &str, concurrency: bool) {
-    kaspa_core::log::try_init_logger("info");
+    kaspa_core::log::try_init_logger("trace");
     let main_path = Path::new(file_path);
     let proof_exists = common::file_exists(&main_path.join("proof.json.gz"));
 
@@ -934,6 +939,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
         consensus_config.process_genesis = false;
     }
     let consensus_config = Arc::new(consensus_config);
+    let txindex_config: Arc<TxIndexConfig> = Arc::new(TxIndexConfig::new(&consensus_config));
 
     let tick_service = Arc::new(TickService::default());
     let (notification_send, notification_recv) = unbounded();
@@ -943,10 +949,12 @@ async fn json_test(file_path: &str, concurrency: bool) {
     // External storage for storing block bodies. This allows separating header and body processing phases
     let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let external_block_store = DbBlockTransactionsStore::new(external_storage, CachePolicy::Count(consensus_config.perf.block_data_cache_size));
+    let (_txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
+    let txindex = TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap();
     let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
-    let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone())), None));
+    let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone())), Some(TxIndexProxy::new(txindex.clone()))));
 
     let async_runtime = Arc::new(AsyncRuntime::new(2));
     async_runtime.register(tick_service.clone());
@@ -1072,6 +1080,30 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_eq!(virtual_utxos.len(), utxoindex_utxos.len());
     assert!(virtual_utxos.is_subset(&utxoindex_utxos));
     assert!(utxoindex_utxos.is_subset(&virtual_utxos));
+
+    assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc.get_source());
+    assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
+
+    let consensus_chain = tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap().added;
+    let consensus_acceptance_data = tc.get_blocks_acceptance_data(consensus_chain.clone()).unwrap();
+    let mut accepted_block_count = 0;
+    let mut accepted_tx_count = 0;
+    for (accepting_block_hash, acceptance_data) in Arc::try_unwrap(consensus_chain).unwrap().into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter()) {
+        for (i, mergeset) in acceptance_data.iter().enumerate() {
+            let indexed_block_acceptance = Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash,]).unwrap()).unwrap().get(0).unwrap().unwrap();
+            assert_eq!(indexed_block_acceptance.ordered_mergeset_index(), i as u16);
+            assert_eq!(indexed_block_acceptance.accepting_block(), accepting_block_hash);
+            accepted_block_count += 1;
+            for tx_entry in mergeset.accepted_transactions.iter() {
+                let indexed_accepted_tx_offset = Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id,]).unwrap()).unwrap().get(0).unwrap().unwrap();
+                assert_eq!(indexed_accepted_tx_offset.including_block(), mergeset.block_hash);
+                assert_eq!(indexed_accepted_tx_offset.transaction_index(), tx_entry.index_within_block);
+                accepted_tx_count += 1;
+            }
+        };
+    }
+    assert_eq!(txindex.read().count_all_merged_blocks().unwrap(), accepted_block_count);
+    assert_eq!(txindex.read().count_all_merged_tx_ids().unwrap(), accepted_tx_count);
 }
 
 fn submit_header_chunk(

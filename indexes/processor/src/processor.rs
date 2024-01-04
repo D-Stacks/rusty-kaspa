@@ -67,14 +67,14 @@ impl Processor {
             while let Ok(notification) = self.recv_channel.recv().await {
                 match self.process_notification(notification).await {
                     Ok(notification) => match notification {
-                        Some(notification) => match notifier.notify(notification) {
-                            Ok(notification) => trace!("[Index processor] sent notification: {notification:?}"),
+                        Some(notification) => match notifier.notify(notification.clone()) {
+                            Ok(_) => trace!("[Index processor] sent notification: {notification:?}"),
                             Err(err) => warn!("[Index processor] notification sender error: {err:?}"),
                         },
                         None => trace!("[Index processor] notification was filtered out"),
                     },
                     Err(err) => {
-                        trace!("[Index processor] error while processing a consensus notification: {err:?}");
+                        warn!("[Index processor] error while processing a consensus notification: {err:?}");
                     }
                 }
             }
@@ -86,6 +86,7 @@ impl Processor {
     }
 
     async fn process_notification(self: &Arc<Self>, notification: consensus_notification::Notification) -> IndexResult<Option<IndexNotification>> {
+        trace!("[{IDENT}]: processing {:?}", notification);
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
                 let utxos_changed_notification = self.process_utxos_changed(utxos_changed_notification).await?;// Converts to `kaspa_index_core::notification::Notification` here
@@ -110,7 +111,6 @@ impl Processor {
         self: &Arc<Self>,
         notification: consensus_notification::UtxosChangedNotification,
     ) -> IndexResult<index_notification::UtxosChangedNotification> {
-        trace!("[{IDENT}]: processing {:?}", notification);
         if let Some(utxoindex) = self.utxoindex.clone() {
             let converted_notification: index_notification::UtxosChangedNotification =
                 utxoindex.update(notification).await?.into();

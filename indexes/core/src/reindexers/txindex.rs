@@ -3,7 +3,7 @@
 use crate::models::txindex::{
     BlockAcceptanceOffsetDiff, TxOffsetDiff, TxOffsetById, TxOffset, TxHashSet, BlockAcceptanceOffset, MergeSetIDX,
 };
-use kaspa_consensus_core::{BlockHashMap, BlockHashSet, HashMapCustomHasher, tx::TransactionIndexType};
+use kaspa_consensus_core::{BlockHashMap, BlockHashSet, HashMapCustomHasher};
 use kaspa_hashes::Hash;
 use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
 use kaspa_utils::arc::ArcExtensions;
@@ -21,7 +21,7 @@ pub struct TxIndexReindexer {
 
 impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
     fn from(vspcc_notification: ConsensusVirtualChainChangedNotification) -> Self {
-        
+        println!("vspcc_notification: {:?}", vspcc_notification);
         let new_sink = match vspcc_notification.added_chain_block_hashes.last() {
             Some(hash) => Some(hash.clone()),
             None => match vspcc_notification.removed_chain_block_hashes.last() {
@@ -48,7 +48,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
                     mergeset
                         .accepted_transactions
                         .into_iter()
-                        .map(|tx_entry| (tx_entry.transaction_id, TxOffset::new(mergeset.block_hash, i as TransactionIndexType))),
+                        .map(|tx_entry| (tx_entry.transaction_id, TxOffset::new(mergeset.block_hash, tx_entry.index_within_block))),
                 );
 
                 block_acceptance_offsets_to_add

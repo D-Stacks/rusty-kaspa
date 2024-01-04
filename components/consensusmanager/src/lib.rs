@@ -150,8 +150,8 @@ impl ConsensusManager {
         // If current consensus is switched, this loop will join the replaced handles, and will switch to waiting for the new ones
         let mut g = self.inner.write();
         while let Some(handle) = g.handles.pop_front() {
-            drop(g);
             handle.join().unwrap();
+            drop(g);
             g = self.inner.write();
         }
 

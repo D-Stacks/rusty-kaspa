@@ -15,6 +15,8 @@ pub trait TxIndexMergedBlockAcceptanceReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
     fn get(&self, block_hash: Hash) -> StoreResult<Option<BlockAcceptanceOffset>>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_keys(&self) -> StoreResult<usize>;
 }
 
 pub trait TxIndexMergedBlockAcceptanceStore {
@@ -51,6 +53,13 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
 
     fn has(&self, block_hash: Hash) -> StoreResult<bool> {
         self.access.has(block_hash)
+    }
+
+    // This induces a lot of processing, so it should be used only for tests.
+    fn count_all_keys(&self) -> StoreResult<usize> {
+        Ok(self.access
+            .iterator()
+            .count())
     }
 }
 

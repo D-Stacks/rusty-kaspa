@@ -140,6 +140,11 @@ where
     fn stop_notify(&self, scope: Scope) -> Result<()> {
         self.execute_subscribe_command(scope, Command::Stop)
     }
+
+    fn has_subscription(&self, event: EventType) -> bool {
+        let subscription = &self.subscriptions.read()[event];
+        subscription.active()
+    }
 }
 
 // TODO: tests

@@ -328,3 +328,8 @@ impl Debug for TxIndex {
         f.debug_struct("TxIndex").finish()
     }
 }
+
+#[cfg(test)]
+mod tests { 
+    //TODO: Add tests
+}

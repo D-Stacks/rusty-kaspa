@@ -1,17 +1,14 @@
 use kaspa_consensus_core::subnets::SUBNETWORK_ID_SIZE;
 
 // Defualts for txindex perf params:
-pub const DEFAULT_TXINDEX_MEMORY_BUDGET: usize = 500_000_000; // 500MB 
+pub const DEFAULT_TXINDEX_MEMORY_BUDGET: usize = 500_000_000; // 500MB
 pub const DEFAULT_TXINDEX_EXTRA_FD_BUDGET: usize = 0;
 pub const DEFAULT_TXINDEX_DB_PARALLELISM: usize = 1;
-
 
 // We define these as constants for a default network transaction here to be able to calculate the approx. expected size & mass of a std transaction.
 
 /// The approximate size with schnorr as the most common script public key.
-pub const SCHNORR_SCRIPT_PUBLIC_KEY_BYTES_PER_TRANSACTION: u64 = ( 
-    34u64 
-) * 3u64; // we expect 1 input and 2 outputs in most cases
+pub const SCHNORR_SCRIPT_PUBLIC_KEY_BYTES_PER_TRANSACTION: u64 = (34u64) * 3u64; // we expect 1 input and 2 outputs in most cases
 
 /// The approx size of a default standard network transaction in bytes.
 pub const DEFAULT_TRANSACTION_SIZE: u64 = {

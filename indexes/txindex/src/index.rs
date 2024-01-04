@@ -1,26 +1,31 @@
-use std::{
-    fmt::Debug,
-    sync::Arc,
-};
+use std::{fmt::Debug, sync::Arc};
 
 use kaspa_consensus_core::tx::TransactionId;
+use kaspa_consensus_notify::notification::{
+    ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification,
+    VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification,
+};
 use kaspa_consensusmanager::{ConsensusManager, ConsensusSessionBlocking};
 use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
-use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
+use kaspa_index_core::{
+    models::txindex::{BlockAcceptanceOffset, TxOffset},
+    reindexers::txindex::TxIndexReindexer,
+};
 use parking_lot::RwLock;
 use rocksdb::WriteBatch;
-use kaspa_index_core::{models::txindex::{TxOffset, BlockAcceptanceOffset}, reindexers::txindex::TxIndexReindexer};
 
 use crate::{
+    config::Config,
     core::api::TxIndexApi,
-    core::errors::TxIndexResult,
     core::errors::TxIndexError,
+    core::errors::TxIndexResult,
     stores::{
         TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
-        TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexStores, TxIndexSourceStore,
-    }, config::Config,
+        TxIndexMergedBlockAcceptanceStore, TxIndexSinkReader, TxIndexSinkStore, TxIndexSourceReader, TxIndexSourceStore,
+        TxIndexStores,
+    },
 };
 pub struct TxIndex {
     stores: TxIndexStores,
@@ -29,16 +34,8 @@ pub struct TxIndex {
 }
 
 impl TxIndex {
-    pub fn new(
-        consensus_manager: Arc<ConsensusManager>,
-        db: Arc<DB>,
-        config: Arc<Config>,
-    ) -> TxIndexResult<Arc<RwLock<Self>>> {
-        let mut txindex = Self {
-            stores: TxIndexStores::new(db, &config)?,
-            consensus_manager: consensus_manager.clone(),
-            config,
-        };
+    pub fn new(consensus_manager: Arc<ConsensusManager>, db: Arc<DB>, config: Arc<Config>) -> TxIndexResult<Arc<RwLock<Self>>> {
+        let mut txindex = Self { stores: TxIndexStores::new(db, &config)?, consensus_manager: consensus_manager.clone(), config };
 
         if !txindex.is_synced()? {
             match txindex.resync() {
@@ -173,7 +170,7 @@ impl TxIndexApi for TxIndex {
 
         let start_hash = txindex_source
         .filter(|txindex_source| *txindex_source == consensus_source)
-        .unwrap_or({ 
+        .unwrap_or({
             info!(
                 "[{0:?}] txindex source is not synced with consensus source. txindex source: {1:?}, consensus source: {2:?} - Resetting the DB",
                 self,
@@ -183,7 +180,7 @@ impl TxIndexApi for TxIndex {
             self.stores.delete_all()?; // we reset the txindex
             // We can set the source anew after clearing db
             self.stores.source_store.set(consensus_source)?;
-            consensus_source 
+            consensus_source
         });
 
         let end_hash = txindex_sink.map_or_else(
@@ -263,7 +260,8 @@ impl TxIndexApi for TxIndex {
             vspcc_notification.removed_chain_blocks_acceptance_data.len()
         );
 
-        if vspcc_notification.added_chain_block_hashes.is_empty() && vspcc_notification.removed_chain_blocks_acceptance_data.is_empty() {
+        if vspcc_notification.added_chain_block_hashes.is_empty() && vspcc_notification.removed_chain_blocks_acceptance_data.is_empty()
+        {
             // This shouldn't really happen, but it happens in integration tests 🤷.
             return Ok(());
         }
@@ -273,10 +271,11 @@ impl TxIndexApi for TxIndex {
         let mut batch: rocksdb::WriteBatchWithTransaction<false> = WriteBatch::default();
 
         self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_reindexer.tx_offset_changes)?;
-        self.stores
-            .merged_block_acceptance_store
-            .write_diff_batch(&mut batch, txindex_reindexer.block_acceptance_offsets_changes)?;
-        self.stores.sink_store.set_via_batch_writer(&mut batch, txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
+        self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, txindex_reindexer.block_acceptance_offsets_changes)?;
+        self.stores.sink_store.set_via_batch_writer(
+            &mut batch,
+            txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"),
+        )?;
 
         self.stores.write_batch(batch)
     }
@@ -298,14 +297,16 @@ impl TxIndexApi for TxIndex {
         self.stores
             .merged_block_acceptance_store
             .remove_many(&mut batch, txindex_reindexer.block_acceptance_offsets_changes.removed)?;
-        self.stores.source_store.replace_if_new(&mut batch, txindex_reindexer.source.expect("a source with each new CADP notification"))?;
+        self.stores
+            .source_store
+            .replace_if_new(&mut batch, txindex_reindexer.source.expect("a source with each new CADP notification"))?;
 
         self.stores.write_batch(batch)
     }
 
     // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize> {
-        Ok(self.stores.accepted_tx_offsets_store.count_all_keys()?)    
+        Ok(self.stores.accepted_tx_offsets_store.count_all_keys()?)
     }
 
     // This potentially causes a large chunk of processing, so it should only be used only for tests.

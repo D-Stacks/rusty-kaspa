@@ -48,8 +48,8 @@ impl<T: GhostdagStoreReader, U: ReachabilityStoreReader, V: RelationsStoreReader
             // It is more intuitive to use forward iterator here, but going downwards the selected chain is faster.
             let mut added = self.reachability_service.backward_chain_iterator(to, common_ancestor, false).collect_vec();
             added.reverse();
-            return ChainPath::new(Arc::new(added), Arc::new(removed))
-        }   
+            return ChainPath::new(Arc::new(added), Arc::new(removed));
+        }
         // Use forward chain iterator
         let max_added_traversal_allowed = max_traversal_allowed - removed.len();
         let added = self

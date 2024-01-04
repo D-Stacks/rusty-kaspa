@@ -1,12 +1,15 @@
-use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
-use kaspa_index_core::models::utxoindex::{CirculatingSupply, CirculatingSupplyDiff};
-use kaspa_consensus::testutils::generate::from_rand::{utxo::{generate_random_utxos_from_script_public_key_pool, generate_random_p2pk_script_public_key}, hash::generate_random_hashes};
+use kaspa_consensus::testutils::generate::from_rand::{
+    hash::generate_random_hashes,
+    utxo::{generate_random_p2pk_script_public_key, generate_random_utxos_from_script_public_key_pool},
+};
 use kaspa_consensus_core::{
     tx::ScriptPublicKey,
     utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff},
     BlockHashSet, HashMapCustomHasher,
 };
+use kaspa_consensus_notify::notification::UtxosChangedNotification as ConsensusUtxosChangedNotification;
 use kaspa_hashes::Hash;
+use kaspa_index_core::models::utxoindex::{CirculatingSupply, CirculatingSupplyDiff};
 #[cfg(test)]
 use rand::Rng;
 use rand::{rngs::SmallRng, SeedableRng};

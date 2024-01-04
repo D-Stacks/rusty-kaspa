@@ -1,6 +1,9 @@
 // External imports
 use kaspa_core::trace;
-use kaspa_database::{prelude::{StoreError, DB}, cache_policy_builder::CachePolicyBuilder};
+use kaspa_database::{
+    cache_policy_builder::CachePolicyBuilder,
+    prelude::{StoreError, DB},
+};
 use std::{
     fmt::{self, Debug, Formatter},
     sync::Arc,
@@ -10,8 +13,8 @@ use rocksdb::WriteBatch;
 
 // Local imports
 use crate::{
-    errors::TxIndexResult,
     config::Config,
+    errors::TxIndexResult,
     stores::{
         accepted_tx_offsets::DbTxIndexAcceptedTxOffsetsStore, merged_block_acceptance::DbTxIndexMergedBlockAcceptanceStore,
         sink::DbTxIndexSinkStore, source::DbTxIndexSourceStore, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceStore,
@@ -30,29 +33,22 @@ pub struct TxIndexStores {
 
 impl TxIndexStores {
     pub fn new(db: Arc<DB>, config: &Arc<Config>) -> Result<Self, StoreError> {
-
         // Build cache policies
         let tx_offset_cache_policy = CachePolicyBuilder::new()
-        .bytes_budget(config.perf.mem_budget_tx_offset())
-        .unit_bytes(config.perf.mem_size_tx_offset())
-        .tracked_bytes()
-        .build();
-        
+            .bytes_budget(config.perf.mem_budget_tx_offset())
+            .unit_bytes(config.perf.mem_size_tx_offset())
+            .tracked_bytes()
+            .build();
+
         let block_acceptance_cache_policy = CachePolicyBuilder::new()
-        .bytes_budget(config.perf.mem_budget_block_acceptance_offset())
-        .unit_bytes(config.perf.mem_size_block_acceptance_offset())
-        .tracked_bytes()
-        .build(); 
+            .bytes_budget(config.perf.mem_budget_block_acceptance_offset())
+            .unit_bytes(config.perf.mem_size_block_acceptance_offset())
+            .tracked_bytes()
+            .build();
 
         Ok(Self {
-            accepted_tx_offsets_store: DbTxIndexAcceptedTxOffsetsStore::new(
-                db.clone(), 
-                tx_offset_cache_policy
-            ),
-            merged_block_acceptance_store: DbTxIndexMergedBlockAcceptanceStore::new(
-                db.clone(),
-                block_acceptance_cache_policy,
-            ),
+            accepted_tx_offsets_store: DbTxIndexAcceptedTxOffsetsStore::new(db.clone(), tx_offset_cache_policy),
+            merged_block_acceptance_store: DbTxIndexMergedBlockAcceptanceStore::new(db.clone(), block_acceptance_cache_policy),
             source_store: DbTxIndexSourceStore::new(db.clone()),
             sink_store: DbTxIndexSinkStore::new(db.clone()),
             db: db.clone(),

@@ -1,21 +1,24 @@
+use crate::core::errors::TxIndexResult;
 use kaspa_consensus_core::tx::TransactionId;
+use kaspa_consensus_notify::notification::{
+    ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification,
+    VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification,
+};
 use kaspa_consensusmanager::spawn_blocking;
 use kaspa_hashes::Hash;
-use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification};
+use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
 use parking_lot::RwLock;
 use std::{fmt::Debug, sync::Arc};
-use kaspa_index_core::models::txindex::{BlockAcceptanceOffset, TxOffset};
-use crate::core::errors::TxIndexResult;
 
 pub trait TxIndexApi: Send + Sync + Debug {
     // Resyncers.
-    
+
     fn resync(&mut self) -> TxIndexResult<()>;
 
     // Sync state
-    
+
     fn is_synced(&self) -> TxIndexResult<bool>;
-    
+
     // Getters
 
     fn get_merged_block_acceptance_offset(&self, hashes: Vec<Hash>) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>>;
@@ -26,12 +29,12 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     fn get_source(&self) -> TxIndexResult<Option<Hash>>;
     // This potentially causes a large chunk of processing, so it should only be used only for tests.
-    fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize>; 
+    fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize>;
     // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_blocks(&self) -> TxIndexResult<usize>;
-    
+
     // Updates
-    
+
     fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()>;
 
     fn update_via_chain_acceptance_data_pruned(

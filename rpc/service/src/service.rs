@@ -30,9 +30,7 @@ use kaspa_core::{
 };
 use kaspa_index_core::models::utxoindex::{BalanceByScriptPublicKey, UtxoSetByScriptPublicKey};
 use kaspa_index_core::notify::{
-    connection::IndexChannelConnection, 
-    notification::Notification as IndexNotification,
-    notifier::IndexNotifier,
+    connection::IndexChannelConnection, notification::Notification as IndexNotification, notifier::IndexNotifier,
 };
 use kaspa_mining::model::tx_query::TransactionQuery;
 use kaspa_mining::{manager::MiningManagerProxy, mempool::tx::Orphan};
@@ -93,6 +91,7 @@ pub struct RpcCoreService {
     mining_manager: MiningManagerProxy,
     flow_context: Arc<FlowContext>,
     utxoindex: Option<UtxoIndexProxy>,
+    #[allow(dead_code)] // TODO: remove this once txindex is implemented in rpc
     txindex: Option<TxIndexProxy>,
     config: Arc<Config>,
     consensus_converter: Arc<ConsensusConverter>,

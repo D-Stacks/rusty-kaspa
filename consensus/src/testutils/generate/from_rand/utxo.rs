@@ -1,9 +1,9 @@
+use crate::testutils::generate::from_rand::hash::generate_random_hash;
 use kaspa_consensus_core::{
     tx::{ScriptPublicKey, ScriptVec, TransactionOutpoint, UtxoEntry},
     utxo::utxo_collection::UtxoCollection,
 };
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng};
-use crate::testutils::generate::from_rand::hash::generate_random_hash;
 
 pub fn generate_random_utxos_from_script_public_key_pool(
     rng: &mut SmallRng,
@@ -52,4 +52,3 @@ pub fn generate_random_p2pk_script_public_key(rng: &mut SmallRng) -> ScriptPubli
     script.push(0xac);
     ScriptPublicKey::new(0_u16, script)
 }
-

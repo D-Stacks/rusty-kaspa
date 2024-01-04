@@ -1,6 +1,12 @@
-use std::{collections::{HashSet, HashMap}, mem::size_of};
+use std::{
+    collections::{HashMap, HashSet},
+    mem::size_of,
+};
 
-use kaspa_consensus_core::{tx::{TransactionIndexType, TransactionId}, BlockHashMap, BlockHashSet};
+use kaspa_consensus_core::{
+    tx::{TransactionId, TransactionIndexType},
+    BlockHashMap, BlockHashSet,
+};
 use kaspa_hashes::Hash;
 use kaspa_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
@@ -10,8 +16,7 @@ pub type TxOffsetById = HashMap<TransactionId, TxOffset>;
 pub type BlockAcceptanceOffsetByHash = BlockHashMap<BlockAcceptanceOffset>;
 pub type MergeSetIDX = u16;
 
-
-/// A struct holding tx diffs to be committed to the txindex via `added` and `removed`. 
+/// A struct holding tx diffs to be committed to the txindex via `added` and `removed`.
 #[derive(Debug, Clone, Default)]
 pub struct TxOffsetDiff {
     pub added: TxOffsetById,
@@ -24,7 +29,7 @@ impl TxOffsetDiff {
     }
 }
 
-/// A struct holding block accepted diffs to be committed to the txindex via `added` and `removed`. 
+/// A struct holding block accepted diffs to be committed to the txindex via `added` and `removed`.
 #[derive(Debug, Clone, Default)]
 pub struct BlockAcceptanceOffsetDiff {
     pub added: BlockAcceptanceOffsetByHash,
@@ -60,7 +65,7 @@ impl TxOffset {
 
 impl MemSizeEstimator for TxOffset {
     fn estimate_mem_units(&self) -> usize {
-        1   
+        1
     }
 
     fn estimate_mem_bytes(&self) -> usize {
@@ -77,7 +82,7 @@ pub struct BlockAcceptanceOffset {
 
 impl MemSizeEstimator for BlockAcceptanceOffset {
     fn estimate_mem_units(&self) -> usize {
-        1   
+        1
     }
 
     fn estimate_mem_bytes(&self) -> usize {

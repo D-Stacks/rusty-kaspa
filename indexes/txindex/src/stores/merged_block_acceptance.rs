@@ -1,6 +1,6 @@
-use kaspa_consensus_core::{BlockHasher, BlockHashSet};
+use kaspa_consensus_core::{BlockHashSet, BlockHasher};
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB, CachePolicy},
+    prelude::{BatchDbWriter, CachePolicy, CachedDbAccess, StoreError, StoreResult, DB},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
@@ -38,9 +38,7 @@ pub struct DbTxIndexMergedBlockAcceptanceStore {
 
 impl DbTxIndexMergedBlockAcceptanceStore {
     pub fn new(db: Arc<DB>, cache_policy: CachePolicy) -> Self {
-        Self {
-            access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()),
-        }
+        Self { access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()) }
     }
 }
 
@@ -55,9 +53,7 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
 
     // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_keys(&self) -> StoreResult<usize> {
-        Ok(self.access
-            .iterator()
-            .count())
+        Ok(self.access.iterator().count())
     }
 }
 

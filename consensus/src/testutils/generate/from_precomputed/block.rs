@@ -1,7 +1,4 @@
-use kaspa_consensus_core::{
-    block::Block,
-    header::Header,
-};
+use kaspa_consensus_core::{block::Block, header::Header};
 use kaspa_hashes::Hash;
 
 pub fn header_from_precomputed_hash(hash: Hash, parents: Vec<Hash>) -> Header {

@@ -74,7 +74,7 @@ use kaspa_core::{debug, info, time::unix_now, trace, warn};
 use kaspa_database::prelude::{StoreError, StoreResultEmptyTuple, StoreResultExtensions};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
-use kaspa_notify::{notifier::Notify, events::EventType};
+use kaspa_notify::{events::EventType, notifier::Notify};
 
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use itertools::Itertools;
@@ -1054,13 +1054,15 @@ impl VirtualStateProcessor {
 
         // Validate transactions of the pruning point itself
         let new_pruning_point_transactions = self.block_transactions_store.get(new_pruning_point).unwrap();
-        let validated_transactions = self.validate_transactions_in_parallel(
-            &new_pruning_point_transactions,
-            &virtual_read.utxo_set,
-            new_pruning_point_header.daa_score,
-            TxValidationFlags::Full,
-            false,
-        ).0;
+        let validated_transactions = self
+            .validate_transactions_in_parallel(
+                &new_pruning_point_transactions,
+                &virtual_read.utxo_set,
+                new_pruning_point_header.daa_score,
+                TxValidationFlags::Full,
+                false,
+            )
+            .0;
         if validated_transactions.len() < new_pruning_point_transactions.len() - 1 {
             // Some non-coinbase transactions are invalid
             return Err(PruningImportError::NewPruningPointTxErrors);

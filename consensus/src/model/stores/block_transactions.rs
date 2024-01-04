@@ -13,7 +13,6 @@ use rocksdb::WriteBatch;
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
     fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError>;
-
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -59,7 +58,7 @@ impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
         self.access.read(hash)
     }
-    
+
     fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError> {
         let mut txs = self.access.read(hash)?.unwrap_or_clone();
         txs.retain_indices(indices)?;

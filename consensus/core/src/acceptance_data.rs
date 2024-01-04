@@ -1,9 +1,7 @@
 use kaspa_hashes::Hash;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    tx::{TransactionId, TransactionIndexType},
-};
+use crate::tx::{TransactionId, TransactionIndexType};
 
 pub type AcceptanceData = Vec<MergesetBlockAcceptanceData>;
 

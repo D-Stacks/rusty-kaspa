@@ -31,8 +31,8 @@ use kaspa_mining::{
 use kaspa_p2p_flows::{flow_context::FlowContext, service::P2pService};
 
 use kaspa_perf_monitor::{builder::Builder as PerfMonitorBuilder, counters::CountersSnapshot};
+use kaspa_txindex::{api::TxIndexProxy, core::config::Config as TxIndexConfig, TxIndex};
 use kaspa_utxoindex::{api::UtxoIndexProxy, UtxoIndex};
-use kaspa_txindex::{api::TxIndexProxy, TxIndex, core::config::Config as TxIndexConfig};
 use kaspa_wrpc_server::service::{Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService};
 
 /// Desired soft FD limit that needs to be consensus_configured
@@ -200,9 +200,9 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
     } else {
         0
     };
-    let utxo_files_limit = if args.utxoindex { index_budget / num_of_active_indexes} else { 0 };
-    let mut tx_files_limit = if args.txindex { index_budget / num_of_active_indexes} else { 0 };
-    
+    let utxo_files_limit = if args.utxoindex { index_budget / num_of_active_indexes } else { 0 };
+    let mut tx_files_limit = if args.txindex { index_budget / num_of_active_indexes } else { 0 };
+
     // Make sure args forms a valid set of properties
     if let Err(err) = validate_args(args) {
         println!("{}", err);
@@ -217,12 +217,13 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
     );
 
     let txindex_config = if args.txindex {
-        let txindex_config = TxIndexConfig::new(&consensus_config); 
+        let txindex_config = TxIndexConfig::new(&consensus_config);
         tx_files_limit += txindex_config.perf.extra_fd_budget as i32;
         fd_remaining -= txindex_config.perf.extra_fd_budget as i32;
         Some(Arc::new(txindex_config))
-    } else {None};
-
+    } else {
+        None
+    };
 
     // TODO: Validate `consensus_config` forms a valid set of properties
 
@@ -366,7 +367,8 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     let outbound_target = if connect_peers.is_empty() { args.outbound_target } else { 0 };
     let dns_seeders = if connect_peers.is_empty() && !args.disable_dns_seeding { consensus_config.dns_seeders } else { &[] };
 
-    let grpc_server_addr = args.rpclisten.unwrap_or(ContextualNetAddress::unspecified()).normalize(consensus_config.default_rpc_port());
+    let grpc_server_addr =
+        args.rpclisten.unwrap_or(ContextualNetAddress::unspecified()).normalize(consensus_config.default_rpc_port());
 
     let core = Arc::new(Core::new());
 
@@ -416,18 +418,18 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv));
     let index_service: Option<Arc<IndexService>> = if args.utxoindex || args.txindex {
         // Use only a single thread for none-consensus databases
-        let utxoindex = if args.utxoindex { 
-            let utxoindex_db =  kaspa_database::prelude::ConnBuilder::default()
-            .with_db_path(utxoindex_db_dir)
-            .with_files_limit(utxo_files_limit)
-            .build()
-            .unwrap();
+        let utxoindex = if args.utxoindex {
+            let utxoindex_db = kaspa_database::prelude::ConnBuilder::default()
+                .with_db_path(utxoindex_db_dir)
+                .with_files_limit(utxo_files_limit)
+                .build()
+                .unwrap();
             Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap()))
         } else {
             None
         };
 
-        let txindex = if args.txindex { 
+        let txindex = if args.txindex {
             let txindex_config = txindex_config.unwrap();
             let txindex_db = kaspa_database::prelude::ConnBuilder::default()
                 .with_db_path(txindex_db_dir)
@@ -435,7 +437,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
                 .with_parallelism(1 + txindex_config.perf.db_parallelism as usize)
                 .build()
                 .unwrap();
-                Some(TxIndexProxy::new(TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap()))
+            Some(TxIndexProxy::new(TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap()))
         } else {
             None
         };
@@ -495,8 +497,13 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         p2p_tower_counters.clone(),
         grpc_tower_counters.clone(),
     ));
-    let grpc_service =
-        Arc::new(GrpcService::new(grpc_server_addr, consensus_config, rpc_core_service.clone(), args.rpc_max_clients, grpc_tower_counters));
+    let grpc_service = Arc::new(GrpcService::new(
+        grpc_server_addr,
+        consensus_config,
+        rpc_core_service.clone(),
+        args.rpc_max_clients,
+        grpc_tower_counters,
+    ));
 
     // Create an async runtime and register the top-level async services
     let async_runtime = Arc::new(AsyncRuntime::new(args.async_threads));

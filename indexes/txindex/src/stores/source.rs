@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbItem, StoreError, StoreResult, DB, DirectDbWriter},
+    prelude::{BatchDbWriter, CachedDbItem, DirectDbWriter, StoreError, StoreResult, DB},
     registry::DatabaseStorePrefixes,
 };
 use kaspa_hashes::Hash;
@@ -50,7 +50,7 @@ impl TxIndexSourceStore for DbTxIndexSourceStore {
 
     fn replace_if_new(&mut self, batch: &mut WriteBatch, new_source: Hash) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
-        if let Some(old_source) = self.get()? { 
+        if let Some(old_source) = self.get()? {
             if old_source == new_source {
                 return Ok(());
             };

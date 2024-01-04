@@ -5,30 +5,32 @@ use crate::{
         RuleError::{BadAcceptedIDMerkleRoot, BadCoinbaseTransaction, BadUTXOCommitment, InvalidTransactionsInUtxoContext},
     },
     model::stores::{block_transactions::BlockTransactionsStoreReader, daa::DaaStoreReader, ghostdag::GhostdagData},
-    processes::transaction_validator::{
-        transaction_validator_populated::TxValidationFlags,
-    },
+    processes::transaction_validator::transaction_validator_populated::TxValidationFlags,
 };
 use kaspa_consensus_core::{
     acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
     coinbase::*,
+    errors::tx::{TxResult, TxRuleError},
     hashing,
     header::Header,
     muhash::MuHashExtensions,
-    tx::{Transaction, TransactionId, ValidatedTransaction, VerifiableTransaction, TransactionIndexType, PopulatedTransaction, MutableTransaction},
+    tx::{
+        MutableTransaction, PopulatedTransaction, Transaction, TransactionId, TransactionIndexType, ValidatedTransaction,
+        VerifiableTransaction,
+    },
     utxo::{
         utxo_diff::UtxoDiff,
         utxo_view::{UtxoView, UtxoViewComposition},
     },
-    BlockHashMap, BlockHashSet, HashMapCustomHasher, errors::tx::{TxResult, TxRuleError},
+    BlockHashMap, BlockHashSet, HashMapCustomHasher,
 };
 use kaspa_core::{info, trace};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
 use kaspa_utils::refs::Refs;
 
-use rayon::prelude::*;
 use rayon::iter::Either;
+use rayon::prelude::*;
 use std::{iter::once, ops::Deref};
 
 /// A context for processing the UTXO state of a block with respect to its selected parent.
@@ -94,9 +96,10 @@ impl VirtualStateProcessor {
             // as part of selected parent UTXO state verification with the exact same UTXO context.
             let validation_flags = if is_selected_parent { TxValidationFlags::SkipScriptChecks } else { TxValidationFlags::Full };
 
-            // Note: below does not process the coinbase tx, this should be inferred separately depending on the `is_selected_parent` boolean. 
-            let (validated_transactions, invalidated_transactions) = self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score, validation_flags, true);
-            
+            // Note: below does not process the coinbase tx, this should be inferred separately depending on the `is_selected_parent` boolean.
+            let (validated_transactions, invalidated_transactions) =
+                self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score, validation_flags, true);
+
             let mut block_fee = 0u64;
             for (validated_tx, _) in validated_transactions.iter() {
                 ctx.mergeset_diff.add_transaction(validated_tx, pov_daa_score).unwrap();
@@ -116,9 +119,10 @@ impl VirtualStateProcessor {
                                 .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx }),
                         )
                         .collect(),
-                    unaccepted_transactions: invalidated_transactions.into_iter()
-                    .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
-                    .collect()
+                    unaccepted_transactions: invalidated_transactions
+                        .into_iter()
+                        .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
+                        .collect(),
                 });
             } else {
                 ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
@@ -127,12 +131,16 @@ impl VirtualStateProcessor {
                         .into_iter()
                         .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
                         .collect(),
-                    unaccepted_transactions:  once( TxEntry { transaction_id: txs.first().expect("expected a coinbase tx").id(), index_within_block: 0 })
-                    .chain( 
+                    unaccepted_transactions: once(TxEntry {
+                        transaction_id: txs.first().expect("expected a coinbase tx").id(),
+                        index_within_block: 0,
+                    })
+                    .chain(
                         invalidated_transactions
-                        .into_iter()
-                        .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
-                    ).collect()
+                            .into_iter()
+                            .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx }),
+                    )
+                    .collect(),
                 });
             }
 

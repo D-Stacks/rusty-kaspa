@@ -1,8 +1,8 @@
-use kaspa_index_core::models::txindex::{TxOffset, TxOffsetDiff, TxHashSet};
+use kaspa_index_core::models::txindex::{TxHashSet, TxOffset, TxOffsetDiff};
 
 use kaspa_consensus_core::tx::TransactionId;
 use kaspa_database::{
-    prelude::{BatchDbWriter, CachedDbAccess, StoreError, StoreResult, DB, CachePolicy},
+    prelude::{BatchDbWriter, CachePolicy, CachedDbAccess, StoreError, StoreResult, DB},
     registry::DatabaseStorePrefixes,
 };
 use rocksdb::WriteBatch;
@@ -46,9 +46,7 @@ impl TxIndexAcceptedTxOffsetsReader for DbTxIndexAcceptedTxOffsetsStore {
 
     // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_keys(&self) -> StoreResult<usize> {
-        Ok(self.access
-            .iterator()
-            .count())
+        Ok(self.access.iterator().count())
     }
 }
 

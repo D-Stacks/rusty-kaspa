@@ -10,7 +10,8 @@ use kaspa_notify::{
     collector::{Collector, CollectorNotificationReceiver},
     error::Result,
     events::EventType,
-    notifier::DynNotify, notification::Notification,
+    notification::Notification,
+    notifier::DynNotify,
 };
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_utils::triggers::SingleTrigger;
@@ -85,11 +86,14 @@ impl Processor {
         });
     }
 
-    async fn process_notification(self: &Arc<Self>, notification: consensus_notification::Notification) -> IndexResult<Option<IndexNotification>> {
+    async fn process_notification(
+        self: &Arc<Self>,
+        notification: consensus_notification::Notification,
+    ) -> IndexResult<Option<IndexNotification>> {
         trace!("[{IDENT}]: processing {:?}", notification);
         match notification {
             ConsensusNotification::UtxosChanged(utxos_changed_notification) => {
-                let utxos_changed_notification = self.process_utxos_changed(utxos_changed_notification).await?;// Converts to `kaspa_index_core::notification::Notification` here
+                let utxos_changed_notification = self.process_utxos_changed(utxos_changed_notification).await?; // Converts to `kaspa_index_core::notification::Notification` here
                 Ok(Some(IndexNotification::UtxosChanged(utxos_changed_notification)))
             }
             ConsensusNotification::PruningPointUtxoSetOverride(prunging_point_utxo_set_override_notification) => {
@@ -97,7 +101,9 @@ impl Processor {
                 Ok(Some(IndexNotification::PruningPointUtxoSetOverride(prunging_point_utxo_set_override_notification.into())))
             }
             ConsensusNotification::VirtualChainChanged(virtual_chain_chainged_notification) => {
-                Ok(Some(IndexNotification::VirtualChainChanged(self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?)))
+                Ok(Some(IndexNotification::VirtualChainChanged(
+                    self.process_virtual_chain_changed_notification(virtual_chain_chainged_notification).await?,
+                )))
             }
             ConsensusNotification::ChainAcceptanceDataPruned(chain_acceptance_data_pruned) => {
                 self.process_chain_acceptance_data_pruned(chain_acceptance_data_pruned).await?;
@@ -112,8 +118,7 @@ impl Processor {
         notification: consensus_notification::UtxosChangedNotification,
     ) -> IndexResult<index_notification::UtxosChangedNotification> {
         if let Some(utxoindex) = self.utxoindex.clone() {
-            let converted_notification: index_notification::UtxosChangedNotification =
-                utxoindex.update(notification).await?.into();
+            let converted_notification: index_notification::UtxosChangedNotification = utxoindex.update(notification).await?.into();
             debug!(
                 "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
                 converted_notification.added.len(),
@@ -135,7 +140,7 @@ impl Processor {
                 notification.added_chain_block_hashes.len(),
                 notification.removed_chain_block_hashes.len()
             );
-            return Ok(notification.into())
+            return Ok(notification.into());
         };
         Err(IndexError::NotSupported(EventType::VirtualChainChanged))
     }
@@ -146,10 +151,7 @@ impl Processor {
     ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
             txindex.update_via_chain_acceptance_data_pruned(notification.clone()).await?;
-            debug!(
-                "IDXPRC, updated txindex with {0} pruned chain blocks",
-                notification.mergeset_block_acceptance_data_pruned.len(),
-            );
+            debug!("IDXPRC, updated txindex with {0} pruned chain blocks", notification.mergeset_block_acceptance_data_pruned.len(),);
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::ChainAcceptanceDataPruned))
@@ -179,19 +181,21 @@ mod tests {
     use super::*;
     use async_channel::{unbounded, Receiver, Sender};
     use kaspa_consensus::{
-        config::Config as ConsensusConfig, 
-        consensus::test_consensus::TestConsensus, 
-        params::DEVNET_PARAMS, 
-        testutils::generate::{from_rand::{
-            utxo::{generate_random_outpoint, generate_random_utxo}, 
-            hash::{generate_random_hashes, generate_random_hash}, acceptance_data::{generate_random_acceptance_data, generate_random_acceptance_data_vec},
-        }}};
+        config::Config as ConsensusConfig,
+        consensus::test_consensus::TestConsensus,
+        params::DEVNET_PARAMS,
+        testutils::generate::from_rand::{
+            acceptance_data::{generate_random_acceptance_data, generate_random_acceptance_data_vec},
+            hash::{generate_random_hash, generate_random_hashes},
+            utxo::{generate_random_outpoint, generate_random_utxo},
+        },
+    };
     use kaspa_consensus_core::utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff};
     use kaspa_consensusmanager::ConsensusManager;
     use kaspa_database::create_temp_db;
     use kaspa_database::prelude::ConnBuilder;
     use kaspa_database::utils::DbLifetime;
-    use kaspa_notify::{notifier::test_helpers::NotifyMock};
+    use kaspa_notify::notifier::test_helpers::NotifyMock;
     use kaspa_txindex::{config::Config as TxIndexConfig, TxIndex};
     use kaspa_utxoindex::UtxoIndex;
     use rand::{rngs::SmallRng, SeedableRng};
@@ -284,7 +288,7 @@ mod tests {
                     }
                 }
                 assert_eq!(test_notification.accumulated_utxo_diff.remove.len(), notification_utxo_removed_count);
-            },
+            }
             unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
         }
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
@@ -327,65 +331,104 @@ mod tests {
             Arc::new(to_remove_acceptance_data.clone()),
         );
 
-        pipeline.consensus_sender.send(ConsensusNotification::VirtualChainChanged(test_notification.clone())).await.expect("expected send");
+        pipeline
+            .consensus_sender
+            .send(ConsensusNotification::VirtualChainChanged(test_notification.clone()))
+            .await
+            .expect("expected send");
 
         match pipeline.processor_receiver.recv().await.expect("receives a notification") {
             IndexNotification::VirtualChainChanged(virtual_chain_changed_notification) => {
-                // Assert length of added and removed match 
-                assert_eq!(test_notification.added_chain_block_hashes.len(), virtual_chain_changed_notification.added_chain_block_hashes.len());
-                assert_eq!(test_notification.removed_chain_block_hashes.len(), virtual_chain_changed_notification.removed_chain_block_hashes.len());
-                assert_eq!(test_notification.added_chain_blocks_acceptance_data.len(), virtual_chain_changed_notification.added_chain_blocks_acceptance_data.len());
-                assert_eq!(test_notification.removed_chain_blocks_acceptance_data.len(), virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.len());
+                // Assert length of added and removed match
+                assert_eq!(
+                    test_notification.added_chain_block_hashes.len(),
+                    virtual_chain_changed_notification.added_chain_block_hashes.len()
+                );
+                assert_eq!(
+                    test_notification.removed_chain_block_hashes.len(),
+                    virtual_chain_changed_notification.removed_chain_block_hashes.len()
+                );
+                assert_eq!(
+                    test_notification.added_chain_blocks_acceptance_data.len(),
+                    virtual_chain_changed_notification.added_chain_blocks_acceptance_data.len()
+                );
+                assert_eq!(
+                    test_notification.removed_chain_blocks_acceptance_data.len(),
+                    virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.len()
+                );
                 // Assert added hashes match
-                for (test_hash, notification_hash) in test_notification.added_chain_block_hashes.iter().zip(virtual_chain_changed_notification.added_chain_block_hashes.iter()) {
+                for (test_hash, notification_hash) in test_notification
+                    .added_chain_block_hashes
+                    .iter()
+                    .zip(virtual_chain_changed_notification.added_chain_block_hashes.iter())
+                {
                     assert_eq!(test_hash, notification_hash);
                 }
                 // Assert removed hashes match
-                for (test_hash, notification_hash) in test_notification.removed_chain_block_hashes.iter().zip(virtual_chain_changed_notification.removed_chain_block_hashes.iter()) {
+                for (test_hash, notification_hash) in test_notification
+                    .removed_chain_block_hashes
+                    .iter()
+                    .zip(virtual_chain_changed_notification.removed_chain_block_hashes.iter())
+                {
                     assert_eq!(test_hash, notification_hash);
                 }
                 // Assert added acceptance data match
-                for (test_mergesets, notification_mergesets) in test_notification.added_chain_blocks_acceptance_data.iter().zip(virtual_chain_changed_notification.added_chain_blocks_acceptance_data.iter()) {
+                for (test_mergesets, notification_mergesets) in test_notification
+                    .added_chain_blocks_acceptance_data
+                    .iter()
+                    .zip(virtual_chain_changed_notification.added_chain_blocks_acceptance_data.iter())
+                {
                     assert_eq!(test_mergesets.len(), notification_mergesets.len());
                     for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
                         assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
                         assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
                         assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
-                        for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
+                        for (test_tx_entry, notification_tx_entry) in
+                            test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter())
+                        {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
                         }
-                        for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
+                        for (test_tx_entry, notification_tx_entry) in
+                            test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter())
+                        {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
                         }
                     }
                 }
                 // Assert removed acceptance data match
-                for (test_mergesets, notification_mergesets) in test_notification.removed_chain_blocks_acceptance_data.iter().zip(virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.iter()) {
+                for (test_mergesets, notification_mergesets) in test_notification
+                    .removed_chain_blocks_acceptance_data
+                    .iter()
+                    .zip(virtual_chain_changed_notification.removed_chain_blocks_acceptance_data.iter())
+                {
                     assert_eq!(test_mergesets.len(), notification_mergesets.len());
                     for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
                         assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
                         assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
                         assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
-                        for (test_tx_entry, notification_tx_entry) in test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter()) {
+                        for (test_tx_entry, notification_tx_entry) in
+                            test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter())
+                        {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
                         }
-                        for (test_tx_entry, notification_tx_entry) in test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter()) {
+                        for (test_tx_entry, notification_tx_entry) in
+                            test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter())
+                        {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
                         }
                     }
-                };
-            },
+                }
+            }
             unexpected_notification => panic!("Unexpected notification: {unexpected_notification:?}"),
         }
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");
     }
-
 
     #[tokio::test]
     async fn test_chain_acceptance_daa_pruned_notification() {
@@ -402,9 +445,13 @@ mod tests {
             history_root,
         );
 
-        pipeline.consensus_sender.send(ConsensusNotification::ChainAcceptanceDataPruned(test_notification.clone())).await.expect("expected send");
-    
-        // we expect no index notification response to be sent, so below is enough for the test.  
+        pipeline
+            .consensus_sender
+            .send(ConsensusNotification::ChainAcceptanceDataPruned(test_notification.clone()))
+            .await
+            .expect("expected send");
+
+        // we expect no index notification response to be sent, so below is enough for the test.
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");

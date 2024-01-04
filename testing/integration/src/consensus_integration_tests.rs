@@ -32,7 +32,7 @@ use kaspa_consensus_core::network::{NetworkId, NetworkType::Mainnet};
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::trusted::{ExternalGhostdagData, TrustedBlock};
 use kaspa_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry};
-use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlueWorkType, BlockHashSet, HashMapCustomHasher};
+use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlockHashSet, BlueWorkType, HashMapCustomHasher};
 use kaspa_consensus_notify::root::ConsensusNotificationRoot;
 use kaspa_consensus_notify::service::NotifyService;
 use kaspa_consensusmanager::ConsensusManager;
@@ -53,14 +53,13 @@ use kaspa_database::prelude::{CachePolicy, ConnBuilder};
 use kaspa_index_processor::service::IndexService;
 use kaspa_math::Uint256;
 use kaspa_muhash::MuHash;
+use kaspa_txindex::api::{TxIndexApi, TxIndexProxy};
+use kaspa_txindex::config::Config as TxIndexConfig;
+use kaspa_txindex::TxIndex;
 use kaspa_txscript::caches::TxScriptCacheCounters;
 use kaspa_utxoindex::api::{UtxoIndexApi, UtxoIndexProxy};
-use kaspa_txindex::api::{TxIndexApi, TxIndexProxy};
 use kaspa_utxoindex::UtxoIndex;
-use kaspa_txindex::TxIndex;
-use kaspa_txindex::config::Config as TxIndexConfig;
 use serde::{Deserialize, Serialize};
-use tokio::time::sleep;
 use std::cmp::{max, Ordering};
 use std::collections::HashSet;
 use std::path::Path;
@@ -73,6 +72,7 @@ use std::{
     io::{BufRead, BufReader},
     str::{from_utf8, FromStr},
 };
+use tokio::time::sleep;
 
 use crate::common;
 
@@ -579,7 +579,8 @@ async fn median_time_test() {
         let consensus = TestConsensus::new(&test.consensus_config);
         let wait_handles = consensus.init();
 
-        let num_blocks = test.consensus_config.past_median_time_window_size(0) as u64 * test.consensus_config.past_median_time_sample_rate(0);
+        let num_blocks =
+            test.consensus_config.past_median_time_window_size(0) as u64 * test.consensus_config.past_median_time_sample_rate(0);
         let timestamp_deviation_tolerance = test.consensus_config.timestamp_deviation_tolerance(0);
         for i in 1..(num_blocks + 1) {
             let parent = if i == 1 { test.consensus_config.genesis.hash } else { (i - 1).into() };
@@ -948,13 +949,18 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     // External storage for storing block bodies. This allows separating header and body processing phases
     let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
-    let external_block_store = DbBlockTransactionsStore::new(external_storage, CachePolicy::Count(consensus_config.perf.block_data_cache_size));
+    let external_block_store =
+        DbBlockTransactionsStore::new(external_storage, CachePolicy::Count(consensus_config.perf.block_data_cache_size));
     let (_txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
     let txindex = TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap();
     let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
-    let index_service = Arc::new(IndexService::new(&notify_service.notifier(), Some(UtxoIndexProxy::new(utxoindex.clone())), Some(TxIndexProxy::new(txindex.clone()))));
+    let index_service = Arc::new(IndexService::new(
+        &notify_service.notifier(),
+        Some(UtxoIndexProxy::new(utxoindex.clone())),
+        Some(TxIndexProxy::new(txindex.clone())),
+    ));
 
     let async_runtime = Arc::new(AsyncRuntime::new(2));
     async_runtime.register(tick_service.clone());
@@ -1068,7 +1074,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     }
 
     // TODO: remove this sleep once we have a better way to wait for the txindex to catch up
-    sleep(Duration::from_secs(10)).await; // Wait for the txindex to catch up.. 
+    sleep(Duration::from_secs(10)).await; // Wait for the txindex to catch up..
     core.shutdown();
     core.join(joins);
 
@@ -1089,34 +1095,45 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
 
     let consensus_chain = Arc::new(
-    [
-            &[ tc_source ], // we concat source to the added chain path, as it is none-inclusive.
-            Arc::try_unwrap(tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap()
-            .added)
-            .unwrap().as_slice()
-        ].concat()
+        [
+            &[tc_source], // we concat source to the added chain path, as it is none-inclusive.
+            Arc::try_unwrap(tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap().added).unwrap().as_slice(),
+        ]
+        .concat(),
     );
-    
+
     let consensus_acceptance_data = tc.get_blocks_acceptance_data(consensus_chain.clone()).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
     let mut seen_hashes = BlockHashSet::new();
     let mut seen_tx_ids = BlockHashSet::new();
-    for (accepting_block_hash, acceptance_data) in Arc::try_unwrap(consensus_chain).unwrap().into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter()) {
+    for (accepting_block_hash, acceptance_data) in
+        Arc::try_unwrap(consensus_chain).unwrap().into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter())
+    {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
-            let indexed_block_acceptance_offset = Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash,]).unwrap()).unwrap().get(0).unwrap().unwrap();
+            let indexed_block_acceptance_offset =
+                Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash]).unwrap())
+                    .unwrap()
+                    .get(0)
+                    .unwrap()
+                    .unwrap();
             assert_eq!(indexed_block_acceptance_offset.ordered_mergeset_index(), i as u16);
             assert_eq!(indexed_block_acceptance_offset.accepting_block(), accepting_block_hash);
             seen_hashes.insert(mergeset.block_hash);
             accepted_block_count += 1;
             for tx_entry in mergeset.accepted_transactions.iter() {
-                let indexed_accepted_tx_offset = Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id,]).unwrap()).unwrap().get(0).unwrap().unwrap();
+                let indexed_accepted_tx_offset =
+                    Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id]).unwrap())
+                        .unwrap()
+                        .get(0)
+                        .unwrap()
+                        .unwrap();
                 assert_eq!(indexed_accepted_tx_offset.including_block(), mergeset.block_hash);
                 assert_eq!(indexed_accepted_tx_offset.transaction_index(), tx_entry.index_within_block);
                 seen_tx_ids.insert(tx_entry.transaction_id);
                 accepted_tx_count += 1;
             }
-        };
+        }
     }
     assert_eq!(txindex.read().count_all_merged_blocks().unwrap(), accepted_block_count);
     assert_eq!(txindex.read().count_all_merged_tx_ids().unwrap(), accepted_tx_count);
@@ -1299,7 +1316,10 @@ async fn bounded_merge_depth_test() {
         })
         .build();
 
-    assert!((consensus_config.ghostdag_k as u64) < consensus_config.merge_depth, "K must be smaller than merge depth for this test to run");
+    assert!(
+        (consensus_config.ghostdag_k as u64) < consensus_config.merge_depth,
+        "K must be smaller than merge depth for this test to run"
+    );
 
     let consensus = TestConsensus::new(&consensus_config);
     let wait_handles = consensus.init();
@@ -1535,9 +1555,11 @@ async fn difficulty_test() {
                 tip = add_block(&consensus, None, vec![tip.hash]).await;
             }
         }
-        [(tip.bits, test.consensus_config.genesis.bits), (full_window_bits(&consensus, tip.hash), stage_1_bits)].iter().for_each(|(a, b)| {
-            assert_eq!(*a, *b, "{}: block_in_the_past shouldn't affect its own difficulty, but only its future", test.name);
-        });
+        [(tip.bits, test.consensus_config.genesis.bits), (full_window_bits(&consensus, tip.hash), stage_1_bits)].iter().for_each(
+            |(a, b)| {
+                assert_eq!(*a, *b, "{}: block_in_the_past shouldn't affect its own difficulty, but only its future", test.name);
+            },
+        );
         for _ in 0..sample_rate {
             tip = add_block(&consensus, None, vec![tip.hash]).await;
         }

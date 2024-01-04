@@ -8,6 +8,7 @@ use crate::{
     model::{
         services::reachability::{MTReachabilityService, ReachabilityService},
         stores::{
+            acceptance_data::AcceptanceDataStoreReader,
             ghostdag::{CompactGhostdagData, GhostdagStoreReader},
             headers::HeaderStoreReader,
             past_pruning_points::PastPruningPointsStoreReader,
@@ -19,7 +20,6 @@ use crate::{
             tips::{TipsStore, TipsStoreReader},
             utxo_diffs::UtxoDiffsStoreReader,
             virtual_state::VirtualStateStoreReader,
-            acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
         },
     },
     processes::{pruning_proof::PruningProofManager, reachability::inquirer as reachability, relations},
@@ -36,8 +36,7 @@ use kaspa_consensus_core::{
     BlockHashSet,
 };
 use kaspa_consensus_notify::{
-    notification::{Notification, PruningPointUtxoSetOverrideNotification},
-    notification::ChainAcceptanceDataPrunedNotification,
+    notification::{ChainAcceptanceDataPrunedNotification, Notification},
     root::ConsensusNotificationRoot,
 };
 
@@ -46,9 +45,9 @@ use kaspa_core::{debug, info, warn};
 use kaspa_database::prelude::{BatchDbWriter, MemoryWriter, StoreResultExtensions, DB};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
-use kaspa_notify::{notifier::Notify, events::EventType};
+use kaspa_notify::{events::EventType, notifier::Notify};
 use kaspa_utils::iter::IterExtensions;
-use parking_lot::{RwLockUpgradableReadGuard, lock_api::RwLock};
+use parking_lot::RwLockUpgradableReadGuard;
 use rocksdb::WriteBatch;
 use std::{
     collections::VecDeque,
@@ -376,7 +375,7 @@ impl PruningProcessor {
             self.block_window_cache_for_difficulty.remove(&current);
             self.block_window_cache_for_past_median_time.remove(&current);
 
-            if !keep_blocks.contains(&current) {              
+            if !keep_blocks.contains(&current) {
                 let mut batch = WriteBatch::default();
                 let mut level_relations_write = self.relations_stores.write();
                 let mut reachability_relations_write = self.reachability_relations_store.write();
@@ -384,18 +383,20 @@ impl PruningProcessor {
                 let mut staging_reachability = StagingReachabilityStore::new(reachability_read);
                 let mut statuses_write = self.statuses_store.write();
 
-                //let pruned_acceptance_data = self.acceptance_data_store.clone().get(current).unwrap(); 
+                //let pruned_acceptance_data = self.acceptance_data_store.clone().get(current).unwrap();
                 let chain_acceptance_pruned = if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // check if someone is subscribed
                 && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // check if it is a chain block
-                && self.acceptance_data_store.has(current).unwrap() // check if acceptance data has already been pruned
+                && self.acceptance_data_store.has(current).unwrap()
+                // check if acceptance data has already been pruned
                 {
-                    Some(Notification::ChainAcceptanceDataPruned(
-                        ChainAcceptanceDataPrunedNotification::new(
-                            current,
-                            self.acceptance_data_store.get(current).expect("expected get"),
-                            new_pruning_point,
-                        )))
-                } else { None };
+                    Some(Notification::ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification::new(
+                        current,
+                        self.acceptance_data_store.get(current).expect("expected get"),
+                        new_pruning_point,
+                    )))
+                } else {
+                    None
+                };
 
                 // Prune data related to block bodies and UTXO state
                 self.utxo_multisets_store.delete_batch(&mut batch, current).unwrap();

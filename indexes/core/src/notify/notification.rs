@@ -1,7 +1,11 @@
 use crate::models::utxoindex::{UtxoChanges, UtxoSetByScriptPublicKey};
 use derive_more::Display;
 use kaspa_consensus_core::acceptance_data::AcceptanceData;
-use kaspa_consensus_notify::notification::{VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification, PruningPointUtxoSetOverrideNotification as ConsensusPruningPointUtxoSetOverrideNotification};
+use kaspa_consensus_notify::notification::{
+    ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification,
+    PruningPointUtxoSetOverrideNotification as ConsensusPruningPointUtxoSetOverrideNotification,
+    VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification,
+};
 use kaspa_hashes::Hash;
 use kaspa_notify::{
     events::EventType,
@@ -17,7 +21,7 @@ use std::{collections::HashMap, sync::Arc};
 full_featured! {
 #[derive(Clone, Debug, Display)]
 pub enum Notification {
-    
+
     // Notifications pertaining to the UTXO index
     #[display(fmt = "UtxosChanged notification")]
     UtxosChanged(UtxosChangedNotification),
@@ -81,7 +85,7 @@ impl From<ConsensusChainAcceptanceDataPrunedNotification> for ChainAcceptanceDat
             mergeset_block_acceptance_data_pruned: value.mergeset_block_acceptance_data_pruned,
             history_root: value.history_root,
         }
-    }  
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,7 +116,7 @@ impl From<ConsensusVirtualChainChangedNotification> for VirtualChainChangedNotif
     fn from(value: ConsensusVirtualChainChangedNotification) -> Self {
         Self {
             added_chain_block_hashes: value.added_chain_block_hashes,
-            removed_chain_block_hashes:value.removed_chain_block_hashes,
+            removed_chain_block_hashes: value.removed_chain_block_hashes,
             added_chain_blocks_acceptance_data: value.added_chain_blocks_acceptance_data,
             removed_chain_blocks_acceptance_data: value.removed_chain_blocks_acceptance_data,
         }

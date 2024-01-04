@@ -10,10 +10,7 @@ use kaspa_index_core::notify::notifier::IndexNotifier;
 use kaspa_notify::{
     connection::ChannelType,
     events::{EventSwitches, EventType},
-    scope::{
-        ChainAcceptanceDataPrunedScope, PruningPointUtxoSetOverrideScope, Scope,
-        UtxosChangedScope, VirtualChainChangedScope,
-    },
+    scope::{ChainAcceptanceDataPrunedScope, PruningPointUtxoSetOverrideScope, Scope, UtxosChangedScope, VirtualChainChangedScope},
 };
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
@@ -52,7 +49,7 @@ impl IndexService {
             (false, false) => {
                 warn!("At least one of utxoindex or txindex should be enabled to run the index processor");
                 [].as_ref().into()
-            },
+            }
         };
         let collector = Arc::new(Processor::new(utxoindex.clone(), txindex.clone(), consensus_notify_channel.receiver()));
         let notifier = Arc::new(IndexNotifier::new(INDEX_SERVICE, events, vec![collector], vec![], 1));

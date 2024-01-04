@@ -1,10 +1,10 @@
-use kaspa_consensus_core::{
-    block::Block,
-    header::Header,
-};
+use kaspa_consensus_core::{block::Block, header::Header};
 use rand::{rngs::SmallRng, Rng};
 
-use crate::testutils::generate::from_rand::{hash::{generate_random_hash, generate_random_hashes}, tx::generate_random_transactions};
+use crate::testutils::generate::from_rand::{
+    hash::{generate_random_hash, generate_random_hashes},
+    tx::generate_random_transactions,
+};
 
 ///Note: generate_random_block is filled with random data, it does not represent a consensus-valid block!
 pub fn generate_random_block(

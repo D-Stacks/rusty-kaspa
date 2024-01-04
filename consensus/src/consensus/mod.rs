@@ -264,7 +264,7 @@ impl Consensus {
         ));
 
         let pruning_processor =
-            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, notification_root.clone(), pruning_lock.clone(), config.clone(), is_consensus_exiting.clone()));
+            Arc::new(PruningProcessor::new(pruning_receiver, db.clone(), &storage, &services, &notification_root, pruning_lock.clone(), config.clone(), is_consensus_exiting.clone()));
 
         // Ensure the relations stores are initialized
         header_processor.init();
@@ -696,6 +696,12 @@ impl ConsensusApi for Consensus {
         Ok(self.services.reachability_service.is_chain_ancestor_of(low, high))
     }
 
+    fn is_chain_block(&self, this: Hash, ) -> ConsensusResult<bool> {
+        let _guard = self.pruning_lock.blocking_read();
+        self.validate_block_exists(this)?;
+        Ok(self.services.reachability_service.is_chain_ancestor_of(this, self.get_sink()))
+    }
+
     // max_blocks has to be greater than the merge set size limit
     fn get_hashes_between(&self, low: Hash, high: Hash, max_blocks: usize) -> ConsensusResult<(Vec<Hash>, Hash)> {
         let _guard = self.pruning_lock.blocking_read();
@@ -835,6 +841,10 @@ impl ConsensusApi for Consensus {
                 .get(hash)
                 .map_err(|_| ConsensusError::MissingData(hash)))
             .collect::<ConsensusResult<Vec<_>>>()?))
+    }
+
+    fn get_block_acceptance_data(&self, hash: Hash) -> ConsensusResult<Arc<AcceptanceData>> {
+        Ok(self.acceptance_data_store.get(hash).map_err(|_| ConsensusError::MissingData(hash))?)
     }
 
     fn get_missing_block_body_hashes(&self, high: Hash) -> ConsensusResult<Vec<Hash>> {

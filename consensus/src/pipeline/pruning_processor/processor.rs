@@ -19,7 +19,7 @@ use crate::{
             tips::{TipsStore, TipsStoreReader},
             utxo_diffs::UtxoDiffsStoreReader,
             virtual_state::VirtualStateStoreReader,
-            acceptance_data::AcceptanceDataStoreReader,
+            acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
         },
     },
     processes::{pruning_proof::PruningProofManager, reachability::inquirer as reachability, relations},
@@ -36,18 +36,19 @@ use kaspa_consensus_core::{
     BlockHashSet,
 };
 use kaspa_consensus_notify::{
-    notification::Notification as ConsensusNotification,
+    notification::{Notification, PruningPointUtxoSetOverrideNotification},
     notification::ChainAcceptanceDataPrunedNotification,
     root::ConsensusNotificationRoot,
 };
+
 use kaspa_consensusmanager::SessionLock;
-use kaspa_core::{debug, info, warn, trace};
+use kaspa_core::{debug, info, warn};
 use kaspa_database::prelude::{BatchDbWriter, MemoryWriter, StoreResultExtensions, DB};
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
 use kaspa_notify::{notifier::Notify, events::EventType};
 use kaspa_utils::iter::IterExtensions;
-use parking_lot::RwLockUpgradableReadGuard;
+use parking_lot::{RwLockUpgradableReadGuard, lock_api::RwLock};
 use rocksdb::WriteBatch;
 use std::{
     collections::VecDeque,
@@ -108,7 +109,7 @@ impl PruningProcessor {
         db: Arc<DB>,
         storage: &Arc<ConsensusStorage>,
         services: &Arc<ConsensusServices>,
-        notification_root: Arc<ConsensusNotificationRoot>,
+        notification_root: &Arc<ConsensusNotificationRoot>,
         pruning_lock: SessionLock,
         config: Arc<Config>,
         is_consensus_exiting: Arc<AtomicBool>,
@@ -375,13 +376,27 @@ impl PruningProcessor {
             self.block_window_cache_for_difficulty.remove(&current);
             self.block_window_cache_for_past_median_time.remove(&current);
 
-            if !keep_blocks.contains(&current) {
+            if !keep_blocks.contains(&current) {              
                 let mut batch = WriteBatch::default();
                 let mut level_relations_write = self.relations_stores.write();
                 let mut reachability_relations_write = self.reachability_relations_store.write();
                 let mut staging_relations = StagingRelationsStore::new(&mut reachability_relations_write);
                 let mut staging_reachability = StagingReachabilityStore::new(reachability_read);
-                let mut statuses_write = self.statuses_store.write();                
+                let mut statuses_write = self.statuses_store.write();
+
+                //let pruned_acceptance_data = self.acceptance_data_store.clone().get(current).unwrap(); 
+                let chain_acceptance_pruned = if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // check if someone is subscribed
+                && self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // check if it is a chain block
+                && self.acceptance_data_store.has(current).unwrap() // check if acceptance data has already been pruned
+                {
+                    Some(Notification::ChainAcceptanceDataPruned(
+                        ChainAcceptanceDataPrunedNotification::new(
+                            current,
+                            self.acceptance_data_store.get(current).expect("expected get"),
+                            new_pruning_point,
+                        )))
+                } else { None };
+
                 // Prune data related to block bodies and UTXO state
                 self.utxo_multisets_store.delete_batch(&mut batch, current).unwrap();
                 self.utxo_diffs_store.delete_batch(&mut batch, current).unwrap();
@@ -441,6 +456,10 @@ impl PruningProcessor {
                 drop(level_relations_write);
 
                 reachability_read = self.reachability_store.upgradable_read();
+
+                if let Some(chain_acceptance_pruned) = chain_acceptance_pruned {
+                    self.notification_root.notify(chain_acceptance_pruned).unwrap();
+                };
             }
         }
 

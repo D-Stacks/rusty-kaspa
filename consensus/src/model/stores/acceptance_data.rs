@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 pub trait AcceptanceDataStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<AcceptanceData>, StoreError>;
+    fn has(&self, hash: Hash) -> Result<bool, StoreError>;
 }
 
 pub trait AcceptanceDataStore: AcceptanceDataStoreReader {
@@ -50,6 +51,10 @@ impl DbAcceptanceDataStore {
 impl AcceptanceDataStoreReader for DbAcceptanceDataStore {
     fn get(&self, hash: Hash) -> Result<Arc<AcceptanceData>, StoreError> {
         self.access.read(hash)
+    }
+
+    fn has(&self, hash: Hash) -> Result<bool, StoreError> {
+        self.access.has(hash)
     }
 }
 

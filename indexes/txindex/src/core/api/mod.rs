@@ -25,9 +25,9 @@ pub trait TxIndexApi: Send + Sync + Debug {
     fn get_sink(&self) -> TxIndexResult<Option<Hash>>;
 
     fn get_source(&self) -> TxIndexResult<Option<Hash>>;
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize>; 
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_blocks(&self) -> TxIndexResult<usize>;
     
     // Updates

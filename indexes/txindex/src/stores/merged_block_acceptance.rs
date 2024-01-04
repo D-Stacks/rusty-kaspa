@@ -15,7 +15,7 @@ pub trait TxIndexMergedBlockAcceptanceReader {
     /// Get [`TransactionOffset`] queried by [`TransactionId`],
     fn get(&self, block_hash: Hash) -> StoreResult<Option<BlockAcceptanceOffset>>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_keys(&self) -> StoreResult<usize>;
 }
 
@@ -33,14 +33,12 @@ pub trait TxIndexMergedBlockAcceptanceStore {
 
 #[derive(Clone)]
 pub struct DbTxIndexMergedBlockAcceptanceStore {
-    db: Arc<DB>,
     access: CachedDbAccess<Hash, BlockAcceptanceOffset, BlockHasher>,
 }
 
 impl DbTxIndexMergedBlockAcceptanceStore {
     pub fn new(db: Arc<DB>, cache_policy: CachePolicy) -> Self {
         Self {
-            db: Arc::clone(&db),
             access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::TxIndexMergedBlockAcceptance.into()),
         }
     }
@@ -55,7 +53,7 @@ impl TxIndexMergedBlockAcceptanceReader for DbTxIndexMergedBlockAcceptanceStore 
         self.access.has(block_hash)
     }
 
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_keys(&self) -> StoreResult<usize> {
         Ok(self.access
             .iterator()

@@ -32,7 +32,7 @@ use kaspa_consensus_core::network::{NetworkId, NetworkType::Mainnet};
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::trusted::{ExternalGhostdagData, TrustedBlock};
 use kaspa_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry};
-use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlueWorkType};
+use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlueWorkType, BlockHashSet, HashMapCustomHasher};
 use kaspa_consensus_notify::root::ConsensusNotificationRoot;
 use kaspa_consensus_notify::service::NotifyService;
 use kaspa_consensusmanager::ConsensusManager;
@@ -47,7 +47,7 @@ use itertools::Itertools;
 use kaspa_core::core::Core;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
-use kaspa_core::{assert_match, info, warn};
+use kaspa_core::{assert_match, info};
 use kaspa_database::create_temp_db;
 use kaspa_database::prelude::{CachePolicy, ConnBuilder};
 use kaspa_index_processor::service::IndexService;
@@ -910,7 +910,7 @@ fn gzip_file_lines(path: &Path) -> impl Iterator<Item = String> {
 }
 
 async fn json_test(file_path: &str, concurrency: bool) {
-    kaspa_core::log::try_init_logger("trace");
+    kaspa_core::log::try_init_logger("info");
     let main_path = Path::new(file_path);
     let proof_exists = common::file_exists(&main_path.join("proof.json.gz"));
 
@@ -936,7 +936,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     let mut consensus_config = ConsensusConfig::new(params);
     if proof_exists {
-        consensus_config.process_genesis = false;
+        consensus_config.process_genesis = true;
     }
     let consensus_config = Arc::new(consensus_config);
     let txindex_config: Arc<TxIndexConfig> = Arc::new(TxIndexConfig::new(&consensus_config));
@@ -1035,6 +1035,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
         tc.import_pruning_point_utxo_set(pruning_point.unwrap(), multiset).unwrap();
         utxoindex.write().resync().unwrap();
+        txindex.write().resync().unwrap();
         // TODO: Add consensus validation that the pruning point is actually the right block according to the rules (in pruning depth etc).
     }
 
@@ -1066,6 +1067,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
         }
     }
 
+    // TODO: remove this sleep once we have a better way to wait for the txindex to catch up
+    sleep(Duration::from_secs(10)).await; // Wait for the txindex to catch up.. 
     core.shutdown();
     core.join(joins);
 
@@ -1081,23 +1084,36 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert!(virtual_utxos.is_subset(&utxoindex_utxos));
     assert!(utxoindex_utxos.is_subset(&virtual_utxos));
 
-    assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc.get_source());
+    let tc_source = tc.get_source();
+    assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc_source);
     assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
 
-    let consensus_chain = tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap().added;
+    let consensus_chain = Arc::new(
+    [
+            &[ tc_source ], // we concat source to the added chain path, as it is none-inclusive.
+            Arc::try_unwrap(tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap()
+            .added)
+            .unwrap().as_slice()
+        ].concat()
+    );
+    
     let consensus_acceptance_data = tc.get_blocks_acceptance_data(consensus_chain.clone()).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
+    let mut seen_hashes = BlockHashSet::new();
+    let mut seen_tx_ids = BlockHashSet::new();
     for (accepting_block_hash, acceptance_data) in Arc::try_unwrap(consensus_chain).unwrap().into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter()) {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
-            let indexed_block_acceptance = Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash,]).unwrap()).unwrap().get(0).unwrap().unwrap();
-            assert_eq!(indexed_block_acceptance.ordered_mergeset_index(), i as u16);
-            assert_eq!(indexed_block_acceptance.accepting_block(), accepting_block_hash);
+            let indexed_block_acceptance_offset = Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash,]).unwrap()).unwrap().get(0).unwrap().unwrap();
+            assert_eq!(indexed_block_acceptance_offset.ordered_mergeset_index(), i as u16);
+            assert_eq!(indexed_block_acceptance_offset.accepting_block(), accepting_block_hash);
+            seen_hashes.insert(mergeset.block_hash);
             accepted_block_count += 1;
             for tx_entry in mergeset.accepted_transactions.iter() {
                 let indexed_accepted_tx_offset = Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id,]).unwrap()).unwrap().get(0).unwrap().unwrap();
                 assert_eq!(indexed_accepted_tx_offset.including_block(), mergeset.block_hash);
                 assert_eq!(indexed_accepted_tx_offset.transaction_index(), tx_entry.index_within_block);
+                seen_tx_ids.insert(tx_entry.transaction_id);
                 accepted_tx_count += 1;
             }
         };

@@ -1,10 +1,10 @@
 use std::{
     fmt::Debug,
-    sync::{Arc, Weak},
+    sync::Arc,
 };
 
 use kaspa_consensus_core::tx::TransactionId;
-use kaspa_consensusmanager::{ConsensusManager, ConsensusResetHandler, ConsensusSessionBlocking};
+use kaspa_consensusmanager::{ConsensusManager, ConsensusSessionBlocking};
 use kaspa_core::{error, info, trace};
 use kaspa_database::prelude::DB;
 use kaspa_hashes::Hash;
@@ -77,6 +77,17 @@ impl TxIndex {
         let mut total_blocks_added: u64 = 0u64;
         let mut removed_processed_in_batch = 0u64;
         let mut added_processed_in_batch = 0u64;
+
+        // As the `session.get_virtual_chain_from_block` method is exclusive to the start-hash, under the added condition, we commit this separately..
+        if session.is_chain_block(start_hash)? {
+            self.update_via_vspcc_added(ConsensusVirtualChainChangedNotification::new(
+                Arc::new(vec![start_hash]),
+                Arc::new(vec![]),
+                Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
+                Arc::new(vec![]),
+            ))?;
+        };
+
         while start_hash != end_hash {
             let mut chain_path =
                 session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.config.perf.resync_chunksize as usize))?;
@@ -292,12 +303,12 @@ impl TxIndexApi for TxIndex {
         self.stores.write_batch(batch)
     }
 
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_tx_ids(&self) -> TxIndexResult<usize> {
         Ok(self.stores.accepted_tx_offsets_store.count_all_keys()?)    
     }
 
-    // This induces a lot of processing, so it should be used only for tests.
+    // This potentially causes a large chunk of processing, so it should only be used only for tests.
     fn count_all_merged_blocks(&self) -> TxIndexResult<usize> {
         Ok(self.stores.merged_block_acceptance_store.count_all_keys()?)
     }

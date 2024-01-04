@@ -21,7 +21,6 @@ pub struct TxIndexReindexer {
 
 impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
     fn from(vspcc_notification: ConsensusVirtualChainChangedNotification) -> Self {
-        println!("vspcc_notification: {:?}", vspcc_notification);
         let new_sink = match vspcc_notification.added_chain_block_hashes.last() {
             Some(hash) => Some(hash.clone()),
             None => match vspcc_notification.removed_chain_block_hashes.last() {

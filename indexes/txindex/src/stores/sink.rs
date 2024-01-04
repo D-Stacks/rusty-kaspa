@@ -20,13 +20,12 @@ pub trait TxIndexSinkStore: TxIndexSinkReader {
 /// A DB + cache implementation of `SinkStore` trait, with concurrent readers support.
 #[derive(Clone)]
 pub struct DbTxIndexSinkStore {
-    db: Arc<DB>,
     access: CachedDbItem<Hash>,
 }
 
 impl DbTxIndexSinkStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSink.into()) }
+        Self { access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::TxIndexSink.into()) }
     }
 }
 

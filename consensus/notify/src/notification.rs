@@ -18,9 +18,6 @@ pub enum Notification {
     #[display(fmt = "BlockAdded notification: block hash {}", "_0.block.header.hash")]
     BlockAdded(BlockAddedNotification),
 
-    #[display(fmt = "ChainAcceptanceDataPruned notification notification: chain hash pruned: {}, mergset block acceptance pruned: {}, history root: {}", "_0.chain_hash_pruned", "_0.mergeset_block_acceptance_data_pruned.len()", "_0.history_root")]
-    ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification),
-
     #[display(fmt = "VirtualChainChanged notification: {} removed blocks, {} added blocks, {} accepted transactions", "_0.removed_chain_block_hashes.len()", "_0.added_chain_block_hashes.len()", "_0.added_chain_blocks_acceptance_data.len()")]
     VirtualChainChanged(VirtualChainChangedNotification),
 
@@ -44,6 +41,9 @@ pub enum Notification {
 
     #[display(fmt = "NewBlockTemplate notification")]
     NewBlockTemplate(NewBlockTemplateNotification),
+
+    #[display(fmt = "ChainAcceptanceDataPruned notification notification: chain hash pruned: {}, mergset block acceptance pruned: {}, history root: {}", "_0.chain_hash_pruned", "_0.mergeset_block_acceptance_data_pruned.len()", "_0.history_root")]
+    ChainAcceptanceDataPruned(ChainAcceptanceDataPrunedNotification),
 }
 }
 

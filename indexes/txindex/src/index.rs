@@ -330,6 +330,6 @@ impl Debug for TxIndex {
 }
 
 #[cfg(test)]
-mod tests { 
+mod tests {
     //TODO: Add tests
 }

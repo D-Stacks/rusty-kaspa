@@ -331,5 +331,6 @@ impl Debug for TxIndex {
 
 #[cfg(test)]
 mod tests {
-    //TODO: Add tests
+
+    fn test_reorg() {}
 }

@@ -464,7 +464,6 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
 
     let mining_monitor = Arc::new(MiningMonitor::new(mining_counters.clone(), tx_script_cache_counters.clone(), tick_service.clone()));
     let mining_manager = MiningManagerProxy::new(Arc::new(MiningManager::new_with_extended_config(
-        network.is_mainnet(),
         consensus_config.target_time_per_block,
         false,
         consensus_config.max_block_mass,

@@ -134,7 +134,7 @@ impl Processor {
         notification: consensus_notification::VirtualChainChangedNotification,
     ) -> IndexResult<index_notification::VirtualChainChangedNotification> {
         if let Some(txindex) = self.txindex.clone() {
-            txindex.update_via_vspcc_added(notification.clone()).await?;
+            txindex.update_via_virtual_chain_changed(notification.clone()).await?;
             debug!(
                 "IDXPRC, updated txindex with {0} added and {1} removed chain blocks",
                 notification.added_chain_block_hashes.len(),
@@ -223,7 +223,7 @@ mod tests {
             tc.init();
             let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
             let utxoindex = Some(UtxoIndexProxy::new(UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap()));
-            let txindex_config = Arc::new(TxIndexConfig::new(&consensus_config));
+            let txindex_config = Arc::new(TxIndexConfig::from(&consensus_config));
             let txindex = Some(TxIndexProxy::new(TxIndex::new(consensus_manager, txindex_db, txindex_config).unwrap()));
             let processor = Arc::new(Processor::new(utxoindex, txindex, consensus_receiver));
             let (processor_sender, processor_receiver) = unbounded();
@@ -382,15 +382,8 @@ mod tests {
                     for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
                         assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
                         assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
-                        assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
                         for (test_tx_entry, notification_tx_entry) in
                             test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter())
-                        {
-                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
-                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
-                        }
-                        for (test_tx_entry, notification_tx_entry) in
-                            test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter())
                         {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
@@ -407,15 +400,8 @@ mod tests {
                     for (test_mergeset, notification_mergeset) in test_mergesets.iter().zip(notification_mergesets.iter()) {
                         assert_eq!(test_mergeset.block_hash, notification_mergeset.block_hash);
                         assert_eq!(test_mergeset.accepted_transactions.len(), notification_mergeset.accepted_transactions.len());
-                        assert_eq!(test_mergeset.unaccepted_transactions.len(), notification_mergeset.unaccepted_transactions.len());
                         for (test_tx_entry, notification_tx_entry) in
                             test_mergeset.accepted_transactions.iter().zip(notification_mergeset.accepted_transactions.iter())
-                        {
-                            assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
-                            assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
-                        }
-                        for (test_tx_entry, notification_tx_entry) in
-                            test_mergeset.unaccepted_transactions.iter().zip(notification_mergeset.unaccepted_transactions.iter())
                         {
                             assert_eq!(test_tx_entry.transaction_id, notification_tx_entry.transaction_id);
                             assert_eq!(test_tx_entry.index_within_block, notification_tx_entry.index_within_block);
@@ -431,7 +417,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_chain_acceptance_daa_pruned_notification() {
+    async fn test_chain_acceptance_data_pruned_notification() {
         let pipeline = NotifyPipeline::new();
         let rng = &mut SmallRng::seed_from_u64(42);
 
@@ -451,8 +437,9 @@ mod tests {
             .await
             .expect("expected send");
 
-        // we expect no index notification response to be sent, so below is enough for the test.
+        // we expect no index notification response to be sent, so below is enough for the test
         assert!(pipeline.processor_receiver.is_empty(), "the notification receiver should be empty");
+        // TODO: We can none-the-less check that the notification was processed correctly via the txindex itself
         pipeline.consensus_sender.close();
         pipeline.processor.clone().join().await.expect("stopping the processor must succeed");
     }

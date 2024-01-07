@@ -217,7 +217,7 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
     );
 
     let txindex_config = if args.txindex {
-        let txindex_config = TxIndexConfig::new(&consensus_config);
+        let txindex_config = TxIndexConfig::from(&consensus_config);
         tx_files_limit += txindex_config.perf.extra_fd_budget as i32;
         fd_remaining -= txindex_config.perf.extra_fd_budget as i32;
         Some(Arc::new(txindex_config))
@@ -486,8 +486,12 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         index_service.as_ref().map(|x| x.notifier()),
         mining_manager,
         flow_context,
-        index_service.as_ref().map(|x| x.utxoindex().unwrap()),
-        index_service.as_ref().map(|x| x.txindex().unwrap()),
+        if let Some(ref index_service) = index_service {
+            index_service.utxoindex()
+        } else { None },
+        if let Some(ref index_service) = index_service {
+            index_service.txindex()
+        } else { None },
         consensus_config.clone(),
         core.clone(),
         processing_counters,

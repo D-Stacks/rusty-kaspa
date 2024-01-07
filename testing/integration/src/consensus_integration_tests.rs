@@ -940,7 +940,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
         consensus_config.process_genesis = true;
     }
     let consensus_config = Arc::new(consensus_config);
-    let txindex_config: Arc<TxIndexConfig> = Arc::new(TxIndexConfig::new(&consensus_config));
+    let txindex_config: Arc<TxIndexConfig> = Arc::new(TxIndexConfig::from(&consensus_config));
 
     let tick_service = Arc::new(TickService::default());
     let (notification_send, notification_recv) = unbounded();
@@ -1041,7 +1041,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
         tc.import_pruning_point_utxo_set(pruning_point.unwrap(), multiset).unwrap();
         utxoindex.write().resync().unwrap();
-        txindex.write().resync().unwrap();
         // TODO: Add consensus validation that the pruning point is actually the right block according to the rules (in pruning depth etc).
     }
 
@@ -1073,8 +1072,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
         }
     }
 
-    // TODO: remove this sleep once we have a better way to wait for the txindex to catch up
-    sleep(Duration::from_secs(10)).await; // Wait for the txindex to catch up..
     core.shutdown();
     core.join(joins);
 
@@ -1085,30 +1082,25 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_selected_chain_store_matches_virtual_chain(&tc);
     let virtual_utxos: HashSet<TransactionOutpoint> =
         HashSet::from_iter(tc.get_virtual_utxos(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
+    assert!(utxoindex.read().is_synced().unwrap());
     let utxoindex_utxos = utxoindex.read().get_all_outpoints().unwrap();
     assert_eq!(virtual_utxos.len(), utxoindex_utxos.len());
     assert!(virtual_utxos.is_subset(&utxoindex_utxos));
     assert!(utxoindex_utxos.is_subset(&virtual_utxos));
 
-    let tc_source = tc.get_source();
-    assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc_source);
+    let tc_history_root = tc.get_history_root();
+    assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc_history_root);
     assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
 
-    let consensus_chain = Arc::new(
-        [
-            &[tc_source], // we concat source to the added chain path, as it is none-inclusive.
-            Arc::try_unwrap(tc.get_virtual_chain_from_block(tc.get_source(), None, None).unwrap().added).unwrap().as_slice(),
-        ]
-        .concat(),
-    );
-
-    let consensus_acceptance_data = tc.get_blocks_acceptance_data(consensus_chain.clone()).unwrap();
+    let mut consensus_chain = Arc::try_unwrap(tc.get_virtual_chain_from_block(tc_history_root, None, usize::MAX).unwrap().added).unwrap();
+    consensus_chain.insert(0, tc_history_root);
+    let consensus_acceptance_data = tc.get_blocks_acceptance_data(Arc::new(consensus_chain.clone())).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
     let mut seen_hashes = BlockHashSet::new();
     let mut seen_tx_ids = BlockHashSet::new();
     for (accepting_block_hash, acceptance_data) in
-        Arc::try_unwrap(consensus_chain).unwrap().into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter())
+        consensus_chain.into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter())
     {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
             let indexed_block_acceptance_offset =

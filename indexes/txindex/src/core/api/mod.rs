@@ -35,7 +35,7 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     // Updates
 
-    fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()>;
+    fn update_via_virtual_chain_changed(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()>;
 
     fn update_via_chain_acceptance_data_pruned(
         &mut self,
@@ -65,8 +65,8 @@ impl TxIndexProxy {
         spawn_blocking(move || self.inner.read().get_merged_block_acceptance_offset(hashes)).await.unwrap()
     }
 
-    pub async fn update_via_vspcc_added(self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
-        spawn_blocking(move || self.inner.write().update_via_vspcc_added(vspcc_notification)).await.unwrap()
+    pub async fn update_via_virtual_chain_changed(self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
+        spawn_blocking(move || self.inner.write().update_via_virtual_chain_changed(vspcc_notification)).await.unwrap()
     }
 
     pub async fn update_via_chain_acceptance_data_pruned(

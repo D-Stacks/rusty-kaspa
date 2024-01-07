@@ -5,19 +5,18 @@ use crate::{
         RuleError::{BadAcceptedIDMerkleRoot, BadCoinbaseTransaction, BadUTXOCommitment, InvalidTransactionsInUtxoContext},
     },
     model::stores::{block_transactions::BlockTransactionsStoreReader, daa::DaaStoreReader, ghostdag::GhostdagData},
-    processes::transaction_validator::transaction_validator_populated::TxValidationFlags,
+    processes::transaction_validator::{
+        errors::{TxResult, TxRuleError},
+        transaction_validator_populated::TxValidationFlags,
+    },
 };
 use kaspa_consensus_core::{
-    acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
+    acceptance_data::{TxEntry, MergesetBlockAcceptanceData},
     coinbase::*,
-    errors::tx::{TxResult, TxRuleError},
     hashing,
     header::Header,
     muhash::MuHashExtensions,
-    tx::{
-        MutableTransaction, PopulatedTransaction, Transaction, TransactionId, TransactionIndexType, ValidatedTransaction,
-        VerifiableTransaction,
-    },
+    tx::{MutableTransaction, PopulatedTransaction, Transaction, TransactionId, ValidatedTransaction, VerifiableTransaction},
     utxo::{
         utxo_diff::UtxoDiff,
         utxo_view::{UtxoView, UtxoViewComposition},
@@ -29,7 +28,6 @@ use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
 use kaspa_utils::refs::Refs;
 
-use rayon::iter::Either;
 use rayon::prelude::*;
 use std::{iter::once, ops::Deref};
 
@@ -95,10 +93,7 @@ impl VirtualStateProcessor {
             // No need to fully validate selected parent transactions since selected parent txs were already validated
             // as part of selected parent UTXO state verification with the exact same UTXO context.
             let validation_flags = if is_selected_parent { TxValidationFlags::SkipScriptChecks } else { TxValidationFlags::Full };
-
-            // Note: below does not process the coinbase tx, this should be inferred separately depending on the `is_selected_parent` boolean.
-            let (validated_transactions, invalidated_transactions) =
-                self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score, validation_flags, true);
+            let validated_transactions = self.validate_transactions_in_parallel(&txs, &composed_view, pov_daa_score, validation_flags);
 
             let mut block_fee = 0u64;
             for (validated_tx, _) in validated_transactions.iter() {
@@ -119,10 +114,6 @@ impl VirtualStateProcessor {
                                 .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx }),
                         )
                         .collect(),
-                    unaccepted_transactions: invalidated_transactions
-                        .into_iter()
-                        .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
-                        .collect(),
                 });
             } else {
                 ctx.mergeset_acceptance_data.push(MergesetBlockAcceptanceData {
@@ -131,16 +122,6 @@ impl VirtualStateProcessor {
                         .into_iter()
                         .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx })
                         .collect(),
-                    unaccepted_transactions: once(TxEntry {
-                        transaction_id: txs.first().expect("expected a coinbase tx").id(),
-                        index_within_block: 0,
-                    })
-                    .chain(
-                        invalidated_transactions
-                            .into_iter()
-                            .map(|(tx, tx_idx)| TxEntry { transaction_id: tx.id(), index_within_block: tx_idx }),
-                    )
-                    .collect(),
                 });
             }
 
@@ -195,7 +176,7 @@ impl VirtualStateProcessor {
         // Verify all transactions are valid in context
         let current_utxo_view = selected_parent_utxo_view.compose(&ctx.mergeset_diff);
         let validated_transactions =
-            self.validate_transactions_in_parallel(&txs, &current_utxo_view, header.daa_score, TxValidationFlags::Full, false).0;
+            self.validate_transactions_in_parallel(&txs, &current_utxo_view, header.daa_score, TxValidationFlags::Full);
         if validated_transactions.len() < txs.len() - 1 {
             // Some non-coinbase transactions are invalid
             return Err(InvalidTransactionsInUtxoContext(txs.len() - 1 - validated_transactions.len(), txs.len() - 1));
@@ -234,21 +215,15 @@ impl VirtualStateProcessor {
         utxo_view: &V,
         pov_daa_score: u64,
         flags: TxValidationFlags,
-        process_invalidated_txs: bool,
-    ) -> (Vec<(ValidatedTransaction<'a>, TransactionIndexType)>, Vec<(&'a Transaction, TransactionIndexType)>) {
-        self.thread_pool.install(move || {
-            txs.into_par_iter() // We can do this in parallel without complications since block body validation already ensured
-                                                      // that all txs within each block are independent
+    ) -> Vec<(ValidatedTransaction<'a>, u32)> {
+        self.thread_pool.install(|| {
+            txs
+                .par_iter() // We can do this in parallel without complications since block body validation already ensured
+                            // that all txs within each block are independent
                 .enumerate()
                 .skip(1) // Skip the coinbase tx.
-                .filter_map(|(i, tx)| {
-                    match self.validate_transaction_in_utxo_context(tx, &utxo_view, pov_daa_score, flags) {
-                        Ok(vtx) => Some(Either::Left((vtx, i as TransactionIndexType))),
-                        Err(_) if process_invalidated_txs => Some(Either::Right((tx, i as TransactionIndexType))),
-                        Err(_) => None,
-                    }
-                })
-                .partition_map(|x| x)
+                .filter_map(|(i, tx)| self.validate_transaction_in_utxo_context(tx, &utxo_view, pov_daa_score, flags).ok().map(|vtx| (vtx, i as u32)))
+                .collect()
         })
     }
 

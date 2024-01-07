@@ -9,10 +9,9 @@ pub type AcceptanceData = Vec<MergesetBlockAcceptanceData>;
 pub struct MergesetBlockAcceptanceData {
     pub block_hash: Hash,
     pub accepted_transactions: Vec<TxEntry>,
-    pub unaccepted_transactions: Vec<TxEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TxEntry {
     pub transaction_id: TransactionId,
     pub index_within_block: TransactionIndexType,

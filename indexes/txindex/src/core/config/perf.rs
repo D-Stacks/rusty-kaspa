@@ -27,7 +27,7 @@ impl PerfParams {
     pub fn new(consensus_config: &Arc<ConsensusConfig>, params: &Params) -> Self {
         let resync_chunksize = bounded_size(
             params.max_blocks_in_mergeset_depth as usize,
-            DEFAULT_TXINDEX_EXTRA_FD_BUDGET,
+            DEFAULT_TXINDEX_MEMORY_BUDGET,
             max(
                 //per chain block
                 ((size_of::<TransactionId>() + size_of::<TxOffset>()) * params.max_default_txs_per_block as usize

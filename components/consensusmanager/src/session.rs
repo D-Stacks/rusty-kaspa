@@ -230,7 +230,7 @@ impl ConsensusSessionOwned {
     }
 
     pub async fn async_get_virtual_chain_from_block(&self, hash: Hash) -> ConsensusResult<ChainPath> {
-        self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(hash, None, None)).await
+        self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(hash, None, usize::MAX)).await
     }
 
     pub async fn async_get_virtual_parents(&self) -> BlockHashSet {

@@ -280,7 +280,7 @@ impl VirtualStateProcessor {
         assert_eq!(virtual_ghostdag_data.selected_parent, new_sink);
 
         let sink_multiset = self.utxo_multisets_store.get(new_sink).unwrap();
-        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, None);
+        let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, usize::MAX);
         let new_virtual_state = self
             .calculate_and_commit_virtual_state(
                 virtual_read,
@@ -1060,9 +1060,7 @@ impl VirtualStateProcessor {
                 &virtual_read.utxo_set,
                 new_pruning_point_header.daa_score,
                 TxValidationFlags::Full,
-                false,
-            )
-            .0;
+            );
         if validated_transactions.len() < new_pruning_point_transactions.len() - 1 {
             // Some non-coinbase transactions are invalid
             return Err(PruningImportError::NewPruningPointTxErrors);

@@ -15,8 +15,8 @@ pub struct Config {
 }
 
 impl From<&Arc<ConsensusConfig>> for Config {
-    fn from(consensus_config: &ConsensusConfig) -> Self {
+    fn from(consensus_config: &Arc<ConsensusConfig>) -> Self {
         let params = Params::new(consensus_config);
-        Arc::new(Self { params: params.clone(), perf: PerfParams::new(consensus_config, &params) })
+        Self { params: params.clone(), perf: PerfParams::new(consensus_config, &params) }
     }
 }

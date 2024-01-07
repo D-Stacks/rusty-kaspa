@@ -492,6 +492,10 @@ impl ConsensusApi for Consensus {
         self.pruning_point_store.read().pruning_point().unwrap()
     }
 
+    fn get_history_root(&self) -> Hash {
+        self.pruning_point_store.read().history_root().unwrap()
+    }
+
     /// Estimates number of blocks and headers stored in the node
     ///
     /// This is an estimation based on the daa score difference between the node's `source` and `sink`'s daa score,
@@ -509,7 +513,7 @@ impl ConsensusApi for Consensus {
         self.config.is_nearly_synced(compact.timestamp, compact.daa_score)
     }
 
-    fn get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: Option<usize>) -> ConsensusResult<ChainPath> {
+    fn get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: usize) -> ConsensusResult<ChainPath> {
         // Calculate chain changes between the given hash and the
         // sink. Note that we explicitly don't
         // do the calculation against the virtual itself so that we

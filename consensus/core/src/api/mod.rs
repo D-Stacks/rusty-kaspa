@@ -117,6 +117,10 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    fn get_history_root(&self) -> Hash {
+        unimplemented!()
+    }
+
     /// source refers to the earliest block from which the current node has full header & block data  
     fn get_source(&self) -> Hash {
         unimplemented!()
@@ -139,7 +143,8 @@ pub trait ConsensusApi: Send + Sync {
     /// 1) Specifying the `high` hash as `None` will calculate the chain path up to the current sink.
     /// 2) Specifying `max_blocks` as `None` will impose no limit.
     /// 3) `max_blocks` limit will populate removed chain path and then the added chain path, up to max_blocks.
-    fn get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: Option<usize>) -> ConsensusResult<ChainPath> {
+    /// 3.1) use usize::MAX to get all blocks in the chain path, with optimized performance, (in cases where batching is not required)
+    fn get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: usize) -> ConsensusResult<ChainPath> {
         unimplemented!()
     }
 

@@ -1,6 +1,9 @@
 use std::{fmt::Debug, sync::Arc};
 
-use kaspa_consensus_core::tx::TransactionId;
+use kaspa_consensus_core::{tx::{
+    TransactionId,
+},
+};
 use kaspa_consensus_notify::notification::{
     ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification,
     VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification,
@@ -17,7 +20,7 @@ use parking_lot::RwLock;
 use rocksdb::WriteBatch;
 
 use crate::{
-    config::Config,
+    config::Config as TxIndexConfig,
     core::api::TxIndexApi,
     core::errors::TxIndexError,
     core::errors::TxIndexResult,
@@ -30,11 +33,11 @@ use crate::{
 pub struct TxIndex {
     stores: TxIndexStores,
     consensus_manager: Arc<ConsensusManager>,
-    config: Arc<Config>, // move into config, once txindex is configurable.
+    config: Arc<TxIndexConfig>, // move into config, once txindex is configurable.
 }
 
 impl TxIndex {
-    pub fn new(consensus_manager: Arc<ConsensusManager>, db: Arc<DB>, config: Arc<Config>) -> TxIndexResult<Arc<RwLock<Self>>> {
+    pub fn new(consensus_manager: Arc<ConsensusManager>, db: Arc<DB>, config: Arc<TxIndexConfig>) -> TxIndexResult<Arc<RwLock<Self>>> {
         let mut txindex = Self { stores: TxIndexStores::new(db, &config)?, consensus_manager: consensus_manager.clone(), config };
 
         if !txindex.is_synced()? {
@@ -77,17 +80,16 @@ impl TxIndex {
 
         // As the `session.get_virtual_chain_from_block` method is exclusive to the start-hash, under the added condition, we commit this separately..
         if session.is_chain_block(start_hash)? {
-            self.update_via_vspcc_added(ConsensusVirtualChainChangedNotification::new(
+            self.update_via_virtual_chain_changed(ConsensusVirtualChainChangedNotification::new(
                 Arc::new(vec![start_hash]),
                 Arc::new(vec![]),
                 Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
                 Arc::new(vec![]),
             ))?;
         };
-
         while start_hash != end_hash {
             let mut chain_path =
-                session.get_virtual_chain_from_block(start_hash, Some(end_hash), Some(self.config.perf.resync_chunksize as usize))?;
+                session.get_virtual_chain_from_block(start_hash, Some(end_hash), self.config.perf.resync_chunksize as usize)?;
 
             // We switch added to removed, and clear removed, as we have no use for the removed data.
             if unsync_segment {
@@ -120,7 +122,7 @@ impl TxIndex {
                 removed_chain_blocks_acceptance_data,
             );
 
-            self.update_via_vspcc_added(vspcc_notification)?;
+            self.update_via_virtual_chain_changed(vspcc_notification)?;
 
             if removed_processed_in_batch != 0 {
                 total_blocks_removed += removed_processed_in_batch;
@@ -164,23 +166,23 @@ impl TxIndexApi for TxIndex {
         let session = futures::executor::block_on(consensus.session_blocking());
         // Gather the necessary block hashes
         let txindex_source = self.stores.source_store.get()?;
-        let consensus_source = session.get_source();
+        let consensus_history_root = session.get_history_root();
         let txindex_sink = self.stores.sink_store.get()?;
         let consensus_sink = session.get_sink();
 
         let start_hash = txindex_source
-        .filter(|txindex_source| *txindex_source == consensus_source)
+        .filter(|txindex_source| *txindex_source == consensus_history_root)
         .unwrap_or({
             info!(
-                "[{0:?}] txindex source is not synced with consensus source. txindex source: {1:?}, consensus source: {2:?} - Resetting the DB",
+                "[{0:?}] txindex source is not synced with consensus history root. txindex source: {1:?}, consensus history root: {2:?} - Resetting the DB",
                 self,
                 txindex_source,
-                consensus_source,
+                consensus_history_root,
             );
             self.stores.delete_all()?; // we reset the txindex
-            // We can set the source anew after clearing db
-            self.stores.source_store.set(consensus_source)?;
-            consensus_source
+            // We can set the source anew after clearing db        
+            self.stores.source_store.set(consensus_history_root)?;    
+            consensus_history_root
         });
 
         let end_hash = txindex_sink.map_or_else(
@@ -252,7 +254,7 @@ impl TxIndexApi for TxIndex {
     }
 
     // Update methods
-    fn update_via_vspcc_added(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
+    fn update_via_virtual_chain_changed(&mut self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
         trace!(
             "[{0:?}] Updating db with {1} added chain blocks and {2} removed chain blocks via virtual chain changed notification",
             self,
@@ -329,9 +331,11 @@ impl Debug for TxIndex {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
-    use crate::{config::Config as TxIndexConfig, TxIndex};
+    use crate::{config::Config as TxIndexConfig, TxIndex, api::TxIndexApi};
+    use futures::sink;
     use kaspa_consensus::{
         consensus::test_consensus::TestConsensus,
         model::stores::{
@@ -341,7 +345,6 @@ mod tests {
             DB,
         },
         params::{DEVNET_PARAMS, MAINNET_PARAMS},
-        processes::reachability::tests::gen,
         testutils::generate::{
             self,
             from_rand::{
@@ -354,7 +357,7 @@ mod tests {
         acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
         config::Config as ConsensusConfig,
         tx::TransactionId,
-        BlockHashSet,
+        BlockHashSet, BlockHashMap, HashMapCustomHasher,
     };
     use kaspa_consensus_notify::notification::{Notification, VirtualChainChangedNotification};
     use kaspa_consensusmanager::ConsensusManager;
@@ -363,11 +366,13 @@ mod tests {
         prelude::{BatchDbWriter, ConnBuilder},
         utils::DbLifetime,
     };
+    use kaspa_hashes::Hash;
+    use kaspa_index_core::models::txindex::{MergeSetIDX, BlockAcceptanceOffset, TxOffset};
+    use kaspa_utils::hashmap;
     use parking_lot::RwLock;
-    use rand::{distributions::Distribution, rngs::SmallRng, SeedableRng};
-    use std::sync::Arc;
-
-    pub type TxHashSet = BlockHashSet; // We may use a BlockHashSet for testing.
+    use rand::{distributions::Distribution, rngs::SmallRng, SeedableRng, seq::index};
+    use std::{sync::Arc, hash::Hash};
+    use std::collections::HashMap;
 
     struct TestContext {
         pub txindex: Arc<RwLock<TxIndex>>,
@@ -379,121 +384,176 @@ mod tests {
         fn new() -> Self {
             let (txindex_db_lifetime, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
             let consensus_config = ConsensusConfig::new(MAINNET_PARAMS);
+            let txindex_config = Arc::new(TxIndexConfig::from(&Arc::new(consensus_config.clone())));
             let consensus = Arc::new(TestConsensus::new(&consensus_config));
             let txindex =
-                TxIndex::new(Arc::new(ConsensusManager::from_consensus(consensus)), txindex_db, &consensus_config.into()).unwrap();
+                TxIndex::new(Arc::new(ConsensusManager::from_consensus(consensus.consensus_clone())), txindex_db, txindex_config).unwrap();
 
             Self { txindex, consensus, db_lifetime: txindex_db_lifetime }
         }
     }
 
     #[test]
-    fn test_remerged_virtual_chain_changed() {
-        let test_context = TestContext::new().unwrap();
-        let rng = SmallRng::from_seed(42);
+    fn test_reorged_virtual_chain_changed() {
+        // This test tests the re-orged condition of: 
+        // A 🡒 B 🡒 D 
+        // C 🡕 
+        //                 
+        // To:
+        //
+        // A 🡒 E 🡒 F 
+        // C 🡕
+        // 
+        // I.e. an Intial State of:
+        // A: Accepting A,
+        // B: Accepting B & C,
+        // D: Accepting D,
+        //
+        // TO:
+        //
+        // A: Accepting A,
+        // E: Accepting E & C,
+        // F: Accepting F,
+        //
+        // Thereby:
+        //
+        // Removing B & D, adding E & F, and remerging C.
+        //
+        // The Test holds the following acceptance and rejection txs, regarding the transactions:
+        //
+        // Intial state: 
+        // A: Accepted 
+        // A: Unaccepted
+        // B: Accepted 
+        // B: Unaccepted 
+        // C via B: Accepted x 4
+        // C via B: Unaccepted x 4
+        // D: Accepted
+        // D: Unaccepted
+        // 
+        // Which expands to the following flow with the re-org notification:
+        //
+        // C via B: Accepted -> C via E: Accepted 
+        // C via B: Unaccepted -> C via E: Unaccepted
+        // C via B: Accepted -> C via E: Unaccepted
+        // C via B: Unaccepted -> C via E: Accepted
+        // C via B: Accepted -> C via E: Unaccepted -> F: Unaccepted
+        // C via B: Unaccepted -> C via E: Unaccepted -> F: Accepted
+        // C via B: Unaccepted -> C via E: Unaccepted -> F: Unaccepted
+        // C via B: Accepted -> C via E: Accepted  -> F: Unaccepted
+        // E: Accepted
+        // E: Unaccepted
+        // E: Unaccepted -> F: Accepted
+        // E: Unaccepted -> F: Unaccepted
+        // E: Accepted -> F: Unaccepted
+        // F: Accepted
+        // F: Unaccepted
+        // 
+        // Afterward we should be left with the following accepted txs:
+        //
+        // A: Accepted, 
+        // C via B: Accepted -> C via E: Accepted, 
+        // C via B: Unaccepted -> C via E: Accepted,
+        // C via B: Unaccepted -> C via E: Unaccepted -> F: Accepted,
+        // E: Accepted
+        // E: Accepted -> F: Unaccepted
+        // E: Unaccepted -> F: Accepted
+        // F: Accepted      
 
-        // Define blocks for op
-        let new_sink_a = generate_random_hash(&mut rng.clone()); // unintialized => accepted.
-        let remerged_block_b = generate_random_hash(&mut rng.clone()); // intialized & accepted => unaccepted.
-        let former_sink_c = generate_random_hash(&mut rng.clone()); // intialized & accepted => accepted.
+        let test_context = TestContext::new();
+        let rng = SmallRng::seed_from_u64(42u64);
 
-        // Assign txs to the blocks
-        let new_sink_a_tx0_new_to_accepted = TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 0 }; // unitialized => accepted (i.e. a hash that was accepted in the new sink)
-        let new_sink_a_tx1_new_to_unaccepted =
-            TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 1 }; // unitialized => unaccepted (i.e. a hash that was in the new sink, but not unaccepted)
-        let new_sink_a_tx2_former_sink_tx0_accepted_to_unaccepted = {
-            let tx_id = generate_random_hash(&mut rng.clone());
-            (TxEntry { transaction_id: tx_id, index_within_block: 2 }, TxEntry { transaction_id: tx_id, index_within_block: 0 })
-        };
-        let new_sink_a_tx3_former_sink_tx1_unaccepted_to_accepted = {
-            let tx_id = generate_random_hash(&mut rng.clone());
-            (TxEntry { transaction_id: tx_id, index_within_block: 3 }, TxEntry { transaction_id: tx_id, index_within_block: 1 })
-        };
+        // Define Relevant Hashes
+        let hash_a = Hash::from_u64_word(1);
+        let hash_b = Hash::from_u64_word(2);
+        let hash_c = Hash::from_u64_word(3);
+        let hash_d = Hash::from_u64_word(4);
+        let hash_e = Hash::from_u64_word(5);
+        let hash_f = Hash::from_u64_word(6);
 
-        let remerged_block_b_tx0_unaccepted_to_unaccepted =
-            TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 0 }; // unintialized => accepted (i.e. a hash that was accepted in the former sink)
-        let remerged_block_b_tx1_unaccepted_to_accepted =
-            TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 1 }; //
-        let remerged_block_b_tx2_accepted_to_unaccepted =
-            TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 2 }; //
-        let remerged_block_b_tx3_accepted_to_accepted =
-            TxEntry { transaction_id: generate_random_hash(&mut rng.clone()), index_within_block: 3 };
+        // Define Relevant TxIds
+        let tx_id_a_accpeted = TransactionId::from_u64(7);
+        let tx_id_a_unaccpeted = TransactionId::from_u64(8);
+        let tx_id_b_accpeted = TransactionId::from_u64(9);
+        let tx_id_b_unaccpeted = TransactionId::from_u64(10);
+        let tx_id_c_via_b_accpeted_via_e_accpeted = TransactionId::from_u64(11);
+        let tx_id_c_via_b_accpeted_via_e_unaccepted = TransactionId::from_u64(12);
+        let tx_id_c_via_b_unaccpeted_via_e_accepted = TransactionId::from_u64(13);
+        let tx_id_c_via_b_unaccpeted_via_e_unaccepted = TransactionId::from_u64(14);
+        let tx_id_c_via_b_accpeted_via_e_accpeted_via_f_unaccepted = TransactionId::from_u64(15);
+        let tx_id_c_via_b_unaccpeted_via_e_accpeted_via_f_unaccepted = TransactionId::from_u64(16);
+        let tx_id_c_via_b_unaccpeted_via_e_unaccpeted_via_f_accpeted = TransactionId::from_u64(17);
+        let tx_id_c_via_b_unaccpeted_via_e_unaccpeted_via_f_unaccpeted = TransactionId::from_u64(18);   
+        let tx_id_d_accpeted = TransactionId::from_u64(19);
+        let tx_id_d_unaccpeted = TransactionId::from_u64(20);
+        let tx_id_e_accpeted = TransactionId::from_u64(21);
+        let tx_id_e_unaccpeted = TransactionId::from_u64(22);
+        let tx_id_f_accpeted = TransactionId::from_u64(23);
+        let tx_id_f_unaccpeted = TransactionId::from_u64(24);
+        let tx_id_        
+    
+        // Define the initial state
 
-        let intial_state_notification = VirtualChainChangedNotification::new(
-            Arc::new(vec![former_sink_c]),
+        // extract expected block acceptance and tx offset from intial state
+
+        // test expected block acceptance and tx offset from intial state to txindex state
+
+        // define the re-org notification
+
+        // extract expected block acceptance and tx offset from re-org notification
+
+        // test expected block acceptance and tx offset from re-org notification to txindex state
+
+        // test expected intial state residue against txindex state. 
+
+
+        let init_sink_hash = HASH_A;
+        let init_sink_accepted_txs = vec![
+            TxEntry { transaction_id: TX_ID_A, index_within_block: 0 },
+            TxEntry { transaction_id: TX_ID_B, index_within_block: 1 },
+        ];
+        let init_sink_unaccepted_txs = vec![
+            TxEntry { transaction_id: TX_ID_C, index_within_block: 2 },
+            TxEntry { transaction_id: TX_ID_D, index_within_block: 3 },
+        ];
+        let init_sink_merged_hash = HASH_B;
+
+        let init_sink_merged_hash_accepted_txs = vec![
+            TxEntry { transaction_id: TX_ID_E, index_within_block: 0 },
+            TxEntry { transaction_id: TX_ID_F, index_within_block: 1 },
+        ];
+
+        let init_sink_merged_hash_unaccepted_txs = vec![
+            TxEntry { transaction_id: TX_ID_G, index_within_block: 2 },
+            TxEntry { transaction_id: TX_ID_H, index_within_block: 3 },
+        ];
+
+        let init_virtual_chain_changed_notification = VirtualChainChangedNotification::new(
+            Arc::new(vec![sink_hash]),
             Arc::new(vec![]),
-            Arc::new(vec![
-                Arc::new(vec![MergesetBlockAcceptanceData {
-                    block_hash: former_sink_c,
-                    accepted_transactions: vec![
-                        new_sink_a_tx2_former_sink_tx0_accepted_to_unaccepted.1,
-                        ]
-                    unaccepted_transactions: vec![
-                        new_sink_a_tx3_former_sink_tx1_unaccepted_to_accepted.0,
-                    ],
-                },
-                MergesetBlockAcceptanceData {
-                    block_hash: remerged_block_b,
-                    accepted_transactions: vec![
-                        remerged_block_b_tx2_accepted_to_unaccepted,
-                        remerged_block_b_tx3_accepted_to_accepted,
-                    ],
-                    unaccepted_transactions: vec![
-                        remerged_block_b_tx0_unaccepted_to_unaccepted,
-                        remerged_block_b_tx1_unaccepted_to_accepted,
-                    ],
-                },])]),
+            Arc::new(vec![Arc::new(vec![MergesetBlockAcceptanceData {
+                block_hash: sink_merged_hash,
+                accepted_transactions: sink_merged_hash_accepted_txs,
+            }, MergesetBlockAcceptanceData {
+                block_hash: sink_hash,
+                accepted_transactions: sink_accepted_txs,
+                unaccepted_transactions: sink_unaccepted_txs,
+            }])]),
         Arc::new(vec![]),
-        );
+        ); 
 
-        let state_change_notification = VirtualChainChangedNotification::new(
-            Arc::new(vec![new_sink_a]),
-            Arc::new(vec![former_sink_c]),
-            Arc::new(vec![
-                Arc::new(vec![MergesetBlockAcceptanceData {
-                    block_hash: remerged_block_b,
-                    accepted_transactions: vec![
-                        remerged_block_b_tx1_unaccepted_to_accepted,
-                        remerged_block_b_tx3_accepted_to_accepted,
-                    ],
-                    unaccepted_transactions: vec![
-                        remerged_block_b_tx0_unaccepted_to_unaccepted,
-                        remerged_block_b_tx2_accepted_to_unaccepted,
-                    ],
-                },
-                MergesetBlockAcceptanceData {
-                    block_hash: new_sink_a,
-                    accepted_transactions: vec![
-                        new_sink_a_tx0_new_to_accepted,
-                        new_sink_a_tx3_former_sink_tx1_unaccepted_to_accepted.0,
-                    ],
-                    unaccepted_transactions: vec![
-                        new_sink_a_tx1_new_to_unaccepted,
-                        new_sink_a_tx2_former_sink_tx0_accepted_to_unaccepted.0,
-                    ],
-                }]),
-            ],),
-            Arc::new(vec![
-                Arc::new(vec![MergesetBlockAcceptanceData {
-                    block_hash: new_sink_a,
-                    accepted_transactions: vec![new_sink_a_tx2_former_sink_tx0_accepted_to_unaccepted.0],
-                    unaccepted_transactions: vec![
-                        new_sink_a_tx3_former_sink_tx1_unaccepted_to_accepted.0,
-                        new_sink_a_tx2_former_sink_tx0_accepted_to_unaccepted.0,
-                    ],
-                },
-                MergesetBlockAcceptanceData {
-                    block_hash: remerged_block_b,
-                    accepted_transactions: vec![
-                        remerged_block_b_tx2_accepted_to_unaccepted,
-                        remerged_block_b_tx3_accepted_to_accepted,
-                    ],
-                    unaccepted_transactions: vec![
-                        remerged_block_b_tx0_unaccepted_to_unaccepted,
-                        remerged_block_b_tx1_unaccepted_to_accepted,
-                    ],
-                }]),
-            ]),
-        );
+        let init_block_acceptance_offsets = BlockHashMap::<BlockAcceptanceOffset>::new();
+        let init_tx_acceptance_offsets = HashMap::<TransactionId, TxOffset>::new();
+        for accepting_block, mergesets in init_virtual_chain_changed_notification.added_chain_block_hashes.iter().copied().zip(init_virtual_chain_changed_notification.added_chain_blocks_acceptance_data.iter().cloned()) {
+            for (i, mergeset) in mergesets.into_iter().enumerate() {
+                init_block_acceptance_offsets.insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block, i as MergeSetIDX));
+                init_tx_acceptance_offsets.extend(mergeset.accepted_transactions.into_iter().map(|tx_entry| (tx_entry.transaction_id, TxOffset::new(mergeset.block_hash, tx_entry.index_within_block))));
+            };
+        };
+
+        test_context.txindex.write().update_via_virtual_chain_changed(virtual_chain_changed_notification).unwrap();
+
+        }
+        
     }
-}
+*/

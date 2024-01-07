@@ -41,14 +41,10 @@ pub fn generate_random_mergeset_block_acceptance(
     tx_amount: TransactionIndexType,
     unaccepted_ratio: f64,
 ) -> MergesetBlockAcceptanceData {
-    let mut indexes = (0..tx_amount - 1).collect_vec();
-    indexes.shuffle(rng);
-    let split_point = (tx_amount as f64 * unaccepted_ratio) as usize;
-    let (unaccepted_indexes, accepted_indexes) = indexes.as_mut_slice().split_at(split_point);
+    let accepted_indexes = (0..tx_amount - 1).collect_vec().choose_multiple(rng, (tx_amount as f64 * unaccepted_ratio) as usize).copied().collect_vec();
     MergesetBlockAcceptanceData {
         block_hash: generate_random_hash(rng),
-        accepted_transactions: generate_random_tx_entries(rng, &accepted_indexes),
-        unaccepted_transactions: generate_random_tx_entries(rng, &unaccepted_indexes),
+        accepted_transactions: generate_random_tx_entries(rng, accepted_indexes.as_slice()),
     }
 }
 

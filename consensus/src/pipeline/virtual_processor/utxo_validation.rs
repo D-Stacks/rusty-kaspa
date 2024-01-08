@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use kaspa_consensus_core::{
-    acceptance_data::{TxEntry, MergesetBlockAcceptanceData},
+    acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
     coinbase::*,
     hashing,
     header::Header,

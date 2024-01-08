@@ -65,7 +65,10 @@ impl TxIndexProxy {
         spawn_blocking(move || self.inner.read().get_merged_block_acceptance_offset(hashes)).await.unwrap()
     }
 
-    pub async fn update_via_virtual_chain_changed(self, vspcc_notification: ConsensusVirtualChainChangedNotification) -> TxIndexResult<()> {
+    pub async fn update_via_virtual_chain_changed(
+        self,
+        vspcc_notification: ConsensusVirtualChainChangedNotification,
+    ) -> TxIndexResult<()> {
         spawn_blocking(move || self.inner.write().update_via_virtual_chain_changed(vspcc_notification)).await.unwrap()
     }
 

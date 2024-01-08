@@ -498,12 +498,8 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         index_service.as_ref().map(|x| x.notifier()),
         mining_manager,
         flow_context,
-        if let Some(ref index_service) = index_service {
-            index_service.utxoindex()
-        } else { None },
-        if let Some(ref index_service) = index_service {
-            index_service.txindex()
-        } else { None },
+        if let Some(ref index_service) = index_service { index_service.utxoindex() } else { None },
+        if let Some(ref index_service) = index_service { index_service.txindex() } else { None },
         consensus_config.clone(),
         core.clone(),
         processing_counters,

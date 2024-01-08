@@ -91,9 +91,8 @@ impl ChainPath {
         Self { added, removed }
     }
 
-    // Retrieves the checkpoint [],
-    pub fn checkpoint_hash(&self) -> Option<&Hash> {
-        self.added.last().or(self.removed.last())
+    pub fn checkpoint_hash(&self) -> Hash {
+        self.added.last().unwrap_or(&self.removed.last().expect("none-empty chain path")).clone()
     }
 }
 

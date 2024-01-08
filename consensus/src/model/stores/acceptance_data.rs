@@ -1,6 +1,6 @@
 use kaspa_consensus_core::acceptance_data::AcceptanceData;
-use kaspa_consensus_core::acceptance_data::TxEntry;
 use kaspa_consensus_core::acceptance_data::MergesetBlockAcceptanceData;
+use kaspa_consensus_core::acceptance_data::TxEntry;
 use kaspa_consensus_core::BlockHasher;
 use kaspa_database::prelude::CachePolicy;
 use kaspa_database::prelude::StoreError;

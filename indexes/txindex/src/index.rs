@@ -1,9 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use kaspa_consensus_core::{tx::{
-    TransactionId,
-},
-};
+use kaspa_consensus_core::tx::TransactionId;
 use kaspa_consensus_notify::notification::{
     ChainAcceptanceDataPrunedNotification as ConsensusChainAcceptanceDataPrunedNotification,
     VirtualChainChangedNotification as ConsensusVirtualChainChangedNotification,
@@ -113,7 +110,7 @@ impl TxIndex {
             removed_processed_in_batch += chain_path.added.len() as u64;
             added_processed_in_batch += chain_path.removed.len() as u64;
 
-            start_hash = *chain_path.checkpoint_hash().expect("chain path should not be empty");
+            start_hash = chain_path.checkpoint_hash();
 
             let vspcc_notification = ConsensusVirtualChainChangedNotification::new(
                 chain_path.added,
@@ -181,7 +178,7 @@ impl TxIndexApi for TxIndex {
             );
             self.stores.delete_all()?; // we reset the txindex
             // We can set the source anew after clearing db        
-            self.stores.source_store.set(consensus_history_root)?;    
+            self.stores.source_store.set(consensus_history_root)?;
             consensus_history_root
         });
 
@@ -395,15 +392,15 @@ mod tests {
 
     #[test]
     fn test_reorged_virtual_chain_changed() {
-        // This test tests the re-orged condition of: 
-        // A 🡒 B 🡒 D 
-        // C 🡕 
-        //                 
+        // This test tests the re-orged condition of:
+        // A 🡒 B 🡒 D
+        // C 🡕
+        //
         // To:
         //
-        // A 🡒 E 🡒 F 
+        // A 🡒 E 🡒 F
         // C 🡕
-        // 
+        //
         // I.e. an Intial State of:
         // A: Accepting A,
         // B: Accepting B & C,
@@ -421,19 +418,19 @@ mod tests {
         //
         // The Test holds the following acceptance and rejection txs, regarding the transactions:
         //
-        // Intial state: 
-        // A: Accepted 
+        // Intial state:
+        // A: Accepted
         // A: Unaccepted
-        // B: Accepted 
-        // B: Unaccepted 
+        // B: Accepted
+        // B: Unaccepted
         // C via B: Accepted x 4
         // C via B: Unaccepted x 4
         // D: Accepted
         // D: Unaccepted
-        // 
+        //
         // Which expands to the following flow with the re-org notification:
         //
-        // C via B: Accepted -> C via E: Accepted 
+        // C via B: Accepted -> C via E: Accepted
         // C via B: Unaccepted -> C via E: Unaccepted
         // C via B: Accepted -> C via E: Unaccepted
         // C via B: Unaccepted -> C via E: Accepted
@@ -448,17 +445,17 @@ mod tests {
         // E: Accepted -> F: Unaccepted
         // F: Accepted
         // F: Unaccepted
-        // 
+        //
         // Afterward we should be left with the following accepted txs:
         //
-        // A: Accepted, 
-        // C via B: Accepted -> C via E: Accepted, 
+        // A: Accepted,
+        // C via B: Accepted -> C via E: Accepted,
         // C via B: Unaccepted -> C via E: Accepted,
         // C via B: Unaccepted -> C via E: Unaccepted -> F: Accepted,
         // E: Accepted
         // E: Accepted -> F: Unaccepted
         // E: Unaccepted -> F: Accepted
-        // F: Accepted      
+        // F: Accepted
 
         let test_context = TestContext::new();
         let rng = SmallRng::seed_from_u64(42u64);
@@ -483,15 +480,15 @@ mod tests {
         let tx_id_c_via_b_accpeted_via_e_accpeted_via_f_unaccepted = TransactionId::from_u64(15);
         let tx_id_c_via_b_unaccpeted_via_e_accpeted_via_f_unaccepted = TransactionId::from_u64(16);
         let tx_id_c_via_b_unaccpeted_via_e_unaccpeted_via_f_accpeted = TransactionId::from_u64(17);
-        let tx_id_c_via_b_unaccpeted_via_e_unaccpeted_via_f_unaccpeted = TransactionId::from_u64(18);   
+        let tx_id_c_via_b_unaccpeted_via_e_unaccpeted_via_f_unaccpeted = TransactionId::from_u64(18);
         let tx_id_d_accpeted = TransactionId::from_u64(19);
         let tx_id_d_unaccpeted = TransactionId::from_u64(20);
         let tx_id_e_accpeted = TransactionId::from_u64(21);
         let tx_id_e_unaccpeted = TransactionId::from_u64(22);
         let tx_id_f_accpeted = TransactionId::from_u64(23);
         let tx_id_f_unaccpeted = TransactionId::from_u64(24);
-        let tx_id_        
-    
+        let tx_id_
+
         // Define the initial state
 
         // extract expected block acceptance and tx offset from intial state
@@ -504,7 +501,7 @@ mod tests {
 
         // test expected block acceptance and tx offset from re-org notification to txindex state
 
-        // test expected intial state residue against txindex state. 
+        // test expected intial state residue against txindex state.
 
 
         let init_sink_hash = HASH_A;
@@ -540,7 +537,7 @@ mod tests {
                 unaccepted_transactions: sink_unaccepted_txs,
             }])]),
         Arc::new(vec![]),
-        ); 
+        );
 
         let init_block_acceptance_offsets = BlockHashMap::<BlockAcceptanceOffset>::new();
         let init_tx_acceptance_offsets = HashMap::<TransactionId, TxOffset>::new();
@@ -554,6 +551,6 @@ mod tests {
         test_context.txindex.write().update_via_virtual_chain_changed(virtual_chain_changed_notification).unwrap();
 
         }
-        
+
     }
 */

@@ -43,7 +43,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
             .into_iter()
             .zip(vspcc_notification.added_chain_blocks_acceptance_data.unwrap_or_clone().into_iter())
         {
-            for (i, mergeset) in acceptance_data.unwrap_or_clone().into_iter().enumerate() {     
+            for (i, mergeset) in acceptance_data.unwrap_or_clone().into_iter().enumerate() {
                 tx_offsets_to_add.extend(
                     mergeset
                         .accepted_transactions

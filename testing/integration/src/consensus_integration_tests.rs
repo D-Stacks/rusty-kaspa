@@ -32,7 +32,7 @@ use kaspa_consensus_core::network::{NetworkId, NetworkType::Mainnet};
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::trusted::{ExternalGhostdagData, TrustedBlock};
 use kaspa_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry};
-use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlockHashSet, BlueWorkType, HashMapCustomHasher};
+use kaspa_consensus_core::{blockhash, hashing, BlockHashMap, BlueWorkType};
 use kaspa_consensus_notify::root::ConsensusNotificationRoot;
 use kaspa_consensus_notify::service::NotifyService;
 use kaspa_consensusmanager::ConsensusManager;
@@ -43,7 +43,7 @@ use kaspa_hashes::Hash;
 
 use flate2::read::GzDecoder;
 use futures_util::future::try_join_all;
-use itertools::{Itertools, merge};
+use itertools::{Itertools};
 use kaspa_core::core::Core;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
@@ -64,7 +64,7 @@ use std::cmp::{max, Ordering};
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -72,7 +72,7 @@ use std::{
     io::{BufRead, BufReader},
     str::{from_utf8, FromStr},
 };
-use tokio::time::sleep;
+
 
 use crate::common;
 
@@ -1077,7 +1077,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
     core.shutdown();
     core.join(joins);
 
-
     // Assert that at least one body tip was resolved with valid UTXO
     assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusUTXOValid));
     // Assert that the indexed selected chain store matches the virtual chain obtained
@@ -1095,7 +1094,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc_history_root);
     assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
 
-    let mut consensus_chain = Arc::try_unwrap(tc.get_virtual_chain_from_block(tc_history_root, None, usize::MAX).unwrap().added).unwrap();
+    let mut consensus_chain =
+        Arc::try_unwrap(tc.get_virtual_chain_from_block(tc_history_root, None, usize::MAX).unwrap().added).unwrap();
     consensus_chain.insert(0, tc_history_root);
     let consensus_acceptance_data = tc.get_blocks_acceptance_data(Arc::new(consensus_chain.clone())).unwrap();
     let mut accepted_block_count = 0;

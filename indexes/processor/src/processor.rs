@@ -120,7 +120,7 @@ impl Processor {
         if let Some(utxoindex) = self.utxoindex.clone() {
             let converted_notification: index_notification::UtxosChangedNotification = utxoindex.update(notification).await?.into();
             debug!(
-                "IDXPRC, Creating UtxosChanged notifications with {} added and {} removed utxos",
+                "[Index processor] Creating UtxosChanged notifications with {0} added and {1} removed utxos",
                 converted_notification.added.len(),
                 converted_notification.removed.len()
             );
@@ -136,7 +136,7 @@ impl Processor {
         if let Some(txindex) = self.txindex.clone() {
             txindex.update_via_virtual_chain_changed(notification.clone()).await?;
             debug!(
-                "IDXPRC, updated txindex with {0} added and {1} removed chain blocks",
+                "[Index processor] updated txindex with {0} added and {1} removed chain blocks",
                 notification.added_chain_block_hashes.len(),
                 notification.removed_chain_block_hashes.len()
             );
@@ -151,7 +151,10 @@ impl Processor {
     ) -> IndexResult<()> {
         if let Some(txindex) = self.txindex.clone() {
             txindex.update_via_chain_acceptance_data_pruned(notification.clone()).await?;
-            debug!("IDXPRC, updated txindex with {0} pruned chain blocks", notification.mergeset_block_acceptance_data_pruned.len(),);
+            debug!(
+                "[Index processor] updated txindex with {0} pruned chain blocks",
+                notification.mergeset_block_acceptance_data_pruned.len(),
+            );
             return Ok(());
         };
         Err(IndexError::NotSupported(EventType::ChainAcceptanceDataPruned))

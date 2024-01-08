@@ -43,7 +43,7 @@ use kaspa_hashes::Hash;
 
 use flate2::read::GzDecoder;
 use futures_util::future::try_join_all;
-use itertools::{Itertools};
+use itertools::Itertools;
 use kaspa_core::core::Core;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
@@ -72,7 +72,6 @@ use std::{
     io::{BufRead, BufReader},
     str::{from_utf8, FromStr},
 };
-
 
 use crate::common;
 
@@ -947,7 +946,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     let tick_service = Arc::new(TickService::default());
     let (notification_send, notification_recv) = unbounded();
     let tc = Arc::new(TestConsensus::with_notifier(&consensus_config, notification_send));
-    let notify_service = Arc::new(NotifyService::new(tc.notification_root(), notification_recv));
+    let notify_service = Arc::new(NotifyService::new(tc.notification_root().clone(), notification_recv));
 
     // External storage for storing block bodies. This allows separating header and body processing phases
     let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
@@ -1064,7 +1063,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
         }
 
         let statuses = try_join_all(prev_joins).await.unwrap();
-        assert!(statuses.iter().all(|s| s.is_valid()));
+        assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
     } else {
         for hash in missing_bodies {
             let block = Block::from_arcs(tc.get_header(hash).unwrap(), external_block_store.get(hash).unwrap());

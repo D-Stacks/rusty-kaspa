@@ -76,12 +76,19 @@ impl TxIndex {
         let mut added_processed_in_batch = 0u64;
 
         // As the `session.get_virtual_chain_from_block` method is exclusive to the start-hash, under the added condition, we commit this separately..
-        if session.is_chain_block(start_hash)? {
+        if unsync_segment {
             self.update_via_virtual_chain_changed(ConsensusVirtualChainChangedNotification::new(
                 Arc::new(vec![start_hash]),
                 Arc::new(vec![]),
                 Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
                 Arc::new(vec![]),
+            ))?;
+        } else {
+            self.update_via_virtual_chain_changed(ConsensusVirtualChainChangedNotification::new(
+                Arc::new(vec![]),
+                Arc::new(vec![start_hash]),
+                Arc::new(vec![]),
+                Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
             ))?;
         };
         while start_hash != end_hash {

@@ -18,7 +18,7 @@ pub enum Notification {
     #[display(fmt = "BlockAdded notification: block hash {}", "_0.block.header.hash")]
     BlockAdded(BlockAddedNotification),
 
-    #[display(fmt = "VirtualChainChanged notification: {} removed blocks, {} added blocks, {} accepted transactions", "_0.removed_chain_block_hashes.len()", "_0.added_chain_block_hashes.len()", "_0.added_chain_blocks_acceptance_data.len()")]
+    #[display(fmt = "VirtualChainChanged notification: {} removed blocks, {} added blocks, {} accepted transactions, {} accepted transactions removed", "_0.removed_chain_block_hashes.len()", "_0.added_chain_block_hashes.len()", "_0.added_chain_blocks_acceptance_data.len()", "_0.removed_chain_blocks_acceptance_data.len()")]
     VirtualChainChanged(VirtualChainChangedNotification),
 
     #[display(fmt = "FinalityConflict notification: violating block hash {}", "_0.violating_block_hash")]
@@ -61,7 +61,10 @@ impl NotificationTrait for Notification {
                 // If the subscription excludes accepted transaction ids and the notification includes some
                 // then we must re-create the object and drop the ids, otherwise we can clone it as is.
                 if let Notification::VirtualChainChanged(ref payload) = self {
-                    if !subscription.include_accepted_transaction_ids() && !payload.added_chain_blocks_acceptance_data.is_empty() {
+                    if !subscription.include_accepted_transaction_ids()
+                        && !(payload.added_chain_blocks_acceptance_data.is_empty()
+                            && payload.removed_chain_blocks_acceptance_data.is_empty())
+                    {
                         return Some(Notification::VirtualChainChanged(VirtualChainChangedNotification {
                             removed_chain_block_hashes: payload.removed_chain_block_hashes.clone(),
                             added_chain_block_hashes: payload.added_chain_block_hashes.clone(),

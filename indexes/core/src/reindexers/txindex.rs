@@ -62,7 +62,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
                     mergeset
                         .accepted_transactions
                         .into_iter()
-                        .filter(|tx_entry| tx_offsets_to_add.contains_key(&tx_entry.transaction_id))
+                        .filter(|tx_entry| !tx_offsets_to_add.contains_key(&tx_entry.transaction_id))
                         .map(|tx_entry| tx_entry.transaction_id),
                 );
 

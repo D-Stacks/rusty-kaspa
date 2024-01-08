@@ -63,17 +63,6 @@ pub enum DatabaseStorePrefixes {
     TxIndexSource = 202,
     TxIndexMergedBlockAcceptance = 203, // Move to acceptance index eventually.
 
-    // 3) ADDR index    // Reserve
-    //AddrIndexAcceptedTxs = 207,   // Reserve
-    //AddrIndexIncludedTxs = 208,   // Reserve
-
-    // 4) HT index  // Reserve
-    //HtIndexDaaScore = 212,    // Reserve
-    //HtIndexBlueScore = 213,   // Reserve
-
-    // 5) ACC index
-    // AccIndexBlockAcceptance = 217,   // Reserve
-
     // ---- Separator ----
     /// Reserved as a separator
     Separator = SEPARATOR,

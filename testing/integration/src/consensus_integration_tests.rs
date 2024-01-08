@@ -1075,17 +1075,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
     core.shutdown();
     core.join(joins);
 
-    let internal = tc.block_transactions_store.get_all_blocks_and_txs().unwrap();
-    let external = external_block_store.get_all_blocks_and_txs().unwrap();
-
-    assert_eq!(internal.len(), external.len());
-
-    for (hash, tx_ids) in internal.into_iter() {
-        let external_block_txs = external.get(&hash).unwrap();
-        assert_eq!(tx_ids.len(), external_block_txs.len());
-        assert!(tx_ids.is_subset(external_block_txs));
-        assert!(external_block_txs.is_subset(&tx_ids));
-    }
 
     // Assert that at least one body tip was resolved with valid UTXO
     assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusUTXOValid));

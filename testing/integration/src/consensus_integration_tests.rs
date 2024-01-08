@@ -43,7 +43,7 @@ use kaspa_hashes::Hash;
 
 use flate2::read::GzDecoder;
 use futures_util::future::try_join_all;
-use itertools::Itertools;
+use itertools::{Itertools, merge};
 use kaspa_core::core::Core;
 use kaspa_core::signals::Shutdown;
 use kaspa_core::task::runtime::AsyncRuntime;
@@ -1062,7 +1062,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
         }
 
         let statuses = try_join_all(prev_joins).await.unwrap();
-        assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
+        assert!(statuses.iter().all(|s| s.is_valid()));
     } else {
         for hash in missing_bodies {
             let block = Block::from_arcs(tc.get_header(hash).unwrap(), external_block_store.get(hash).unwrap());
@@ -1074,6 +1074,18 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     core.shutdown();
     core.join(joins);
+
+    let internal = tc.block_transactions_store.get_all_blocks_and_txs().unwrap();
+    let external = external_block_store.get_all_blocks_and_txs().unwrap();
+
+    assert_eq!(internal.len(), external.len());
+
+    for (hash, tx_ids) in internal.into_iter() {
+        let external_block_txs = external.get(&hash).unwrap();
+        assert_eq!(tx_ids.len(), external_block_txs.len());
+        assert!(tx_ids.is_subset(external_block_txs));
+        assert!(external_block_txs.is_subset(&tx_ids));
+    }
 
     // Assert that at least one body tip was resolved with valid UTXO
     assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusUTXOValid));
@@ -1097,8 +1109,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
     let consensus_acceptance_data = tc.get_blocks_acceptance_data(Arc::new(consensus_chain.clone())).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
-    let mut seen_hashes = BlockHashSet::new();
-    let mut seen_tx_ids = BlockHashSet::new();
     for (accepting_block_hash, acceptance_data) in
         consensus_chain.into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter())
     {
@@ -1111,8 +1121,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
                     .unwrap();
             assert_eq!(indexed_block_acceptance_offset.ordered_mergeset_index(), i as u16);
             assert_eq!(indexed_block_acceptance_offset.accepting_block(), accepting_block_hash);
-            seen_hashes.insert(mergeset.block_hash);
             accepted_block_count += 1;
+            accepted_tx_count += mergeset.accepted_transactions.len();
             for tx_entry in mergeset.accepted_transactions.iter() {
                 let indexed_accepted_tx_offset =
                     Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id]).unwrap())
@@ -1122,8 +1132,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
                         .unwrap();
                 assert_eq!(indexed_accepted_tx_offset.including_block(), mergeset.block_hash);
                 assert_eq!(indexed_accepted_tx_offset.transaction_index(), tx_entry.index_within_block);
-                seen_tx_ids.insert(tx_entry.transaction_id);
-                accepted_tx_count += 1;
             }
         }
     }

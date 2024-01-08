@@ -1,5 +1,8 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
+use kaspa_consensus_core::{BlockHashMap, HashMapCustomHasher};
+use kaspa_consensus_core::tx::TransactionId;
 use kaspa_consensus_core::{tx::Transaction, BlockHasher};
 use kaspa_database::prelude::CachePolicy;
 use kaspa_database::prelude::StoreError;
@@ -13,6 +16,7 @@ use rocksdb::WriteBatch;
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
     fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get_all_blocks_and_txs(&self) -> Result<BlockHashMap<HashSet<TransactionId>>, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -63,6 +67,17 @@ impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
         let mut txs = self.access.read(hash)?.unwrap_or_clone();
         txs.retain_indices(indices)?;
         Ok(Arc::new(txs))
+    }
+
+    fn get_all_blocks_and_txs(&self) -> Result<BlockHashMap<HashSet<TransactionId>>, StoreError> {
+        let mut all_blocks_and_txs = BlockHashMap::new();
+        for res in self.access.iterator() {
+            let res = res.unwrap();
+            let (block_hash, txs) = (Hash::from_slice(&res.0), res.1);
+            let tx_ids = txs.iter().map(|tx| tx.id()).collect::<HashSet<_>>();
+            all_blocks_and_txs.insert(block_hash, tx_ids);
+        }
+        Ok(all_blocks_and_txs)
     }
 }
 

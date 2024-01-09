@@ -43,43 +43,52 @@ mod test {
     }
 
     #[test]
-    fn test_txindex_reindexer_from_vspcc_notification() {
-        let block_a = Hash::from_u64_word(1); // unaccpeted
-        let block_aa @ block_hh = Hash::from_u64_word(2); // remerged
-        let block_b = Hash::from_u64_word(3); // unaccpeted
+    fn test_txindex_reindexer_from_virtual_chain_changed_notification() {
 
-        let block_h = Hash::from_u64_word(4); // new accepted
-                                              // block hh is already defined above, with block aa.
-        let block_i @ sink = Hash::from_u64_word(5); // new accepted
+        // Define the block hashes:
 
-        // Txs removed:
-        let tx_a_1 = Hash::from_u64_word(6); // accepted in block a, not reaccepted
-        let tx_aa_2 = Hash::from_u64_word(7); // accepted in block aa, not reaccepted
-        let tx_b_3 = Hash::from_u64_word(8); // accepted in block bb, not reaccepted
+        // Blocks removed (i.e. unaccepted):
+        let block_a = Hash::from_u64_word(1);
+        let block_b = Hash::from_u64_word(2);
 
-        // Txs ReAdded:
+        // Blocks ReAdded (i.e. reaccepted):
+        let block_aa @ block_hh = Hash::from_u64_word(3);
 
-        let tx_a_2 @ tx_h_1 = Hash::from_u64_word(9); // accepted in block a, reaccepted in block h
-        let tx_a_3 @ tx_i_4 = Hash::from_u64_word(10); // accepted in block a, reaccepted in block i
-        let tx_a_4 @ tx_hh_3 = Hash::from_u64_word(11); // accepted in block a, reaccepted in block hh
-        let tx_aa_1 @ tx_h_2 = Hash::from_u64_word(12); // accepted in block aa, reaccepted in block_h
-        let tx_aa_3 @ tx_i_1 = Hash::from_u64_word(13); // accepted in block aa, reaccepted in block_i
-        let tx_aa_4 @ tx_hh_4 = Hash::from_u64_word(14); // accepted in block aa, reaccepted in block_hh
-        let tx_b_1 @ tx_h_3 = Hash::from_u64_word(15); // accepted in block b, reaccepted in block_h
-        let tx_b_2 @ tx_i_2 = Hash::from_u64_word(16); // accepted in block b, reaccepted in block_i
-        let tx_b_4 @ tx_hh_1 = Hash::from_u64_word(17); // accepted in block b, reaccepted in block_hh
+        // Blocks Added (i.e. newly reaccepted):
+        let block_h = Hash::from_u64_word(4); 
+        let block_i @ sink = Hash::from_u64_word(5);
 
-        // Txs added:
-        let tx_h_4 = Hash::from_u64_word(18); // not accepted, accepted in block h.
-        let tx_hh_2 = Hash::from_u64_word(19); // not accepted, accepted in block hh.
-        let tx_i_3 = Hash::from_u64_word(20); // not accepted, accepted in block i.
+        // Define the tx ids;
+
+        // Txs removed (i.e. unaccepted)):
+        let tx_a_1 = TransactionId::from_u64_word(6); // accepted in block a, not reaccepted
+        let tx_aa_2 = TransactionId::from_u64_word(7); // accepted in block aa, not reaccepted
+        let tx_b_3 = TransactionId::from_u64_word(8); // accepted in block bb, not reaccepted
+
+        // Txs ReAdded (i.e. reaccepted)):
+        let tx_a_2 @ tx_h_1 = TransactionId::from_u64_word(9); // accepted in block a, reaccepted in block h
+        let tx_a_3 @ tx_i_4 = TransactionId::from_u64_word(10); // accepted in block a, reaccepted in block i
+        let tx_a_4 @ tx_hh_3 = TransactionId::from_u64_word(11); // accepted in block a, reaccepted in block hh
+        let tx_aa_1 @ tx_h_2 = TransactionId::from_u64_word(12); // accepted in block aa, reaccepted in block_h
+        let tx_aa_3 @ tx_i_1 = TransactionId::from_u64_word(13); // accepted in block aa, reaccepted in block_i
+        let tx_aa_4 @ tx_hh_4 = TransactionId::from_u64_word(14); // accepted in block aa, reaccepted in block_hh
+        let tx_b_1 @ tx_h_3 = TransactionId::from_u64_word(15); // accepted in block b, reaccepted in block_h
+        let tx_b_2 @ tx_i_2 = TransactionId::from_u64_word(16); // accepted in block b, reaccepted in block_i
+        let tx_b_4 @ tx_hh_1 = TransactionId::from_u64_word(17); // accepted in block b, reaccepted in block_hh
+
+        // Txs added (i.e. newly accepted)):
+        let tx_h_4 = TransactionId::from_u64_word(18); // not originally accepted, accepted in block h.
+        let tx_hh_2 = TransactionId::from_u64_word(19); // not originally accepted, accepted in block hh.
+        let tx_i_3 = TransactionId::from_u64_word(20); // not originally accepted, accepted in block i.
 
         // Define sets accordingly:
 
+        // Define the block hashes into unaccepted / accepted / reaccepted sets:
         let unaccepted_blocks = BlockHashSet::from_iter([block_a, block_b].into_iter());
         let reaccepted_blocks = BlockHashSet::from_iter([block_aa, block_hh].into_iter());
         let accepted_blocks = BlockHashSet::from_iter([block_h, block_i].into_iter());
 
+        // Define the tx hashes into block sets:
         let block_a_transactions = HashSet::<TransactionId>::from([tx_a_1, tx_a_2, tx_a_3, tx_a_4]);
         let block_aa_transactions = HashSet::<TransactionId>::from([tx_aa_1, tx_aa_2, tx_aa_3, tx_aa_4]);
         let block_b_transactions = HashSet::<TransactionId>::from([tx_b_1, tx_b_2, tx_b_3, tx_b_4]);
@@ -87,6 +96,7 @@ mod test {
         let block_hh_transactions = HashSet::<TransactionId>::from([tx_hh_1, tx_hh_2, tx_hh_3, tx_hh_4]);
         let block_i_transactions = HashSet::<TransactionId>::from([tx_i_1, tx_i_2, tx_i_3, tx_i_4]);
 
+        // Define the tx hashes into unaccepted / accepted / reaccepted sets:
         let unaccepted_transactions = HashSet::<TransactionId>::from_iter(
             block_a_transactions.iter().cloned().chain(block_aa_transactions.iter().cloned()).chain(block_b_transactions.iter().cloned()).filter(|tx_id| {
                 !(block_h_transactions.contains(tx_id)
@@ -109,6 +119,7 @@ mod test {
                 .filter(|tx_id| !reaccepted_transactions.contains(tx_id))
         );
 
+        // Define the notification:
         let test_vspcc_notification = VirtualChainChangedNotification {
             added_chain_block_hashes: Arc::new(vec![block_h, block_i]),
             added_chain_blocks_acceptance_data: Arc::new(vec![
@@ -183,7 +194,7 @@ mod test {
         assert_eq!(reindexer.new_sink.unwrap(), sink);
         assert!(reindexer.source.is_none());
 
-        // Check the accepted and reaccepted Offsets:
+        // Check the added offsets (i.e. accepted & reaccepted):
         let mut block_acceptance_offsets_added_count = 0;
         let mut tx_offsets_added_count = 0;
         for (accepting_block_hash,acceptance_data) in test_vspcc_notification.added_chain_block_hashes.iter().cloned().zip(test_vspcc_notification.added_chain_blocks_acceptance_data.iter().cloned()) {
@@ -209,7 +220,7 @@ mod test {
         assert_eq!(block_acceptance_offsets_added_count, reindexer.block_acceptance_offsets_changes.added.len());
         assert_eq!(tx_offsets_added_count, reindexer.tx_offset_changes.added.len());
 
-        // Test Unaccepted Txs:
+        // Check removed offsets (i.e. unaccepted):
         let mut tx_offsets_removed_count = 0;
         let mut block_acceptance_offsets_removed_count = 0;
         for (_, acceptance_data) in test_vspcc_notification.removed_chain_block_hashes.iter().zip(test_vspcc_notification.removed_chain_blocks_acceptance_data.iter()) {
@@ -239,24 +250,27 @@ mod test {
     #[test]
     fn test_txindex_reindexer_from_chain_acceptance_data_pruned() {
 
+        // Define the block hashes:
         let chain_block_a_pruned = Hash::from_u64_word(1);
         let mergeset_block_b_pruned = Hash::from_u64_word(2);
-        let mergeset_block_c_pruned = Hash::from_u64_word(2);
+        let mergeset_block_c_pruned = Hash::from_u64_word(3);
 
-        let history_root = Hash::from_u64_word(3);
+        let history_root = Hash::from_u64_word(4);
 
-        let tx_a_1 = Hash::from_u64_word(4);
-        let tx_a_2 = Hash::from_u64_word(5);
-        let tx_b_1 = Hash::from_u64_word(6);
-        let tx_b_2 = Hash::from_u64_word(7);
-        let tx_c_1 = Hash::from_u64_word(8);
-        let tx_c_2 = Hash::from_u64_word(9);
+        // Define the tx ids;
+        let tx_a_1 = TransactionId::from_u64_word(5);
+        let tx_a_2 = TransactionId::from_u64_word(6);
+        let tx_b_1 = TransactionId::from_u64_word(7);
+        let tx_b_2 = TransactionId::from_u64_word(8);
+        let tx_c_1 = TransactionId::from_u64_word(9);
+        let tx_c_2 = TransactionId::from_u64_word(10);
 
+        // Define the notification:
         let test_chain_acceptance_data_pruned_notification = ChainAcceptanceDataPrunedNotification {
             chain_hash_pruned: chain_block_a_pruned,
             mergeset_block_acceptance_data_pruned: Arc::new(vec![
                 MergesetBlockAcceptanceData {
-                    block_hash: mergeset_block_b_pruned,
+                    block_hash: chain_block_a_pruned,
                     accepted_transactions: vec![
                         TxEntry { transaction_id: tx_a_1, index_within_block: 0 },
                         TxEntry { transaction_id: tx_a_2, index_within_block: 1 },
@@ -277,21 +291,32 @@ mod test {
                     ],
                 },
             ]),
-            history_root: Hash::from_u64_word(9),
+            history_root: history_root,
         };
 
+        // Reindex
         let reindexer = TxIndexReindexer::from(test_chain_acceptance_data_pruned_notification.clone());
 
+        // Check the sink and source:
+        assert!(reindexer.new_sink.is_none());
+        assert_eq!(reindexer.source.unwrap(), history_root);  
+
+        // Check the added offsets:
         assert!(reindexer.block_acceptance_offsets_changes.added.is_empty());
         assert!(reindexer.tx_offset_changes.added.is_empty());
-        
-        
+
+        // Check removed offsets:
+        let mut tx_offsets_removed_count = 0;
+        let mut block_acceptance_offsets_removed_count = 0;      
         for mergeset in test_chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.iter().cloned() {
             assert!(reindexer.block_acceptance_offsets_changes.removed.contains(&mergeset.block_hash));
+            block_acceptance_offsets_removed_count += 1;
+            tx_offsets_removed_count += mergeset.accepted_transactions.len();
             for accepted_tx_entry in mergeset.accepted_transactions.iter() {
                 assert!(reindexer.tx_offset_changes.removed.contains(&accepted_tx_entry.transaction_id));
             }
         }
-
+        assert_eq!(block_acceptance_offsets_removed_count, reindexer.block_acceptance_offsets_changes.removed.len());
+        assert_eq!(tx_offsets_removed_count, reindexer.tx_offset_changes.removed.len());
     }
 }

@@ -4,17 +4,17 @@ pub mod reindexers;
 
 #[cfg(test)]
 mod test {
-    
+
     use kaspa_consensus_core::BlockHashSet;
-    
+
     use std::collections::HashSet;
     use std::sync::Arc;
 
     use crate::models::txindex::MergeSetIDX;
     use crate::models::utxoindex::{CirculatingSupply, CirculatingSupplyDiff};
-    use crate::reindexers;
+
     use crate::reindexers::txindex::TxIndexReindexer;
-    
+
     use kaspa_consensus_core::tx::TransactionId;
     use kaspa_consensus_core::{
         acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
@@ -22,7 +22,7 @@ mod test {
         constants::MAX_SOMPI,
         network::NetworkType,
     };
-    use kaspa_consensus_notify::notification::{VirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification};
+    use kaspa_consensus_notify::notification::{ChainAcceptanceDataPrunedNotification, VirtualChainChangedNotification};
     use kaspa_hashes::Hash;
 
     #[test]
@@ -44,7 +44,6 @@ mod test {
 
     #[test]
     fn test_txindex_reindexer_from_virtual_chain_changed_notification() {
-
         // Define the block hashes:
 
         // Blocks removed (i.e. unaccepted):
@@ -55,7 +54,7 @@ mod test {
         let block_aa @ block_hh = Hash::from_u64_word(3);
 
         // Blocks Added (i.e. newly reaccepted):
-        let block_h = Hash::from_u64_word(4); 
+        let block_h = Hash::from_u64_word(4);
         let block_i @ sink = Hash::from_u64_word(5);
 
         // Define the tx ids;
@@ -98,25 +97,31 @@ mod test {
 
         // Define the tx hashes into unaccepted / accepted / reaccepted sets:
         let unaccepted_transactions = HashSet::<TransactionId>::from_iter(
-            block_a_transactions.iter().cloned().chain(block_aa_transactions.iter().cloned()).chain(block_b_transactions.iter().cloned()).filter(|tx_id| {
-                !(block_h_transactions.contains(tx_id)
-                    || block_hh_transactions.contains(tx_id)
-                    || block_i_transactions.contains(tx_id))
-            })
+            block_a_transactions
+                .iter()
+                .cloned()
+                .chain(block_aa_transactions.iter().cloned())
+                .chain(block_b_transactions.iter().cloned())
+                .filter(|tx_id| {
+                    !(block_h_transactions.contains(tx_id)
+                        || block_hh_transactions.contains(tx_id)
+                        || block_i_transactions.contains(tx_id))
+                }),
         );
         let reaccepted_transactions = HashSet::<TransactionId>::from_iter(
             block_h_transactions
-                .iter().cloned()
+                .iter()
+                .cloned()
                 .chain(block_hh_transactions.iter().cloned())
                 .chain(block_i_transactions.iter().cloned())
-                .filter(|tx_id| !unaccepted_transactions.contains(tx_id))
+                .filter(|tx_id| !unaccepted_transactions.contains(tx_id)),
         );
         let accepted_transactions = HashSet::<TransactionId>::from_iter(
             block_h_transactions
                 .into_iter()
                 .chain(block_hh_transactions.iter().cloned())
                 .chain(block_i_transactions.iter().cloned())
-                .filter(|tx_id| !reaccepted_transactions.contains(tx_id))
+                .filter(|tx_id| !reaccepted_transactions.contains(tx_id)),
         );
 
         // Define the notification:
@@ -197,7 +202,12 @@ mod test {
         // Check the added offsets (i.e. accepted & reaccepted):
         let mut block_acceptance_offsets_added_count = 0;
         let mut tx_offsets_added_count = 0;
-        for (accepting_block_hash,acceptance_data) in test_vspcc_notification.added_chain_block_hashes.iter().cloned().zip(test_vspcc_notification.added_chain_blocks_acceptance_data.iter().cloned()) {
+        for (accepting_block_hash, acceptance_data) in test_vspcc_notification
+            .added_chain_block_hashes
+            .iter()
+            .cloned()
+            .zip(test_vspcc_notification.added_chain_blocks_acceptance_data.iter().cloned())
+        {
             for (mergeset_idx, mergeset) in acceptance_data.iter().enumerate() {
                 assert!((accepted_blocks.contains(&mergeset.block_hash) || reaccepted_blocks.contains(&mergeset.block_hash)));
                 assert!(!unaccepted_blocks.contains(&mergeset.block_hash));
@@ -208,7 +218,10 @@ mod test {
                 block_acceptance_offsets_added_count += 1;
                 tx_offsets_added_count += mergeset.accepted_transactions.len();
                 for accepted_tx_entry in mergeset.accepted_transactions.iter() {
-                    assert!(accepted_transactions.contains(&accepted_tx_entry.transaction_id) || reaccepted_transactions.contains(&accepted_tx_entry.transaction_id));
+                    assert!(
+                        accepted_transactions.contains(&accepted_tx_entry.transaction_id)
+                            || reaccepted_transactions.contains(&accepted_tx_entry.transaction_id)
+                    );
                     assert!(!unaccepted_transactions.contains(&accepted_tx_entry.transaction_id));
                     assert!(!reindexer.tx_offset_changes.removed.contains(&accepted_tx_entry.transaction_id));
                     let tx_offset = reindexer.tx_offset_changes.added.get(&accepted_tx_entry.transaction_id).unwrap();
@@ -223,8 +236,8 @@ mod test {
         // Check removed offsets (i.e. unaccepted):
         let mut tx_offsets_removed_count = 0;
         let mut block_acceptance_offsets_removed_count = 0;
-        for (_, acceptance_data) in test_vspcc_notification.removed_chain_block_hashes.iter().zip(test_vspcc_notification.removed_chain_blocks_acceptance_data.iter()) {
-            for (_, mergeset) in acceptance_data.iter().enumerate() {
+        for acceptance_data in test_vspcc_notification.removed_chain_blocks_acceptance_data.iter() {
+            for mergeset in acceptance_data.iter() {
                 if unaccepted_blocks.contains(&mergeset.block_hash) || reaccepted_blocks.contains(&mergeset.block_hash) {
                     assert!(!accepted_blocks.contains(&mergeset.block_hash));
                     if reaccepted_blocks.contains(&mergeset.block_hash) {
@@ -235,7 +248,10 @@ mod test {
                     };
                     for accepted_tx_entry in mergeset.accepted_transactions.iter() {
                         if unaccepted_transactions.contains(&accepted_tx_entry.transaction_id) {
-                            assert!(!(accepted_transactions.contains(&accepted_tx_entry.transaction_id) || reaccepted_transactions.contains(&accepted_tx_entry.transaction_id)));
+                            assert!(
+                                !(accepted_transactions.contains(&accepted_tx_entry.transaction_id)
+                                    || reaccepted_transactions.contains(&accepted_tx_entry.transaction_id))
+                            );
                             assert!(reindexer.tx_offset_changes.removed.contains(&accepted_tx_entry.transaction_id));
                             tx_offsets_removed_count += 1;
                         }
@@ -249,7 +265,6 @@ mod test {
 
     #[test]
     fn test_txindex_reindexer_from_chain_acceptance_data_pruned() {
-
         // Define the block hashes:
         let chain_block_a_pruned = Hash::from_u64_word(1);
         let mergeset_block_b_pruned = Hash::from_u64_word(2);
@@ -291,7 +306,7 @@ mod test {
                     ],
                 },
             ]),
-            history_root: history_root,
+            history_root,
         };
 
         // Reindex
@@ -299,7 +314,7 @@ mod test {
 
         // Check the sink and source:
         assert!(reindexer.new_sink.is_none());
-        assert_eq!(reindexer.source.unwrap(), history_root);  
+        assert_eq!(reindexer.source.unwrap(), history_root);
 
         // Check the added offsets:
         assert!(reindexer.block_acceptance_offsets_changes.added.is_empty());
@@ -307,7 +322,7 @@ mod test {
 
         // Check removed offsets:
         let mut tx_offsets_removed_count = 0;
-        let mut block_acceptance_offsets_removed_count = 0;      
+        let mut block_acceptance_offsets_removed_count = 0;
         for mergeset in test_chain_acceptance_data_pruned_notification.mergeset_block_acceptance_data_pruned.iter().cloned() {
             assert!(reindexer.block_acceptance_offsets_changes.removed.contains(&mergeset.block_hash));
             block_acceptance_offsets_removed_count += 1;

@@ -582,3 +582,4 @@ mod tests {
         assert_eq!(txindex.write().count_all_merged_blocks().unwrap(), 1);
         assert_eq!(txindex.write().count_all_merged_tx_ids().unwrap(), 4);
     }
+}

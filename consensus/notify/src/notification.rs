@@ -114,13 +114,14 @@ impl ChainAcceptanceDataPrunedNotification {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VirtualChainChangedNotification {
     pub added_chain_block_hashes: Arc<Vec<Hash>>,
     pub removed_chain_block_hashes: Arc<Vec<Hash>>,
     pub added_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
     pub removed_chain_blocks_acceptance_data: Arc<Vec<Arc<AcceptanceData>>>,
 }
+
 impl VirtualChainChangedNotification {
     pub fn new(
         added_chain_block_hashes: Arc<Vec<Hash>>,

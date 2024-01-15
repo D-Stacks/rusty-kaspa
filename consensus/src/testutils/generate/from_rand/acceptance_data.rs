@@ -17,7 +17,7 @@ pub fn generate_random_acceptance_data_vec(
     unaccepted_tx_ratio: f64,
 ) -> Vec<Arc<AcceptanceData>> {
     let mut acceptance_data_vec = Vec::with_capacity(len);
-    for _ in 0..(len - 1) {
+    for _ in 0..len {
         acceptance_data_vec.push(Arc::new(generate_random_acceptance_data(rng, mergeset_size, txs_per_block, unaccepted_tx_ratio)));
     }
     acceptance_data_vec

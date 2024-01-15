@@ -8,7 +8,7 @@ use serde_wasm_bindgen::*;
 use wasm_bindgen::prelude::*;
 use workflow_wasm::prelude::*;
 
-#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema, Default)]
 #[serde(rename_all = "camelCase")]
 #[wasm_bindgen(inspectable)]
 pub struct Header {

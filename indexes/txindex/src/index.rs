@@ -337,18 +337,18 @@ impl Debug for TxIndex {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, collections::HashSet, io::Write};
+    use std::sync::Arc;
 
-    use kaspa_consensus::{consensus::test_consensus::{TestConsensus, TestConsensusFactory}, params::MAINNET_PARAMS, model::stores::{virtual_state::VirtualState, acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore, AcceptanceDataStore}, headers::HeaderStore, statuses::StatusesStore}, testutils::generate::from_rand::acceptance_data::{generate_random_acceptance_data, generate_random_acceptance_data_vec}, processes::relations::RelationsStoreExtensions};
-    use kaspa_consensus_core::{config::Config as ConsensusConfig, acceptance_data::{AcceptanceData, MergesetBlockAcceptanceData, TxEntry}, tx::{TransactionId, TransactionIndexType}, ChainPath, BlockHashSet, HashMapCustomHasher, api::ConsensusApi, header::Header, blockstatus::BlockStatus};
+    use kaspa_consensus::{consensus::test_consensus::{TestConsensus, TestConsensusFactory}, params::MAINNET_PARAMS, model::stores::virtual_state::VirtualState};
+    use kaspa_consensus_core::{config::Config as ConsensusConfig, acceptance_data::{MergesetBlockAcceptanceData, TxEntry}, tx::{TransactionId}, ChainPath, api::ConsensusApi};
     use kaspa_consensus_notify::notification::{VirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification};
-    use kaspa_consensusmanager::{ConsensusManager, ConsensusCtl};
-    use kaspa_core::{log::init_logger, info};
+    use kaspa_consensusmanager::{ConsensusManager};
+    
     use kaspa_database::{create_temp_db, prelude::ConnBuilder};
     use kaspa_hashes::Hash;
-    use kaspa_index_core::models::txindex::TxOffset;
+    
     use parking_lot::RwLock;
-    use rand::{rngs::SmallRng, SeedableRng};
+    
     use rocksdb::WriteBatch;
 
     use crate::{TxIndex, config::Config as TxIndexConfig, api::TxIndexApi};

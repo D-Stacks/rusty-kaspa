@@ -24,7 +24,6 @@ pub trait AcceptanceDataStore: AcceptanceDataStoreReader {
     fn insert(&self, hash: Hash, acceptance_data: Arc<AcceptanceData>) -> Result<(), StoreError>;
     fn delete(&self, hash: Hash) -> Result<(), StoreError>;
 }
-
 /// Simple wrapper for implementing `MemSizeEstimator`
 #[derive(Clone, Serialize, Deserialize)]
 struct AcceptanceDataEntry(Arc<AcceptanceData>);

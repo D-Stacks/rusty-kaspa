@@ -137,8 +137,10 @@ impl RpcCoreService {
 
         // Prepare the rpc-core notifier objects
         let mut consensus_events: EventSwitches = EVENT_TYPE_ARRAY[..].into();
+        consensus_events[EventType::ChainAcceptanceDataPruned] = false; // Not used in rpc
         consensus_events[EventType::UtxosChanged] = false;
-        consensus_events[EventType::PruningPointUtxoSetOverride] = index_notifier.is_none();
+        consensus_events[EventType::PruningPointUtxoSetOverride] = utxoindex.is_none();
+        consensus_events[EventType::VirtualChainChanged] = txindex.is_none();
         let consensus_converter = Arc::new(ConsensusConverter::new(consensus_manager.clone(), config.clone()));
         let consensus_collector = Arc::new(CollectorFromConsensus::new(
             "rpc-core <= consensus",
@@ -158,26 +160,25 @@ impl RpcCoreService {
             let index_notify_listener_id = index_notifier
                 .clone()
                 .register_new_listener(IndexChannelConnection::new(index_notify_channel.sender(), ChannelType::Closable));
-            let index_events: EventSwitches = match (utxoindex.is_some(), txindex.is_some()) {
-                (true, true) => [
+            
+            let mut index_events = Vec::new();
+            if utxoindex.is_some() {
+                index_events.append(&mut vec![ 
                     EventType::UtxosChanged,
                     EventType::PruningPointUtxoSetOverride,
+                    ])
+            }
+            if txindex.is_some() {
+                index_events.append(&mut vec![
                     EventType::VirtualChainChanged,
-                    EventType::ChainAcceptanceDataPruned,
-                ]
-                .as_ref()
-                .into(),
-                (true, false) => [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into(),
-                (false, true) => [EventType::VirtualChainChanged, EventType::ChainAcceptanceDataPruned].as_ref().into(),
-                (false, false) => {
-                    panic!("At least one of utxoindex or txindex should be enabled to run the index processor");
-                }
-            };
+                    //EventType::ChainAcceptanceDataPruned, this is not used by the rpc, but if it is, it should be over the index service 
+                    ])
+            }
 
             let index_collector =
                 Arc::new(CollectorFromIndex::new("rpc-core <= index", index_notify_channel.receiver(), index_converter.clone()));
             let index_subscriber =
-                Arc::new(Subscriber::new("rpc-core => index", index_events, index_notifier.clone(), index_notify_listener_id));
+                Arc::new(Subscriber::new("rpc-core => index", index_events.as_slice().as_ref().into(), index_notifier.clone(), index_notify_listener_id));
 
             collectors.push(index_collector);
             subscribers.push(index_subscriber);

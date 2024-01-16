@@ -93,12 +93,8 @@ pub fn validate_args(args: &Args) -> ConsensusConfigResult<()> {
     if args.ram_scale > 10.0 {
         return Err(ConsensusConfigError::RamScaleTooHigh);
     }
-    if args.ram_scale < 0.1 {
-        return Err(ConsensusConfigError::RamScaleTooLow);
-    }
-    }
     Ok(())
-}
+    }
 
 fn get_user_approval_or_exit(message: &str, approve: bool) {
     if approve {
@@ -377,7 +373,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     let outbound_target = if connect_peers.is_empty() { args.outbound_target } else { 0 };
     let dns_seeders = if connect_peers.is_empty() && !args.disable_dns_seeding { consensus_config.dns_seeders } else { &[] };
 
-    let grpc_server_addr = args.rpclisten.unwrap_or(ContextualNetAddress::loopback()).normalize(config.default_rpc_port());
+    let grpc_server_addr = args.rpclisten.unwrap_or(ContextualNetAddress::loopback()).normalize(consensus_config.default_rpc_port());
 
     let core = Arc::new(Core::new());
 
@@ -520,7 +516,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     async_runtime.register(rpc_core_service.clone());
     if !args.disable_grpc {
         let grpc_service =
-            Arc::new(GrpcService::new(grpc_server_addr, config, rpc_core_service.clone(), args.rpc_max_clients, grpc_tower_counters));
+            Arc::new(GrpcService::new(grpc_server_addr, consensus_config, rpc_core_service.clone(), args.rpc_max_clients, grpc_tower_counters));
         async_runtime.register(grpc_service);
     }
     async_runtime.register(p2p_service);

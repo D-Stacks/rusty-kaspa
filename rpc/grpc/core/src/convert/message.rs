@@ -436,6 +436,21 @@ from!(item: RpcResult<&kaspa_rpc_core::GetSyncStatusResponse>, protowire::GetSyn
     }
 });
 
+from!(item: &kaspa_rpc_core::GetTransactionsRequest, protowire::GetTransactionsRequestMessage, {
+    Self { 
+        transaction_ids: item.transaction_ids, 
+        include_verbose_data: item.include_verbose_data, 
+        include_acceptance_data: item.include_acceptance_data 
+    }
+});
+
+from!(item: &kaspa_rpc_core::GetTransactionsResponse, protowire::GetTransactionsResponseMessage, {
+    Self { 
+        transactions: item.transactions, 
+        error: None
+    }
+});
+
 from!(item: &kaspa_rpc_core::NotifyUtxosChangedRequest, protowire::NotifyUtxosChangedRequestMessage, {
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect(), command: item.command.into() }
 });

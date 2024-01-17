@@ -87,6 +87,9 @@ pub enum RpcApiOps {
     /// Get DAA Score timestamp estimate
     GetDaaScoreTimestampEstimate,
 
+    /// Get Transactions accpeted by the Network.
+    GetTransactions,
+
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded,
     NotifyNewBlockTemplate,

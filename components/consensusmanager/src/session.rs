@@ -13,10 +13,10 @@ use kaspa_consensus_core::{
     header::Header,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
     BlockHashSet, BlueWorkType, ChainPath, Hash,
 };
-use kaspa_utils::sync::rwlock::*;
+use kaspa_utils::{sync::rwlock::*, as_slice::AsSlice};
 use std::{ops::Deref, sync::Arc};
 
 pub use tokio::task::spawn_blocking;
@@ -405,6 +405,10 @@ impl ConsensusSessionOwned {
 
     pub async fn async_finality_point(&self) -> Hash {
         self.clone().spawn_blocking(move |c| c.finality_point()).await
+    }
+
+    pub async fn get_transactions_at_indices(&self, hash: Hash, indices: Vec<usize>) -> ConsensusResult<Vec<Transaction>> {
+        Ok(self.clone().spawn_blocking(move |c| c.get_transactions_at_indices(hash, indices.as_slice())).await?)
     }
 }
 

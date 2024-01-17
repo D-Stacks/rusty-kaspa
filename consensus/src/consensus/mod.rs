@@ -59,7 +59,7 @@ use kaspa_consensus_core::{
     network::NetworkType,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
     BlockHashSet, BlueWorkType, ChainPath,
 };
 use kaspa_consensus_notify::root::ConsensusNotificationRoot;
@@ -812,6 +812,10 @@ impl ConsensusApi for Consensus {
                 self.block_transactions_store.get(hash).unwrap_option().unwrap_or_default()
             },
         })
+    }
+
+    fn get_transactions_at_indices(&self, hash: Hash, indices: &[usize]) -> ConsensusResult<Vec<Transaction>> {
+        Ok(self.block_transactions_store.get_at_indices(hash, &mut indices)?);
     }
 
     fn get_ghostdag_data(&self, hash: Hash) -> ConsensusResult<ExternalGhostdagData> {

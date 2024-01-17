@@ -18,6 +18,7 @@ from!(item: &kaspa_rpc_core::RpcTransaction, protowire::RpcTransaction, {
         payload: item.payload.to_rpc_hex(),
         mass: item.mass,
         verbose_data: item.verbose_data.as_ref().map(|x| x.into()),
+        acceptance_data: item.acceptance_data.as_ref().map(|x| x.into()),
     }
 });
 
@@ -63,6 +64,14 @@ from!(item: &kaspa_rpc_core::RpcTransactionVerboseData, protowire::RpcTransactio
         mass: item.mass,
         block_hash: item.block_hash.to_string(),
         block_time: item.block_time,
+    }
+});
+
+from!(item: &kaspa_rpc_core::RpcAcceptanceData, protowire::RpcAcceptanceData, {
+    Self {
+        accepting_block_hash: item.accepting_block_hash.to_string(),
+        accepting_block_time: item.accepting_block_time,
+        accepting_blue_score: item.accepting_blue_score,
     }
 });
 
@@ -113,6 +122,7 @@ try_from!(item: &protowire::RpcTransaction, kaspa_rpc_core::RpcTransaction, {
         payload: Vec::from_rpc_hex(&item.payload)?,
         mass: item.mass,
         verbose_data: item.verbose_data.as_ref().map(kaspa_rpc_core::RpcTransactionVerboseData::try_from).transpose()?,
+        acceptance_data: item.acceptance_data.as_ref().map(kaspa_rpc_core::RpcAcceptanceData::try_from).transpose()?,
     }
 });
 
@@ -170,6 +180,14 @@ try_from!(item: &protowire::RpcTransactionVerboseData, kaspa_rpc_core::RpcTransa
         mass: item.mass,
         block_hash: RpcHash::from_str(&item.block_hash)?,
         block_time: item.block_time,
+    }
+});
+
+try_from!(item: &protowire::RpcAcceptanceData, kaspa_rpc_core::RpcAcceptanceData, {
+    Self {
+        accepting_block_hash: RpcHash::from_str(&item.accepting_block_hash)?,
+        accepting_block_time: item.accepting_block_time,
+        accepting_blue_score: item.accepting_blue_score,
     }
 });
 

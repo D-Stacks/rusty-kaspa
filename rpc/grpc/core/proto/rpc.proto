@@ -65,6 +65,7 @@ message RpcTransaction {
   string payload = 8;
   RpcTransactionVerboseData verboseData = 9;
   uint64 mass = 10;
+  RpcAcceptanceData acceptanceData = 11;
 }
 
 message RpcTransactionInput {
@@ -104,6 +105,12 @@ message RpcTransactionVerboseData{
   uint64 mass = 4;
   string blockHash = 12;
   uint64 blockTime = 14;
+}
+
+message RpcAcceptanceData {
+  string acceptingBlockHash = 1;
+  uint64 acceptingBlockTime = 2;
+  uint64 acceptingBlueScore = 3;
 }
 
 message RpcTransactionInputVerboseData{
@@ -844,10 +851,23 @@ message GetSyncStatusResponseMessage{
 }
 
 message GetDaaScoreTimestampEstimateRequestMessage {
-        repeated uint64 daa_scores = 1;
+  repeated uint64 daa_scores = 1;
 }
 
 message GetDaaScoreTimestampEstimateResponseMessage{
-        repeated uint64 timestamps = 1;
-        RPCError error = 1000;
+  repeated uint64 timestamps = 1;
+  RPCError error = 1000;
+}
+
+// This requires the the node to be run with `--txindex`
+message GetTransactionsRequestMessage {
+  repeated string transactionIds = 1;
+  bool includeVerboseData = 3;
+  bool includeAcceptanceData = 4;
+
+}
+// This requires the the node to be run with `--txindex`
+message GetTransactionsResponseMessage{
+  repeated RpcTransaction transactions = 1;
+  RPCError error = 1000;
 }

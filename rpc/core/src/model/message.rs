@@ -823,6 +823,33 @@ impl GetDaaScoreTimestampEstimateResponse {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetTransactionsRequest { // This requires the the node to be run with -- txindex
+    pub transaction_ids: Vec<RpcTransactionId>,
+    pub include_verbose_data: bool,  
+    pub include_acceptance_data: bool, 
+}
+
+impl GetTransactionsRequest {
+    pub fn new(transaction_ids: Vec<RpcTransactionId>, include_verbose_data: bool, include_acceptance_data: bool) -> Self {
+        Self { transaction_ids, include_verbose_data, include_acceptance_data }
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetTransactionsResponse {
+    pub transactions: Vec<RpcTransaction>, 
+}
+
+impl GetTransactionsResponse {
+    pub fn new(transactions: Vec<RpcTransaction>) -> Self {
+        Self { transactions }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Subscriptions & notifications
 // ----------------------------------------------------------------------------

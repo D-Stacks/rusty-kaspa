@@ -19,7 +19,7 @@ use crate::{
     header::Header,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
     BlockHashSet, BlueWorkType, ChainPath,
 };
 use kaspa_hashes::Hash;
@@ -55,6 +55,8 @@ pub trait ConsensusApi: Send + Sync {
     fn validate_and_insert_trusted_block(&self, tb: TrustedBlock) -> BlockValidationFutures {
         unimplemented!()
     }
+
+    fn get_transactions_at_indices(&self, hash: Hash, indices: &[usize]) -> ConsensusResult<Vec<Transaction>>;
 
     /// Populates the mempool transaction with maximally found UTXO entry data and proceeds to full transaction
     /// validation if all are found. If validation is successful, also [`transaction.calculated_fee`] is expected to be populated.

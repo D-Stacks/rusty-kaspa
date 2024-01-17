@@ -18,6 +18,7 @@ impl From<&Transaction> for RpcTransaction {
             mass: item.mass(),
             // TODO: Implement a populating process inspired from kaspad\app\rpc\rpccontext\verbosedata.go
             verbose_data: None,
+            acceptance_data: None,
         }
     }
 }

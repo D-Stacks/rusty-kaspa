@@ -4,6 +4,7 @@ use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
 use crate::service::NetworkType::{Mainnet, Testnet};
 use async_trait::async_trait;
+use kaspa_consensus::model::stores::selected_chain::SelectedChainStore;
 use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
 use kaspa_consensus_core::{
@@ -416,6 +417,17 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             Vec::new()
         };
         Ok(GetBlocksResponse { block_hashes, blocks })
+    }
+
+    async fn get_transactions_call(&self, request: GetTransactionsRequest) {
+        let tx_offsets = self.txindex.clone().unwrap().get_tx_offsets(request.transaction_ids).await;
+        let session = self.consensus_manager.consensus().session().await;
+        for tx_offset in tx_offsets.iter().cloned() {
+            if let Some(tx_offset) = tx_offset {
+                let tx = session .consensus();
+                let rpc_tx = self.protocol_converter.get_transaction(tx);
+            }
+    }
     }
 
     async fn get_info_call(&self, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {

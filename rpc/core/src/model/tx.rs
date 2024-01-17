@@ -64,6 +64,10 @@ impl RpcTransactionOutput {
     pub fn from_transaction_outputs(other: Vec<TransactionOutput>) -> Vec<Self> {
         other.into_iter().map(Self::from).collect()
     }
+
+    pub fn populate_verbose_data(&mut self, verbose_data: RpcTransactionOutputVerboseData) {
+        self.verbose_data = Some(verbose_data);
+    }
 }
 
 impl From<TransactionOutput> for RpcTransactionOutput {
@@ -93,6 +97,17 @@ pub struct RpcTransaction {
     pub payload: Vec<u8>,
     pub mass: u64,
     pub verbose_data: Option<RpcTransactionVerboseData>,
+    pub acceptance_data: Option<RpcAcceptanceData>,
+}
+
+impl RpcTransaction {
+    pub fn populate_verbose_data(&mut self, verbose_data: RpcTransactionVerboseData) {
+        self.verbose_data = Some(verbose_data);
+    }
+
+    pub fn populate_acceptance_data(&mut self, acceptance_data: RpcAcceptanceData) {
+        self.acceptance_data = Some(acceptance_data);
+    }
 }
 
 /// Represent Kaspa transaction verbose data
@@ -102,8 +117,16 @@ pub struct RpcTransactionVerboseData {
     pub transaction_id: RpcTransactionId,
     pub hash: RpcHash,
     pub mass: u64,
-    pub block_hash: RpcHash,
-    pub block_time: u64,
+    pub block_hash: RpcHash, // including block hash
+    pub block_time: u64, // including block header ts in milliseconds
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcAcceptanceData {
+    pub accepting_block_hash: RpcHash,
+    pub accepting_block_time: u64, // accepting block header ts in milliseconds 
+    pub accepting_blue_score: u64, // accepting block header blue score
 }
 
 /// Represents accepted transaction ids

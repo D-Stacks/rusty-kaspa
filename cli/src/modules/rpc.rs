@@ -233,6 +233,15 @@ impl Rpc {
                 tprintln!(ctx, "rpc method exists but is not supported by the cli: '{op_str}'\r\n");
                 return Ok(());
             }
+            RpcApiOps::GetTransactions => {
+                if argv.is_empty() {
+                    return Err(Error::custom("Missing transaction Ids argument"));
+                }
+                let transaction_ids = argv .map(|transaction_id| RpcHash::from(argv.transaction_ids));
+                let hash = RpcHash::from_hex(hash.as_str())?;
+                let result = rpc.get_transactions_call(GetTransactiosnRequest { hash, argv. }).await?;
+                self.println(&ctx, result);
+            }
         }
 
         let prefix = Regex::new(r"(?i)^\s*rpc\s+\S+\s+").unwrap();

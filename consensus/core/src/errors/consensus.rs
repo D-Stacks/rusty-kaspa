@@ -1,6 +1,8 @@
 use kaspa_hashes::Hash;
 use thiserror::Error;
 
+use crate::tx::TransactionIndexType;
+
 use super::{difficulty::DifficultyError, sync::SyncManagerError, traversal::TraversalError};
 
 #[derive(Error, Debug, Clone)]

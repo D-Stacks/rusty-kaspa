@@ -16,10 +16,10 @@ use crate::{
         pruning::PruningImportResult,
         tx::TxResult,
     },
-    header::Header,
+    header::{CompactHeaderData, Header},
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
     BlockHashSet, BlueWorkType, ChainPath,
 };
 use kaspa_hashes::Hash;
@@ -56,7 +56,9 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_transactions_at_indices(&self, hash: Hash, indices: &[usize]) -> ConsensusResult<Vec<Transaction>>;
+    fn get_transactions_at_indices(&self, hash: Hash, indices: &mut [usize]) -> ConsensusResult<Vec<Transaction>> {
+        unimplemented!()
+    }
 
     /// Populates the mempool transaction with maximally found UTXO entry data and proceeds to full transaction
     /// validation if all are found. If validation is successful, also [`transaction.calculated_fee`] is expected to be populated.
@@ -220,6 +222,10 @@ pub trait ConsensusApi: Send + Sync {
     }
 
     fn get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {
+        unimplemented!()
+    }
+
+    fn get_compact_header(&self, hash: Hash) -> ConsensusResult<CompactHeaderData> {
         unimplemented!()
     }
 

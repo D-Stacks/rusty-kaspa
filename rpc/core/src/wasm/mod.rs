@@ -59,7 +59,6 @@ impl From<&Transaction> for RpcTransaction {
             payload: inner.payload.clone(),
             mass: 0, // TODO: apply mass to all external APIs including wasm
             verbose_data: None,
-            acceptance_data: None,
         }
     }
 }
@@ -78,7 +77,6 @@ impl From<SignableTransaction> for RpcTransaction {
             payload: tx.payload,
             mass: 0, // TODO: apply mass to all external APIs including wasm
             verbose_data: None,
-            acceptance_data: None,
         }
     }
 }

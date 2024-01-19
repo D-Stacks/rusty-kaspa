@@ -26,6 +26,7 @@ use kaspa_rpc_core::{
     RpcContextualPeerAddress, RpcError, RpcExtraData, RpcHash, RpcIpAddress, RpcNetworkType, RpcPeerAddress, RpcResult,
     SubmitBlockRejectReason, SubmitBlockReport,
 };
+use kaspa_utils::hex::FromHex;
 use std::str::FromStr;
 
 macro_rules! from {
@@ -436,19 +437,19 @@ from!(item: RpcResult<&kaspa_rpc_core::GetSyncStatusResponse>, protowire::GetSyn
     }
 });
 
-from!(item: &kaspa_rpc_core::GetTransactionsRequest, protowire::GetTransactionsRequestMessage, {
-    Self { 
-        transaction_ids: item.transaction_ids, 
-        include_verbose_data: item.include_verbose_data, 
-        include_acceptance_data: item.include_acceptance_data 
+from!(item: &kaspa_rpc_core::GetTransactionDataRequest, protowire::GetTransactionDataRequestMessage, {
+    Self {
+        transaction_ids: item.transaction_ids.iter().map(|x| x.to_string()).collect(),
+        include_acceptance_data: item.include_acceptance_data,
+        include_inclusion_data: item.include_inclusion_data,
+        include_verbose_data: item.include_verbose_data,
     }
 });
-
-from!(item: &kaspa_rpc_core::GetTransactionsResponse, protowire::GetTransactionsResponseMessage, {
-    Self { 
-        transactions: item.transactions, 
-        error: None
-    }
+from!(item: RpcResult<&kaspa_rpc_core::GetTransactionDataResponse>, protowire::GetTransactionDataResponseMessage, {
+    Self {
+            transaction_data: item.transaction_data.iter().map(|x| x.into()).collect(),
+            error: None
+        }
 });
 
 from!(item: &kaspa_rpc_core::NotifyUtxosChangedRequest, protowire::NotifyUtxosChangedRequestMessage, {
@@ -839,6 +840,18 @@ try_from!(item: &protowire::GetSyncStatusResponseMessage, RpcResult<kaspa_rpc_co
     Self {
         is_synced: item.is_synced,
     }
+});
+
+try_from!(item: &protowire::GetTransactionDataRequestMessage, kaspa_rpc_core::GetTransactionDataRequest, {
+    Self {
+        transaction_ids: item.transaction_ids.iter().map(|x| RpcHash::from_hex(x)).collect::<Result<Vec<_>, _>>()?,
+        include_acceptance_data: item.include_acceptance_data,
+        include_inclusion_data: item.include_inclusion_data,
+        include_verbose_data: item.include_verbose_data,
+    }
+});
+try_from!(item: &protowire::GetTransactionDataResponseMessage,  RpcResult<kaspa_rpc_core::GetTransactionDataResponse>, {
+    Self { transaction_data: item.transaction_data.iter().map(|x| x.try_into()).collect::<Result<Vec<_>, _>>()? }
 });
 
 try_from!(item: &protowire::NotifyUtxosChangedRequestMessage, kaspa_rpc_core::NotifyUtxosChangedRequest, {

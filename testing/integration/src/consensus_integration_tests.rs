@@ -1109,8 +1109,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
                     .get(0)
                     .unwrap()
                     .unwrap();
-            assert_eq!(indexed_block_acceptance_offset.ordered_mergeset_index(), i as u16);
-            assert_eq!(indexed_block_acceptance_offset.accepting_block(), accepting_block_hash);
+            assert_eq!(indexed_block_acceptance_offset.mergeset_index, i as u16);
+            assert_eq!(indexed_block_acceptance_offset.accepting_block, accepting_block_hash);
             accepted_block_count += 1;
             accepted_tx_count += mergeset.accepted_transactions.len();
             for tx_entry in mergeset.accepted_transactions.iter() {
@@ -1120,8 +1120,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
                         .get(0)
                         .unwrap()
                         .unwrap();
-                assert_eq!(indexed_accepted_tx_offset.including_block(), mergeset.block_hash);
-                assert_eq!(indexed_accepted_tx_offset.transaction_index(), tx_entry.index_within_block);
+                assert_eq!(indexed_accepted_tx_offset.including_block, mergeset.block_hash);
+                assert_eq!(indexed_accepted_tx_offset.transaction_index, tx_entry.index_within_block);
             }
         }
     }

@@ -17,7 +17,7 @@ use crate::{
             acceptance_data::AcceptanceDataStoreReader,
             block_transactions::BlockTransactionsStoreReader,
             ghostdag::{GhostdagData, GhostdagStoreReader},
-            headers::{CompactHeaderData, HeaderStoreReader},
+            headers::HeaderStoreReader,
             headers_selected_tip::HeadersSelectedTipStoreReader,
             past_pruning_points::PastPruningPointsStoreReader,
             pruning::PruningStoreReader,
@@ -54,12 +54,12 @@ use kaspa_consensus_core::{
         tx::TxResult,
     },
     errors::{difficulty::DifficultyError, pruning::PruningImportError},
-    header::Header,
+    header::{CompactHeaderData, Header},
     muhash::MuHashExtensions,
     network::NetworkType,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
     BlockHashSet, BlueWorkType, ChainPath,
 };
 use kaspa_consensus_notify::root::ConsensusNotificationRoot;
@@ -733,6 +733,10 @@ impl ConsensusApi for Consensus {
         self.headers_store.get_header(hash).unwrap_option().ok_or(ConsensusError::HeaderNotFound(hash))
     }
 
+    fn get_compact_header(&self, hash: Hash) -> ConsensusResult<CompactHeaderData> {
+        self.headers_store.get_compact_header_data(hash).unwrap_option().ok_or(ConsensusError::HeaderNotFound(hash))
+    }
+
     fn get_headers_selected_tip(&self) -> Hash {
         self.headers_selected_tip_store.read().get().unwrap().hash
     }
@@ -814,8 +818,8 @@ impl ConsensusApi for Consensus {
         })
     }
 
-    fn get_transactions_at_indices(&self, hash: Hash, indices: &[usize]) -> ConsensusResult<Vec<Transaction>> {
-        Ok(self.block_transactions_store.get_at_indices(hash, &mut indices)?);
+    fn get_transactions_at_indices(&self, hash: Hash, indices: &mut [usize]) -> ConsensusResult<Vec<Transaction>> {
+        Ok(self.block_transactions_store.get_at_indices(hash, indices).map_err(|_e| ConsensusError::MissingData(hash))?)
     }
 
     fn get_ghostdag_data(&self, hash: Hash) -> ConsensusResult<ExternalGhostdagData> {

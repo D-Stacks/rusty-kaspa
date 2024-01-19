@@ -94,7 +94,7 @@ pub fn validate_args(args: &Args) -> ConsensusConfigResult<()> {
         return Err(ConsensusConfigError::RamScaleTooHigh);
     }
     Ok(())
-    }
+}
 
 fn get_user_approval_or_exit(message: &str, approve: bool) {
     if approve {
@@ -515,8 +515,13 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     };
     async_runtime.register(rpc_core_service.clone());
     if !args.disable_grpc {
-        let grpc_service =
-            Arc::new(GrpcService::new(grpc_server_addr, consensus_config, rpc_core_service.clone(), args.rpc_max_clients, grpc_tower_counters));
+        let grpc_service = Arc::new(GrpcService::new(
+            grpc_server_addr,
+            consensus_config,
+            rpc_core_service.clone(),
+            args.rpc_max_clients,
+            grpc_tower_counters,
+        ));
         async_runtime.register(grpc_service);
     }
     async_runtime.register(p2p_service);

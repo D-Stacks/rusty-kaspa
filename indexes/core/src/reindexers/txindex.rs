@@ -1,5 +1,5 @@
 use crate::models::txindex::{
-    BlockAcceptanceOffset, BlockAcceptanceOffsetDiff, MergeSetIDX, TxHashSet, TxOffset, TxOffsetById, TxOffsetDiff,
+    BlockAcceptanceOffset, BlockAcceptanceOffsetDiff, MergesetIndexType, TxHashSet, TxOffset, TxOffsetById, TxOffsetDiff,
 };
 use kaspa_consensus_core::{BlockHashMap, BlockHashSet, HashMapCustomHasher};
 use kaspa_consensus_notify::notification::{
@@ -52,7 +52,7 @@ impl From<ConsensusVirtualChainChangedNotification> for TxIndexReindexer {
                 );
 
                 block_acceptance_offsets_to_add
-                    .insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block_hash, i as MergeSetIDX));
+                    .insert(mergeset.block_hash, BlockAcceptanceOffset::new(accepting_block_hash, i as MergesetIndexType));
             }
         }
 

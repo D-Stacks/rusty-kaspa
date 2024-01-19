@@ -274,7 +274,7 @@ impl TxIndexApi for TxIndex {
 
         let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
 
-        let mut batch  = WriteBatch::default();
+        let mut batch = WriteBatch::default();
 
         self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_reindexer.tx_offset_changes)?;
         self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, txindex_reindexer.block_acceptance_offsets_changes)?;
@@ -339,19 +339,30 @@ impl Debug for TxIndex {
 mod tests {
     use std::sync::Arc;
 
-    use kaspa_consensus::{consensus::test_consensus::{TestConsensus, TestConsensusFactory}, params::MAINNET_PARAMS, model::stores::virtual_state::VirtualState};
-    use kaspa_consensus_core::{config::Config as ConsensusConfig, acceptance_data::{MergesetBlockAcceptanceData, TxEntry}, tx::{TransactionId}, ChainPath, api::ConsensusApi};
-    use kaspa_consensus_notify::notification::{VirtualChainChangedNotification, ChainAcceptanceDataPrunedNotification};
-    use kaspa_consensusmanager::{ConsensusManager};
-    
+    use kaspa_consensus::{
+        consensus::test_consensus::{TestConsensus, TestConsensusFactory},
+        model::stores::virtual_state::VirtualState,
+        params::MAINNET_PARAMS,
+    };
+    use kaspa_consensus_core::{
+        acceptance_data::{MergesetBlockAcceptanceData, TxEntry},
+        api::ConsensusApi,
+        config::Config as ConsensusConfig,
+        tx::TransactionId,
+        ChainPath,
+    };
+    use kaspa_consensus_notify::notification::{ChainAcceptanceDataPrunedNotification, VirtualChainChangedNotification};
+    use kaspa_consensusmanager::ConsensusManager;
+
     use kaspa_database::{create_temp_db, prelude::ConnBuilder};
     use kaspa_hashes::Hash;
-    
+
+    use kaspa_index_core::models::txindex::MergesetIndexType;
     use parking_lot::RwLock;
-    
+
     use rocksdb::WriteBatch;
 
-    use crate::{TxIndex, config::Config as TxIndexConfig, api::TxIndexApi};
+    use crate::{api::TxIndexApi, config::Config as TxIndexConfig, TxIndex};
 
     fn assert_equal_along_virtual_chain(virtual_chain: &ChainPath, test_consensus: Arc<TestConsensus>, txindex: Arc<RwLock<TxIndex>>) {
         assert!(txindex.write().is_synced().unwrap());
@@ -359,53 +370,60 @@ mod tests {
         assert_eq!(txindex.write().get_source().unwrap().unwrap(), test_consensus.get_history_root());
 
         // check intial state
-        for (accepting_block_hash, acceptance_data) in virtual_chain.added.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap())) {
-            for (i, mergeset_block_acceptance_data) in acceptance_data.iter().cloned().enumerate()  {
-                let block_acceptance_offsets = txindex.write().get_merged_block_acceptance_offset(vec![mergeset_block_acceptance_data.block_hash]).unwrap();
+        for (accepting_block_hash, acceptance_data) in
+            virtual_chain.added.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap()))
+        {
+            for (i, mergeset_block_acceptance_data) in acceptance_data.iter().cloned().enumerate() {
+                let block_acceptance_offsets =
+                    txindex.write().get_merged_block_acceptance_offset(vec![mergeset_block_acceptance_data.block_hash]).unwrap();
                 assert_eq!(block_acceptance_offsets.len(), 1);
                 let block_acceptance_offset = block_acceptance_offsets.get(0).unwrap().unwrap();
-                assert_eq!(block_acceptance_offset.accepting_block(), accepting_block_hash);
-                assert_eq!(block_acceptance_offset.ordered_mergeset_index(), i as u16);
+                assert_eq!(block_acceptance_offset.accepting_block, accepting_block_hash);
+                assert_eq!(block_acceptance_offset.mergeset_index, i as MergesetIndexType);
                 for tx_entry in mergeset_block_acceptance_data.accepted_transactions {
                     let tx_offsets = txindex.write().get_tx_offsets(vec![tx_entry.transaction_id]).unwrap();
                     assert_eq!(tx_offsets.len(), 1);
                     let tx_offset = tx_offsets.get(0).unwrap().unwrap();
-                    assert_eq!(tx_offset.including_block(), mergeset_block_acceptance_data.block_hash);
-                    assert_eq!(tx_offset.transaction_index(), tx_entry.index_within_block);
+                    assert_eq!(tx_offset.including_block, mergeset_block_acceptance_data.block_hash);
+                    assert_eq!(tx_offset.transaction_index, tx_entry.index_within_block);
                 }
             }
         }
 
-        for (accepting_block, acceptance_data) in virtual_chain.removed.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap())) {
-            for mergeset_block_acceptance_data in acceptance_data.iter().cloned()  {
+        for (accepting_block, acceptance_data) in
+            virtual_chain.removed.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap()))
+        {
+            for mergeset_block_acceptance_data in acceptance_data.iter().cloned() {
                 let res = txindex.write().get_merged_block_acceptance_offset(vec![mergeset_block_acceptance_data.block_hash]).unwrap();
                 assert_eq!(res.len(), 1);
                 let res = res.first().unwrap();
                 if let Some(block_acceptance) = res {
-                    assert_ne!(block_acceptance.accepting_block(), accepting_block); 
-                } else { continue; }
+                    assert_ne!(block_acceptance.accepting_block, accepting_block);
+                } else {
+                    continue;
+                }
+            }
         }
     }
-}
 
     #[test]
     fn test_txindex_updates() {
         kaspa_core::log::try_init_logger("TRACE");
 
-        // Note: this test closely mirrors the test `test_txindex_reindexer_from_virtual_chain_changed_notification` 
-        // If both fail, check for problems within the reindexer. 
+        // Note: this test closely mirrors the test `test_txindex_reindexer_from_virtual_chain_changed_notification`
+        // If both fail, check for problems within the reindexer.
 
         // Set-up:
         let (_txindex_db_lt, txindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
         let (_tc_db_lt, tc_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
-        
+
         let tc_config = ConsensusConfig::new(MAINNET_PARAMS);
         let txindex_config = Arc::new(TxIndexConfig::from(&Arc::new(tc_config.clone())));
-        
+
         let tc = Arc::new(TestConsensus::with_db(tc_db.clone(), &tc_config));
         let tcm = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
         let txindex = TxIndex::new(tcm, txindex_db, txindex_config.into()).unwrap();
-        
+
         // Define the block hashes:
 
         // Blocks removed (i.e. unaccepted):
@@ -436,35 +454,34 @@ mod tests {
         let tx_b_1 @ tx_h_3 = TransactionId::from_u64_word(15); // accepted in block b, reaccepted in block_h
         let tx_b_2 @ tx_i_2 = TransactionId::from_u64_word(16); // accepted in block b, reaccepted in block_i
         let tx_b_4 @ tx_hh_1 = TransactionId::from_u64_word(17); // accepted in block b, reaccepted in block_hh
-        
+
         // Txs added (i.e. newly accepted)):
         let tx_h_4 = TransactionId::from_u64_word(18); // not originally accepted, accepted in block h.
         let tx_hh_2 = TransactionId::from_u64_word(19); // not originally accepted, accepted in block hh.
         let tx_i_3 = TransactionId::from_u64_word(20); // not originally accepted, accepted in block i.
 
         let acceptance_data_a = Arc::new(vec![
-        MergesetBlockAcceptanceData { 
-            block_hash: block_a, 
-            accepted_transactions: vec![
-                TxEntry { transaction_id: tx_a_1, index_within_block: 0 },
-                TxEntry { transaction_id: tx_a_2, index_within_block: 1 },
-                TxEntry { transaction_id: tx_a_3, index_within_block: 2 },
-                TxEntry { transaction_id: tx_a_4, index_within_block: 3 },
-            ],
-        }, 
-        MergesetBlockAcceptanceData { 
-            block_hash: block_aa, 
-            accepted_transactions: vec![
-                TxEntry { transaction_id: tx_aa_1, index_within_block: 0 },
-                TxEntry { transaction_id: tx_aa_2, index_within_block: 1 },
-                TxEntry { transaction_id: tx_aa_3, index_within_block: 2 },
-                TxEntry { transaction_id: tx_aa_4, index_within_block: 3 },
-            ],
-        }, 
+            MergesetBlockAcceptanceData {
+                block_hash: block_a,
+                accepted_transactions: vec![
+                    TxEntry { transaction_id: tx_a_1, index_within_block: 0 },
+                    TxEntry { transaction_id: tx_a_2, index_within_block: 1 },
+                    TxEntry { transaction_id: tx_a_3, index_within_block: 2 },
+                    TxEntry { transaction_id: tx_a_4, index_within_block: 3 },
+                ],
+            },
+            MergesetBlockAcceptanceData {
+                block_hash: block_aa,
+                accepted_transactions: vec![
+                    TxEntry { transaction_id: tx_aa_1, index_within_block: 0 },
+                    TxEntry { transaction_id: tx_aa_2, index_within_block: 1 },
+                    TxEntry { transaction_id: tx_aa_3, index_within_block: 2 },
+                    TxEntry { transaction_id: tx_aa_4, index_within_block: 3 },
+                ],
+            },
         ]);
 
-        let acceptance_data_b =  Arc::new(vec![
-        MergesetBlockAcceptanceData { 
+        let acceptance_data_b = Arc::new(vec![MergesetBlockAcceptanceData {
             block_hash: block_b,
             accepted_transactions: vec![
                 TxEntry { transaction_id: tx_b_1, index_within_block: 0 },
@@ -472,7 +489,7 @@ mod tests {
                 TxEntry { transaction_id: tx_b_3, index_within_block: 2 },
                 TxEntry { transaction_id: tx_b_4, index_within_block: 3 },
             ],
-        },]);
+        }]);
 
         let virtual_chain = ChainPath::new(Arc::new(vec![block_a, block_b]), Arc::new(Vec::new()));
 
@@ -487,10 +504,7 @@ mod tests {
         let init_virtual_chain_changed_notification = VirtualChainChangedNotification {
             added_chain_block_hashes: virtual_chain.clone().added.clone(),
             removed_chain_block_hashes: virtual_chain.clone().removed.clone(),
-            added_chain_blocks_acceptance_data: Arc::new(vec![
-                acceptance_data_a.clone(),
-                acceptance_data_b.clone(),
-            ],),
+            added_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_a.clone(), acceptance_data_b.clone()]),
             removed_chain_blocks_acceptance_data: Arc::new(Vec::new()),
         };
 
@@ -501,52 +515,44 @@ mod tests {
         assert_eq!(txindex.write().count_all_merged_tx_ids().unwrap(), 12);
 
         let acceptance_data_h = Arc::new(vec![
-            MergesetBlockAcceptanceData { 
-                block_hash: block_h, 
+            MergesetBlockAcceptanceData {
+                block_hash: block_h,
                 accepted_transactions: vec![
                     TxEntry { transaction_id: tx_h_1, index_within_block: 0 },
                     TxEntry { transaction_id: tx_h_2, index_within_block: 1 },
                     TxEntry { transaction_id: tx_h_3, index_within_block: 2 },
                     TxEntry { transaction_id: tx_h_4, index_within_block: 3 },
-                ]
+                ],
             },
-            MergesetBlockAcceptanceData { 
-                block_hash: block_hh, 
+            MergesetBlockAcceptanceData {
+                block_hash: block_hh,
                 accepted_transactions: vec![
                     TxEntry { transaction_id: tx_hh_1, index_within_block: 0 },
                     TxEntry { transaction_id: tx_hh_2, index_within_block: 1 },
                     TxEntry { transaction_id: tx_hh_3, index_within_block: 2 },
                     TxEntry { transaction_id: tx_hh_4, index_within_block: 3 },
-                ]
-            }
+                ],
+            },
         ]);
 
-        let acceptance_data_i= Arc::new(vec![
-            MergesetBlockAcceptanceData { 
-                block_hash: block_i, 
-                accepted_transactions: vec![
-                    TxEntry { transaction_id: tx_i_1, index_within_block: 0 },
-                    TxEntry { transaction_id: tx_i_2, index_within_block: 1 },
-                    TxEntry { transaction_id: tx_i_3, index_within_block: 2 },
-                    TxEntry { transaction_id: tx_i_4, index_within_block: 3 },
-                ]
-            }
-        ]);
+        let acceptance_data_i = Arc::new(vec![MergesetBlockAcceptanceData {
+            block_hash: block_i,
+            accepted_transactions: vec![
+                TxEntry { transaction_id: tx_i_1, index_within_block: 0 },
+                TxEntry { transaction_id: tx_i_2, index_within_block: 1 },
+                TxEntry { transaction_id: tx_i_3, index_within_block: 2 },
+                TxEntry { transaction_id: tx_i_4, index_within_block: 3 },
+            ],
+        }]);
 
         let virtual_chain = ChainPath::new(Arc::new(vec![block_h, block_i]), Arc::new(vec![block_a, block_b]));
 
         // Define the notification:
         let test_vspcc_change_notification = VirtualChainChangedNotification {
             added_chain_block_hashes: virtual_chain.added.clone(),
-            added_chain_blocks_acceptance_data: Arc::new(vec![
-                acceptance_data_h.clone(),
-                acceptance_data_i.clone()
-            ]),
+            added_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_h.clone(), acceptance_data_i.clone()]),
             removed_chain_block_hashes: virtual_chain.removed.clone(),
-            removed_chain_blocks_acceptance_data: Arc::new(vec![
-                acceptance_data_a.clone(),
-                acceptance_data_b.clone(),
-            ]),
+            removed_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_a.clone(), acceptance_data_b.clone()]),
         };
 
         let mut batch = WriteBatch::default();
@@ -577,7 +583,7 @@ mod tests {
         tc_db.write(batch).unwrap();
 
         txindex.write().update_via_chain_acceptance_data_pruned(prune_notification).unwrap();
-        
+
         assert_equal_along_virtual_chain(&virtual_chain, tc, txindex.clone());
         assert_eq!(txindex.write().count_all_merged_blocks().unwrap(), 1);
         assert_eq!(txindex.write().count_all_merged_tx_ids().unwrap(), 4);

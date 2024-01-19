@@ -4,9 +4,10 @@ use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
 use crate::service::NetworkType::{Mainnet, Testnet};
 use async_trait::async_trait;
-use kaspa_consensus::model::stores::selected_chain::SelectedChainStore;
+
 use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
+
 use kaspa_consensus_core::{
     block::Block,
     coinbase::MinerData,
@@ -63,6 +64,7 @@ use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 use kaspa_utxoindex::api::UtxoIndexProxy;
+
 use std::{
     collections::HashMap,
     iter::once,
@@ -161,25 +163,26 @@ impl RpcCoreService {
             let index_notify_listener_id = index_notifier
                 .clone()
                 .register_new_listener(IndexChannelConnection::new(index_notify_channel.sender(), ChannelType::Closable));
-            
+
             let mut index_events = Vec::new();
             if utxoindex.is_some() {
-                index_events.append(&mut vec![ 
-                    EventType::UtxosChanged,
-                    EventType::PruningPointUtxoSetOverride,
-                    ])
+                index_events.append(&mut vec![EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride])
             }
             if txindex.is_some() {
                 index_events.append(&mut vec![
                     EventType::VirtualChainChanged,
-                    //EventType::ChainAcceptanceDataPruned, this is not used by the rpc, but if it is, it should be over the index service 
-                    ])
+                    //EventType::ChainAcceptanceDataPruned, this is not used by the rpc, but if it is, it should be over the index service
+                ])
             }
 
             let index_collector =
                 Arc::new(CollectorFromIndex::new("rpc-core <= index", index_notify_channel.receiver(), index_converter.clone()));
-            let index_subscriber =
-                Arc::new(Subscriber::new("rpc-core => index", index_events.as_slice().as_ref().into(), index_notifier.clone(), index_notify_listener_id));
+            let index_subscriber = Arc::new(Subscriber::new(
+                "rpc-core => index",
+                index_events.as_slice().as_ref().into(),
+                index_notifier.clone(),
+                index_notify_listener_id,
+            ));
 
             collectors.push(index_collector);
             subscribers.push(index_subscriber);
@@ -419,15 +422,52 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         Ok(GetBlocksResponse { block_hashes, blocks })
     }
 
-    async fn get_transactions_call(&self, request: GetTransactionsRequest) {
-        let tx_offsets = self.txindex.clone().unwrap().get_tx_offsets(request.transaction_ids).await;
-        let session = self.consensus_manager.consensus().session().await;
-        for tx_offset in tx_offsets.iter().cloned() {
-            if let Some(tx_offset) = tx_offset {
-                let tx = session .consensus();
-                let rpc_tx = self.protocol_converter.get_transaction(tx);
-            }
-    }
+    async fn get_transaction_data_call(&self, _request: GetTransactionDataRequest) -> RpcResult<GetTransactionDataResponse> {
+        //todo!("get_transaction_data_call");
+        Ok(GetTransactionDataResponse::default())
+        /*
+            let tx_offsets = self.txindex.clone().unwrap().get_tx_offsets(request.transaction_ids).await?;
+            let mut rpc_txs = Vec::<RpcTransaction>::new();
+            // we use these to cache results, and get multiple transactions per block
+            let mut to_query_blocks = BlockHashMap::<Vec<usize>>::new();
+            let mut to_query_acceptance_data = BlockHashMap::<RpcTransactionVerboseData>::new();
+            let mut to_query_inclusion_data = BlockHashMap::<RpcAcceptanceData>::new();
+
+            for tx_offset in tx_offsets.iter().cloned().filter_map(|x| x) {
+                if request.include_verbose_data {
+                    match to_query_blocks.entry(&tx_offset.including_block()) {
+                        Entry::Occupied(e) => e.get_mut().push(tx_offset.transaction_index()),
+                        Entry::Vacant(e) => e.insert(vec![tx_offset.transaction_index()]),
+                    }
+                    }
+                };
+
+            let session = self.consensus_manager.consensus().session().await?;
+
+            for (hash, indices) in to_query_blocks.iter() {
+                let txs = session.async_get_transactions_at_indices(hash, indices).await?;
+                rpc_txs.reserve_exact(txs.len());
+                for tx in txs.into_iter() {
+                    let rpc_tx = tx.into();
+                    if request.include_verbose_data {
+                        match to_query_inclusion_data.entry(hash) {
+                            Entry::Occupied(e) => todo!(),
+                            Entry::Vacant(e) => e.insert(session.async_),
+                        }
+
+                        }
+                    }
+                    rpc_txs.push(rpc_tx);
+                };
+            };
+
+            let session = self.consensus_manager.consensus().session().await;
+            for tx_offset in tx_offsets.iter().cloned() {
+                if let Some(tx_offset) = tx_offset {
+                    let tx = session.async_get_transactions_at_indices(hash, indices).await?;
+                    let rpc_tx = self.protocol_converter.get_transaction(tx);
+                }
+        } */
     }
 
     async fn get_info_call(&self, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {

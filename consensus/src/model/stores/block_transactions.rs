@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
-    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Vec<Transaction>, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -83,10 +83,10 @@ impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
         Ok(self.access.read(hash)?.0)
     }
 
-    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Arc<Vec<Transaction>>, StoreError> {
+    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Vec<Transaction>, StoreError> {
         let mut txs = self.access.read(hash)?.0.unwrap_or_clone();
         txs.retain_indices(indices)?;
-        Ok(Arc::new(txs))
+        Ok(txs)
     }
 }
 

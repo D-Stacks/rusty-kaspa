@@ -10,7 +10,7 @@ mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use crate::models::txindex::MergeSetIDX;
+    use crate::models::txindex::MergesetIndexType;
     use crate::models::utxoindex::{CirculatingSupply, CirculatingSupplyDiff};
 
     use crate::reindexers::txindex::TxIndexReindexer;
@@ -28,7 +28,7 @@ mod test {
     #[test]
     fn test_mergest_idx_max() {
         NetworkType::iter().for_each(|network_type| {
-            assert!(Params::from(network_type).mergeset_size_limit <= MergeSetIDX::MAX as u64);
+            assert!(Params::from(network_type).mergeset_size_limit <= MergesetIndexType::MAX as u64);
         });
     }
 
@@ -213,8 +213,8 @@ mod test {
                 assert!(!unaccepted_blocks.contains(&mergeset.block_hash));
                 assert!(!reindexer.block_acceptance_offsets_changes.removed.contains(&mergeset.block_hash));
                 let block_acceptance_offset = reindexer.block_acceptance_offsets_changes.added.get(&mergeset.block_hash).unwrap();
-                assert_eq!(block_acceptance_offset.accepting_block(), accepting_block_hash);
-                assert_eq!(block_acceptance_offset.ordered_mergeset_index(), mergeset_idx as MergeSetIDX);
+                assert_eq!(block_acceptance_offset.accepting_block, accepting_block_hash);
+                assert_eq!(block_acceptance_offset.mergeset_index, mergeset_idx as MergesetIndexType);
                 block_acceptance_offsets_added_count += 1;
                 tx_offsets_added_count += mergeset.accepted_transactions.len();
                 for accepted_tx_entry in mergeset.accepted_transactions.iter() {
@@ -225,8 +225,8 @@ mod test {
                     assert!(!unaccepted_transactions.contains(&accepted_tx_entry.transaction_id));
                     assert!(!reindexer.tx_offset_changes.removed.contains(&accepted_tx_entry.transaction_id));
                     let tx_offset = reindexer.tx_offset_changes.added.get(&accepted_tx_entry.transaction_id).unwrap();
-                    assert_eq!(mergeset.block_hash, tx_offset.including_block());
-                    assert_eq!(accepted_tx_entry.index_within_block, tx_offset.transaction_index());
+                    assert_eq!(mergeset.block_hash, tx_offset.including_block);
+                    assert_eq!(accepted_tx_entry.index_within_block, tx_offset.transaction_index);
                 }
             }
         }

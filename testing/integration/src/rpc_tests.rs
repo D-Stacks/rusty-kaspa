@@ -48,6 +48,7 @@ async fn sanity_test() {
         enable_unsynced_mining: true,
         block_template_cache_lifetime: Some(0),
         utxoindex: true,
+        txindex: true,
         unsafe_rpc: true,
         ..Default::default()
     };
@@ -541,6 +542,21 @@ async fn sanity_test() {
                     for timestamp in results.timestamps.iter() {
                         info!("Timestamp estimate is {}", timestamp);
                     }
+                })
+            }
+            KaspadPayloadOps::GetTransactionData => {
+                let rpc_client = client.clone();
+                tst!(op, {
+                    let genesis_transactions = SIMNET_GENESIS.build_genesis_transactions();
+                    let results = rpc_client
+                        .get_transaction_data_call(GetTransactionDataRequest { 
+                            transaction_ids: genesis_transactions.iter().map(|tx| tx.id()).collect(),
+                            include_acceptance_data: true, 
+                            include_inclusion_data: true, 
+                            include_verbose_data: true, 
+                        }
+                    ).await.unwrap();
+                    assert!(results.transaction_data.is_empty()) // We do not expect the txindex to be populated, in order to return results in this test.
                 })
             }
 

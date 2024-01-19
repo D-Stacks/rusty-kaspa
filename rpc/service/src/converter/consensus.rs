@@ -16,7 +16,7 @@ use kaspa_notify::converter::Converter;
 use kaspa_rpc_core::{
     BlockAddedNotification, Notification, RpcAcceptedTransactionIds, RpcBlock, RpcBlockVerboseData, RpcHash, RpcMempoolEntry,
     RpcMempoolEntryByAddress, RpcResult, RpcTransaction, RpcTransactionInput, RpcTransactionOutput, RpcTransactionOutputVerboseData,
-    RpcTransactionVerboseData, RpcAcceptanceData,
+    RpcTransactionVerboseData,
 };
 use kaspa_txscript::{extract_script_pub_key_address, script_class::ScriptClass};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
@@ -75,7 +75,7 @@ impl ConsensusConverter {
             block
                 .transactions
                 .iter()
-                .map(|x| self.get_transaction(consensus, x, Some(&block.header), None, include_transaction_verbose_data, true))
+                .map(|x| self.get_transaction(consensus, x, Some(&block.header), include_transaction_verbose_data))
                 .collect::<Vec<_>>()
         } else {
             vec![]
@@ -86,7 +86,7 @@ impl ConsensusConverter {
 
     pub fn get_mempool_entry(&self, consensus: &ConsensusProxy, transaction: &MutableTransaction) -> RpcMempoolEntry {
         let is_orphan = !transaction.is_fully_populated();
-        let rpc_transaction = self.get_transaction(consensus, &transaction.tx, None, None, true, false);
+        let rpc_transaction = self.get_transaction(consensus, &transaction.tx, None, true);
         RpcMempoolEntry::new(transaction.calculated_fee.unwrap_or_default(), rpc_transaction, is_orphan)
     }
 
@@ -119,9 +119,7 @@ impl ConsensusConverter {
         consensus: &ConsensusProxy,
         transaction: &Transaction,
         header: Option<&Header>,
-        accepting_header: Option<&Header>,
         include_verbose_data: bool,
-        include_acceptance_data: bool,
     ) -> RpcTransaction {
         RpcTransaction {
             version: transaction.version,
@@ -141,14 +139,9 @@ impl ConsensusConverter {
                     block_hash: header.map_or_else(RpcHash::default, |x| x.hash),
                     block_time: header.map_or(0, |x| x.timestamp),
                 })
-            } else { None }, 
-            acceptance_data: if include_acceptance_data {
-                Some(RpcAcceptanceData {
-                    accepting_block_hash: accepting_header.map_or_else(RpcHash::default, |x| x.hash),
-                    accepting_block_time: accepting_header.map_or(0, |x| x.timestamp),
-                    accepting_blue_score: accepting_header.map_or(0, |x| x.blue_score),
-                })
-            } else { None },
+            } else {
+                None
+            },
         }
     }
 

@@ -10,13 +10,14 @@ use kaspa_consensus_core::{
     blockstatus::BlockStatus,
     daa_score_timestamp::DaaScoreTimestamp,
     errors::consensus::ConsensusResult,
-    header::Header,
+    header::{CompactHeaderData, Header},
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry, TransactionIndexType},
+    tx::{MutableTransaction, Transaction, TransactionOutpoint, UtxoEntry},
     BlockHashSet, BlueWorkType, ChainPath, Hash,
 };
-use kaspa_utils::{sync::rwlock::*, as_slice::AsSlice};
+use kaspa_utils::sync::rwlock::*;
+
 use std::{ops::Deref, sync::Arc};
 
 pub use tokio::task::spawn_blocking;
@@ -275,6 +276,10 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.get_header(hash)).await
     }
 
+    pub async fn async_get_compact_header(&self, hash: Hash) -> ConsensusResult<CompactHeaderData> {
+        self.clone().spawn_blocking(move |c| c.get_compact_header(hash)).await
+    }
+
     pub async fn async_get_headers_selected_tip(&self) -> Hash {
         self.clone().spawn_blocking(|c| c.get_headers_selected_tip()).await
     }
@@ -407,8 +412,8 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.finality_point()).await
     }
 
-    pub async fn get_transactions_at_indices(&self, hash: Hash, indices: Vec<usize>) -> ConsensusResult<Vec<Transaction>> {
-        Ok(self.clone().spawn_blocking(move |c| c.get_transactions_at_indices(hash, indices.as_slice())).await?)
+    pub async fn async_get_transactions_at_indices(&self, hash: Hash, mut indices: Vec<usize>) -> ConsensusResult<Vec<Transaction>> {
+        Ok(self.clone().spawn_blocking(move |c| c.get_transactions_at_indices(hash, indices.as_mut_slice())).await?)
     }
 }
 

@@ -412,8 +412,8 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.finality_point()).await
     }
 
-    pub async fn async_get_transactions_at_indices(&self, hash: Hash, mut indices: Vec<usize>) -> ConsensusResult<Vec<Transaction>> {
-        Ok(self.clone().spawn_blocking(move |c| c.get_transactions_at_indices(hash, indices.as_mut_slice())).await?)
+    pub async fn async_get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
+        self.clone().spawn_blocking(move |c| c.get_block_transactions(hash)).await
     }
 }
 

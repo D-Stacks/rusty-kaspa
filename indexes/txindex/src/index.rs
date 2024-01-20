@@ -93,7 +93,7 @@ impl TxIndex {
         };
         while start_hash != end_hash {
             let mut chain_path =
-                session.get_virtual_chain_from_block(start_hash, Some(end_hash), self.config.perf.resync_chunksize as usize)?;
+                session.get_virtual_chain_from_block(start_hash, Some(end_hash), self.config.perf.resync_chunksize)?;
 
             // We switch added to removed, and clear removed, as we have no use for the removed data.
             if unsync_segment {
@@ -235,26 +235,16 @@ impl TxIndexApi for TxIndex {
         Ok(false)
     }
 
-    fn get_merged_block_acceptance_offset(&self, hashes: Vec<Hash>) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>> {
-        trace!("[{0:?}] Getting merged block acceptance offsets for {1} blocks", self, hashes.len());
+    fn get_merged_block_acceptance_offset(&self, hash: Hash) -> TxIndexResult<Option<BlockAcceptanceOffset>> {
+        trace!("[{0:?}] Getting merged block acceptance offsets for block: {1}", self, hash);
 
-        Ok(Arc::new(
-            hashes
-                .iter()
-                .map(move |hash| self.stores.merged_block_acceptance_store.get(*hash))
-                .collect::<Result<Vec<Option<BlockAcceptanceOffset>>, _>>()?,
-        ))
+        Ok(self.stores.merged_block_acceptance_store.get(hash)?)
     }
 
-    fn get_tx_offsets(&self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>> {
-        trace!("[{0:?}] Getting tx offsets for {1} txs", self, tx_ids.len());
+    fn get_tx_offset(&self, tx_id: TransactionId) -> TxIndexResult<Option<TxOffset>> {
+        trace!("[{0:?}] Getting tx offsets for transaction_id: {1} ", self, tx_id);
 
-        Ok(Arc::new(
-            tx_ids
-                .iter()
-                .map(move |tx_id| self.stores.accepted_tx_offsets_store.get(*tx_id))
-                .collect::<Result<Vec<Option<TxOffset>>, _>>()?,
-        ))
+        Ok(self.stores.accepted_tx_offsets_store.get(tx_id)?)
     }
 
     // Update methods
@@ -374,16 +364,12 @@ mod tests {
             virtual_chain.added.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap()))
         {
             for (i, mergeset_block_acceptance_data) in acceptance_data.iter().cloned().enumerate() {
-                let block_acceptance_offsets =
-                    txindex.write().get_merged_block_acceptance_offset(vec![mergeset_block_acceptance_data.block_hash]).unwrap();
-                assert_eq!(block_acceptance_offsets.len(), 1);
-                let block_acceptance_offset = block_acceptance_offsets.get(0).unwrap().unwrap();
+                let block_acceptance_offset =
+                    txindex.write().get_merged_block_acceptance_offset(mergeset_block_acceptance_data.block_hash).unwrap().unwrap();
                 assert_eq!(block_acceptance_offset.accepting_block, accepting_block_hash);
                 assert_eq!(block_acceptance_offset.mergeset_index, i as MergesetIndexType);
                 for tx_entry in mergeset_block_acceptance_data.accepted_transactions {
-                    let tx_offsets = txindex.write().get_tx_offsets(vec![tx_entry.transaction_id]).unwrap();
-                    assert_eq!(tx_offsets.len(), 1);
-                    let tx_offset = tx_offsets.get(0).unwrap().unwrap();
+                    let tx_offset = txindex.write().get_tx_offset(tx_entry.transaction_id).unwrap().unwrap();
                     assert_eq!(tx_offset.including_block, mergeset_block_acceptance_data.block_hash);
                     assert_eq!(tx_offset.transaction_index, tx_entry.index_within_block);
                 }
@@ -394,10 +380,9 @@ mod tests {
             virtual_chain.removed.iter().map(|hash| (*hash, test_consensus.get_block_acceptance_data(*hash).unwrap()))
         {
             for mergeset_block_acceptance_data in acceptance_data.iter().cloned() {
-                let res = txindex.write().get_merged_block_acceptance_offset(vec![mergeset_block_acceptance_data.block_hash]).unwrap();
-                assert_eq!(res.len(), 1);
-                let res = res.first().unwrap();
-                if let Some(block_acceptance) = res {
+                let block_acceptance =
+                    txindex.write().get_merged_block_acceptance_offset(mergeset_block_acceptance_data.block_hash).unwrap();
+                if let Some(block_acceptance) = block_acceptance {
                     assert_ne!(block_acceptance.accepting_block, accepting_block);
                 } else {
                     continue;
@@ -422,7 +407,7 @@ mod tests {
 
         let tc = Arc::new(TestConsensus::with_db(tc_db.clone(), &tc_config));
         let tcm = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
-        let txindex = TxIndex::new(tcm, txindex_db, txindex_config.into()).unwrap();
+        let txindex = TxIndex::new(tcm, txindex_db, txindex_config).unwrap();
 
         // Define the block hashes:
 

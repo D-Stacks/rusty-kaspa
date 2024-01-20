@@ -61,8 +61,8 @@ impl NotificationTrait for Notification {
                 // If the subscription excludes accepted transaction ids and the notification includes some
                 // then we must re-create the object and drop the ids, otherwise we can clone it as is.
                 if let Notification::VirtualChainChanged(ref payload) = self {
-                    if !subscription.include_accepted_transaction_ids()
-                        && !(payload.added_chain_blocks_acceptance_data.is_empty()
+                    if !(subscription.include_accepted_transaction_ids()
+                        || payload.added_chain_blocks_acceptance_data.is_empty()
                             && payload.removed_chain_blocks_acceptance_data.is_empty())
                     {
                         return Some(Notification::VirtualChainChanged(VirtualChainChangedNotification {

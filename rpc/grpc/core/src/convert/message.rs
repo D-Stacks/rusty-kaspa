@@ -440,6 +440,7 @@ from!(item: RpcResult<&kaspa_rpc_core::GetSyncStatusResponse>, protowire::GetSyn
 from!(item: &kaspa_rpc_core::GetTransactionDataRequest, protowire::GetTransactionDataRequestMessage, {
     Self {
         transaction_ids: item.transaction_ids.iter().map(|x| x.to_string()).collect(),
+        include_transactions: item.include_transactions,
         include_acceptance_data: item.include_acceptance_data,
         include_inclusion_data: item.include_inclusion_data,
         include_verbose_data: item.include_verbose_data,
@@ -845,6 +846,7 @@ try_from!(item: &protowire::GetSyncStatusResponseMessage, RpcResult<kaspa_rpc_co
 try_from!(item: &protowire::GetTransactionDataRequestMessage, kaspa_rpc_core::GetTransactionDataRequest, {
     Self {
         transaction_ids: item.transaction_ids.iter().map(|x| RpcHash::from_hex(x)).collect::<Result<Vec<_>, _>>()?,
+        include_transactions: item.include_transactions,
         include_acceptance_data: item.include_acceptance_data,
         include_inclusion_data: item.include_inclusion_data,
         include_verbose_data: item.include_verbose_data,

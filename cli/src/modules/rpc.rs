@@ -240,6 +240,7 @@ impl Rpc {
                 let result = rpc
                     .get_transaction_data_call(GetTransactionDataRequest {
                         transaction_ids,
+                        include_transactions: true,
                         include_acceptance_data: true,
                         include_inclusion_data: true,
                         include_verbose_data: true,

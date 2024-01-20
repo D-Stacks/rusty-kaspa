@@ -828,6 +828,7 @@ impl GetDaaScoreTimestampEstimateResponse {
 pub struct GetTransactionDataRequest {
     // This requires the the node to be run with -- txindex
     pub transaction_ids: Vec<RpcTransactionId>,
+    pub include_transactions: bool,
     pub include_acceptance_data: bool,
     pub include_inclusion_data: bool,
     pub include_verbose_data: bool,
@@ -836,11 +837,12 @@ pub struct GetTransactionDataRequest {
 impl GetTransactionDataRequest {
     pub fn new(
         transaction_ids: Vec<RpcTransactionId>,
+        include_transactions: bool,
         include_acceptance_data: bool,
         include_inclusion_data: bool,
         include_verbose_data: bool,
     ) -> Self {
-        Self { transaction_ids, include_acceptance_data, include_inclusion_data, include_verbose_data }
+        Self { transaction_ids, include_transactions, include_acceptance_data, include_inclusion_data, include_verbose_data }
     }
 }
 

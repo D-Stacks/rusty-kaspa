@@ -549,14 +549,22 @@ async fn sanity_test() {
                 tst!(op, {
                     let genesis_transactions = SIMNET_GENESIS.build_genesis_transactions();
                     let results = rpc_client
-                        .get_transaction_data_call(GetTransactionDataRequest { 
+                        .get_transaction_data_call(GetTransactionDataRequest {
                             transaction_ids: genesis_transactions.iter().map(|tx| tx.id()).collect(),
-                            include_acceptance_data: true, 
-                            include_inclusion_data: true, 
-                            include_verbose_data: true, 
-                        }
-                    ).await.unwrap();
-                    assert!(results.transaction_data.is_empty()) // We do not expect the txindex to be populated, in order to return results in this test.
+                            include_transactions: true,
+                            include_acceptance_data: true,
+                            include_inclusion_data: true,
+                            include_verbose_data: true,
+                        })
+                        .await
+                        .unwrap();
+                    // We do not expect the txindex to be populated, in order to return results in this test.
+                    // and we expect a single transaction data to be returned with None for all fields
+                    assert_eq!(results.transaction_data.len(), 1);
+                    let rpc_transaction_data = results.transaction_data.get(0).unwrap();
+                    assert!(rpc_transaction_data.transaction.is_none());
+                    assert!(rpc_transaction_data.inclusion_data.is_none());
+                    assert!(rpc_transaction_data.acceptance_data.is_none());
                 })
             }
 

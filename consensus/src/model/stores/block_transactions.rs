@@ -6,9 +6,7 @@ use kaspa_database::prelude::DB;
 use kaspa_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use kaspa_database::registry::DatabaseStorePrefixes;
 use kaspa_hashes::Hash;
-use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::mem_size::MemSizeEstimator;
-use kaspa_utils::vec::VecExtensions;
 use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
@@ -16,7 +14,6 @@ use std::sync::Arc;
 
 pub trait BlockTransactionsStoreReader {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
-    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Vec<Transaction>, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -81,12 +78,6 @@ impl DbBlockTransactionsStore {
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
         Ok(self.access.read(hash)?.0)
-    }
-
-    fn get_at_indices(&self, hash: Hash, indices: &mut [usize]) -> Result<Vec<Transaction>, StoreError> {
-        let mut txs = self.access.read(hash)?.0.unwrap_or_clone();
-        txs.retain_indices(indices)?;
-        Ok(txs)
     }
 }
 

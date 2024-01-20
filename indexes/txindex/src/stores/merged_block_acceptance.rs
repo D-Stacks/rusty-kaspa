@@ -64,7 +64,7 @@ impl TxIndexMergedBlockAcceptanceStore for DbTxIndexMergedBlockAcceptanceStore {
         block_acceptance_offset_changes: BlockAcceptanceOffsetDiff,
     ) -> StoreResult<()> {
         let mut writer = BatchDbWriter::new(batch);
-        self.access.delete_many(&mut writer, &mut block_acceptance_offset_changes.removed.iter().map(|v| *v))?;
+        self.access.delete_many(&mut writer, &mut block_acceptance_offset_changes.removed.iter().copied())?;
         self.access.write_many(&mut writer, &mut block_acceptance_offset_changes.added.iter().map(|(k, v)| (*k, *v)))?;
         Ok(())
     }

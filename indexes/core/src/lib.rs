@@ -33,11 +33,13 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants, clippy::absurd_extreme_comparisons)] // since this tests change in constants
     fn test_circulating_supply_max() {
         assert!(MAX_SOMPI <= CirculatingSupply::MAX);
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // since this tests change in constants
     fn test_circulating_supply_diff_max() {
         assert!(MAX_SOMPI <= CirculatingSupplyDiff::MAX as u64);
     }
@@ -83,9 +85,9 @@ mod test {
         // Define sets accordingly:
 
         // Define the block hashes into unaccepted / accepted / reaccepted sets:
-        let unaccepted_blocks = BlockHashSet::from_iter([block_a, block_b].into_iter());
-        let reaccepted_blocks = BlockHashSet::from_iter([block_aa, block_hh].into_iter());
-        let accepted_blocks = BlockHashSet::from_iter([block_h, block_i].into_iter());
+        let unaccepted_blocks = BlockHashSet::from_iter([block_a, block_b]);
+        let reaccepted_blocks = BlockHashSet::from_iter([block_aa, block_hh]);
+        let accepted_blocks = BlockHashSet::from_iter([block_h, block_i]);
 
         // Define the tx hashes into block sets:
         let block_a_transactions = HashSet::<TransactionId>::from([tx_a_1, tx_a_2, tx_a_3, tx_a_4]);

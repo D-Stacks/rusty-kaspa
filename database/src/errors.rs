@@ -1,6 +1,5 @@
 use crate::prelude::DbKey;
 use kaspa_hashes::Hash;
-use kaspa_utils::vec::IndexOutOfBoundsError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -24,9 +23,6 @@ pub enum StoreError {
 
     #[error("bincode error {0}")]
     DeserializationError(#[from] Box<bincode::ErrorKind>),
-
-    #[error("index out of bounds error {0}")]
-    IndexOutOfBoundsError(#[from] IndexOutOfBoundsError),
 }
 
 pub type StoreResult<T> = std::result::Result<T, StoreError>;

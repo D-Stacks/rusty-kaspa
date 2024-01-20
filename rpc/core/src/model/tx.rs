@@ -78,7 +78,7 @@ impl From<TransactionOutput> for RpcTransactionOutput {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, BorshSerialize, BorshDeserialize, BorshSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcTransactionData {
     pub transaction: Option<RpcTransaction>,

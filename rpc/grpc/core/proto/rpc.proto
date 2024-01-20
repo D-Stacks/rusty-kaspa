@@ -880,9 +880,10 @@ message GetDaaScoreTimestampEstimateResponseMessage{
 // This requires the the node to be run with `--txindex`
 message GetTransactionDataRequestMessage {
   repeated string transactionIds = 1;
-  bool includeAcceptanceData = 2;
-  bool includeInclusionData = 3;
-  bool includeVerboseData = 4;
+  bool includeTransactions = 2;
+  bool includeAcceptanceData = 3;
+  bool includeInclusionData = 4;
+  bool includeVerboseData = 5;
 
 }
 // This requires the the node to be run with `--txindex`

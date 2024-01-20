@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
 
+use kaspa_consensus_core::header::CompactHeaderData;
 use kaspa_consensus_core::{
     block::Block,
     coinbase::MinerData,
@@ -16,6 +17,7 @@ use kaspa_consensus_core::{
     network::NetworkType,
     tx::{Transaction, COINBASE_TRANSACTION_INDEX},
 };
+use kaspa_consensus_core::{BlockHashMap, HashMapCustomHasher};
 use kaspa_consensus_notify::{
     notifier::ConsensusNotifier,
     {connection::ConsensusChannelConnection, notification::Notification as ConsensusNotification},
@@ -49,6 +51,7 @@ use kaspa_notify::{
 use kaspa_p2p_flows::flow_context::FlowContext;
 use kaspa_p2p_lib::common::ProtocolError;
 use kaspa_perf_monitor::{counters::CountersSnapshot, Monitor as PerfMonitor};
+
 use kaspa_rpc_core::{
     api::{
         ops::RPC_API_VERSION,
@@ -61,10 +64,12 @@ use kaspa_rpc_core::{
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script};
 use kaspa_utils::arc::ArcExtensions;
+
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 use kaspa_utxoindex::api::UtxoIndexProxy;
 
+use std::collections::hash_map::Entry;
 use std::{
     collections::HashMap,
     iter::once,
@@ -422,52 +427,114 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         Ok(GetBlocksResponse { block_hashes, blocks })
     }
 
-    async fn get_transaction_data_call(&self, _request: GetTransactionDataRequest) -> RpcResult<GetTransactionDataResponse> {
-        //todo!("get_transaction_data_call");
-        Ok(GetTransactionDataResponse::default())
-        /*
-            let tx_offsets = self.txindex.clone().unwrap().get_tx_offsets(request.transaction_ids).await?;
-            let mut rpc_txs = Vec::<RpcTransaction>::new();
-            // we use these to cache results, and get multiple transactions per block
-            let mut to_query_blocks = BlockHashMap::<Vec<usize>>::new();
-            let mut to_query_acceptance_data = BlockHashMap::<RpcTransactionVerboseData>::new();
-            let mut to_query_inclusion_data = BlockHashMap::<RpcAcceptanceData>::new();
+    async fn get_transaction_data_call(&self, request: GetTransactionDataRequest) -> RpcResult<GetTransactionDataResponse> {
+        // Validate
+        if !self.config.txindex {
+            return Err(RpcError::NoTxIndex);
+        } else if !request.include_transactions && request.include_verbose_data {
+            return Err(RpcError::InvalidGetTransactionDataRequest);
+        };
 
-            for tx_offset in tx_offsets.iter().cloned().filter_map(|x| x) {
-                if request.include_verbose_data {
-                    match to_query_blocks.entry(&tx_offset.including_block()) {
-                        Entry::Occupied(e) => e.get_mut().push(tx_offset.transaction_index()),
-                        Entry::Vacant(e) => e.insert(vec![tx_offset.transaction_index()]),
+        let session = self.consensus_manager.consensus().session().await;
+
+        let mut cached_block_transactions = BlockHashMap::<Option<Arc<Vec<Transaction>>>>::new();
+        let mut cached_compact_header_cache = BlockHashMap::<Option<CompactHeaderData>>::new();
+        let mut rpc_transaction_data = Vec::with_capacity(request.transaction_ids.len());
+
+        for tx_id in request.transaction_ids.into_iter() {
+            let tx_offset = self.txindex.clone().unwrap().get_tx_offset(tx_id).await.map_err(|e| RpcError::from(e.to_string()))?;
+
+            if let Some(tx_offset) = tx_offset {
+                let rpc_transaction = if request.include_transactions {
+                    let tx = match cached_block_transactions.entry(tx_offset.including_block) {
+                        Entry::Occupied(entry) => {
+                            entry.get().as_ref().map(|block_txs| block_txs.get(tx_offset.transaction_index as usize).unwrap().clone())
+                        }
+                        Entry::Vacant(entry) => {
+                            let block_txs = session.async_get_block_transactions(tx_offset.including_block).await.ok();
+                            entry.insert(block_txs.clone());
+                            block_txs.map(|block_txs| block_txs.get(tx_offset.transaction_index as usize).unwrap().clone())
+                        }
+                    };
+
+                    if let Some(tx) = tx {
+                        let mut rpc_tx = self.consensus_converter.get_transaction(&session, &tx, None, request.include_verbose_data);
+                        if request.include_verbose_data {
+                            // as we only cache compact headers, fill inclusion data here manually.
+                            rpc_tx.verbose_data.as_mut().unwrap().block_hash = tx_offset.including_block;
+                            rpc_tx.verbose_data.as_mut().unwrap().block_time =
+                                match cached_compact_header_cache.entry(tx_offset.including_block) {
+                                    Entry::Occupied(entry) => entry.get().map_or(0, |compact_header| compact_header.timestamp),
+                                    Entry::Vacant(entry) => {
+                                        let compact_header = session.async_get_compact_header(tx_offset.including_block).await.ok();
+                                        entry.insert(compact_header);
+                                        compact_header.map_or(0, |compact_header| compact_header.timestamp)
+                                    }
+                                }
+                        };
+                        Some(rpc_tx)
+                    } else {
+                        None
                     }
-                    }
+                } else {
+                    None
                 };
 
-            let session = self.consensus_manager.consensus().session().await?;
-
-            for (hash, indices) in to_query_blocks.iter() {
-                let txs = session.async_get_transactions_at_indices(hash, indices).await?;
-                rpc_txs.reserve_exact(txs.len());
-                for tx in txs.into_iter() {
-                    let rpc_tx = tx.into();
-                    if request.include_verbose_data {
-                        match to_query_inclusion_data.entry(hash) {
-                            Entry::Occupied(e) => todo!(),
-                            Entry::Vacant(e) => e.insert(session.async_),
-                        }
-
+                let tx_inclusion_data = if request.include_acceptance_data {
+                    match cached_compact_header_cache.entry(tx_offset.including_block) {
+                        Entry::Occupied(entry) => entry
+                            .get()
+                            .and_then(|compact_header| Some(RpcTransactionInclusionData::from((&tx_offset, &compact_header)))),
+                        Entry::Vacant(entry) => {
+                            let compact_header = session.async_get_compact_header(tx_offset.including_block).await.ok();
+                            entry.insert(compact_header);
+                            compact_header.map(|compact_header| RpcTransactionInclusionData::from((&tx_offset, &compact_header)))
                         }
                     }
-                    rpc_txs.push(rpc_tx);
+                } else {
+                    None
                 };
+
+                let tx_acceptance_data = if request.include_acceptance_data {
+                    if let Some(block_acceptance_offset) = self
+                        .txindex
+                        .clone()
+                        .unwrap()
+                        .get_merged_block_acceptance_offset(tx_offset.including_block)
+                        .await
+                        .map_err(|err| RpcError::from(err.to_string()))?
+                    {
+                        match cached_compact_header_cache.entry(block_acceptance_offset.accepting_block) {
+                            Entry::Occupied(entry) => entry.get().and_then(|compact_header| {
+                                Some(RpcTransactionAcceptanceData::from((&block_acceptance_offset, &compact_header)))
+                            }),
+                            Entry::Vacant(entry) => {
+                                let compact_header =
+                                    session.async_get_compact_header(block_acceptance_offset.accepting_block).await.ok();
+                                entry.insert(compact_header);
+                                compact_header.map(|compact_header| {
+                                    RpcTransactionAcceptanceData::from((&block_acceptance_offset, &compact_header))
+                                })
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                rpc_transaction_data.push(RpcTransactionData {
+                    transaction: rpc_transaction,
+                    inclusion_data: tx_inclusion_data,
+                    acceptance_data: tx_acceptance_data,
+                })
+            } else {
+                rpc_transaction_data.push(RpcTransactionData::default());
             };
+        }
 
-            let session = self.consensus_manager.consensus().session().await;
-            for tx_offset in tx_offsets.iter().cloned() {
-                if let Some(tx_offset) = tx_offset {
-                    let tx = session.async_get_transactions_at_indices(hash, indices).await?;
-                    let rpc_tx = self.protocol_converter.get_transaction(tx);
-                }
-        } */
+        Ok(GetTransactionDataResponse { transaction_data: rpc_transaction_data })
     }
 
     async fn get_info_call(&self, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {

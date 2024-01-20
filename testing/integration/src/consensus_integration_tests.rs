@@ -1104,22 +1104,13 @@ async fn json_test(file_path: &str, concurrency: bool) {
     {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
             let indexed_block_acceptance_offset =
-                Arc::try_unwrap(txindex.read().get_merged_block_acceptance_offset(vec![mergeset.block_hash]).unwrap())
-                    .unwrap()
-                    .get(0)
-                    .unwrap()
-                    .unwrap();
+                txindex.read().get_merged_block_acceptance_offset(mergeset.block_hash).unwrap().unwrap();
             assert_eq!(indexed_block_acceptance_offset.mergeset_index, i as u16);
             assert_eq!(indexed_block_acceptance_offset.accepting_block, accepting_block_hash);
             accepted_block_count += 1;
             accepted_tx_count += mergeset.accepted_transactions.len();
             for tx_entry in mergeset.accepted_transactions.iter() {
-                let indexed_accepted_tx_offset =
-                    Arc::try_unwrap(txindex.read().get_tx_offsets(vec![tx_entry.transaction_id]).unwrap())
-                        .unwrap()
-                        .get(0)
-                        .unwrap()
-                        .unwrap();
+                let indexed_accepted_tx_offset = txindex.read().get_tx_offset(tx_entry.transaction_id).unwrap().unwrap();
                 assert_eq!(indexed_accepted_tx_offset.including_block, mergeset.block_hash);
                 assert_eq!(indexed_accepted_tx_offset.transaction_index, tx_entry.index_within_block);
             }

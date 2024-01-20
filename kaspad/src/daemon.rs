@@ -439,7 +439,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
             let txindex_db = kaspa_database::prelude::ConnBuilder::default()
                 .with_db_path(txindex_db_dir)
                 .with_files_limit(tx_files_limit)
-                .with_parallelism(1 + txindex_config.perf.db_parallelism as usize)
+                .with_parallelism(1 + txindex_config.perf.db_parallelism)
                 .build()
                 .unwrap();
             Some(TxIndexProxy::new(TxIndex::new(consensus_manager.clone(), txindex_db, txindex_config).unwrap()))

@@ -92,7 +92,7 @@ impl ChainPath {
     }
 
     pub fn checkpoint_hash(&self) -> Hash {
-        self.added.last().unwrap_or(&self.removed.last().expect("none-empty chain path")).clone()
+        *self.added.last().unwrap_or(self.removed.last().expect("none-empty chain path"))
     }
 }
 

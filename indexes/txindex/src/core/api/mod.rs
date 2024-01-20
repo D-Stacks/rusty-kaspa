@@ -21,9 +21,9 @@ pub trait TxIndexApi: Send + Sync + Debug {
 
     // Getters
 
-    fn get_merged_block_acceptance_offset(&self, hashes: Vec<Hash>) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>>;
+    fn get_merged_block_acceptance_offset(&self, hash: Hash) -> TxIndexResult<Option<BlockAcceptanceOffset>>;
 
-    fn get_tx_offsets(&self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>>;
+    fn get_tx_offset(&self, tx_id: TransactionId) -> TxIndexResult<Option<TxOffset>>;
 
     fn get_sink(&self) -> TxIndexResult<Option<Hash>>;
 
@@ -54,15 +54,12 @@ impl TxIndexProxy {
         Self { inner }
     }
 
-    pub async fn get_tx_offsets(self, tx_ids: Vec<TransactionId>) -> TxIndexResult<Arc<Vec<Option<TxOffset>>>> {
-        spawn_blocking(move || self.inner.read().get_tx_offsets(tx_ids)).await.unwrap()
+    pub async fn get_tx_offset(self, tx_id: TransactionId) -> TxIndexResult<Option<TxOffset>> {
+        spawn_blocking(move || self.inner.read().get_tx_offset(tx_id)).await.unwrap()
     }
 
-    pub async fn get_merged_block_acceptance_offset(
-        self,
-        hashes: Vec<Hash>,
-    ) -> TxIndexResult<Arc<Vec<Option<BlockAcceptanceOffset>>>> {
-        spawn_blocking(move || self.inner.read().get_merged_block_acceptance_offset(hashes)).await.unwrap()
+    pub async fn get_merged_block_acceptance_offset(self, hash: Hash) -> TxIndexResult<Option<BlockAcceptanceOffset>> {
+        spawn_blocking(move || self.inner.read().get_merged_block_acceptance_offset(hash)).await.unwrap()
     }
 
     pub async fn update_via_virtual_chain_changed(

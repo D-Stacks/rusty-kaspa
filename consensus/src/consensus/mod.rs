@@ -818,8 +818,8 @@ impl ConsensusApi for Consensus {
         })
     }
 
-    fn get_transactions_at_indices(&self, hash: Hash, indices: &mut [usize]) -> ConsensusResult<Vec<Transaction>> {
-        Ok(self.block_transactions_store.get_at_indices(hash, indices).map_err(|_e| ConsensusError::MissingData(hash))?)
+    fn get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
+        self.block_transactions_store.get(hash).map_err(|_e| ConsensusError::MissingData(hash))
     }
 
     fn get_ghostdag_data(&self, hash: Hash) -> ConsensusResult<ExternalGhostdagData> {
@@ -859,7 +859,7 @@ impl ConsensusApi for Consensus {
     }
 
     fn get_block_acceptance_data(&self, hash: Hash) -> ConsensusResult<Arc<AcceptanceData>> {
-        Ok(self.acceptance_data_store.get(hash).map_err(|_| ConsensusError::MissingData(hash))?)
+        self.acceptance_data_store.get(hash).map_err(|_| ConsensusError::MissingData(hash))
     }
 
     fn get_missing_block_body_hashes(&self, high: Hash) -> ConsensusResult<Vec<Hash>> {

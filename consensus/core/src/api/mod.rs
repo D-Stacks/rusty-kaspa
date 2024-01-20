@@ -56,7 +56,7 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_transactions_at_indices(&self, hash: Hash, indices: &mut [usize]) -> ConsensusResult<Vec<Transaction>> {
+    fn get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
         unimplemented!()
     }
 

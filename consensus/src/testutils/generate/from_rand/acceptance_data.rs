@@ -51,7 +51,7 @@ pub fn generate_random_mergeset_block_acceptance(
 
 pub fn generate_random_tx_entries(rng: &mut SmallRng, indexes: &[TransactionIndexType]) -> Vec<TxEntry> {
     let mut tx_entries = Vec::with_capacity(indexes.len());
-    for i in indexes.into_iter() {
+    for i in indexes.iter() {
         tx_entries.push(generate_random_tx_entry_with_index(rng, *i));
     }
     tx_entries

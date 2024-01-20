@@ -55,6 +55,6 @@ impl TxIndexSourceStore for DbTxIndexSourceStore {
                 return Ok(());
             };
         };
-        Ok(self.access.write(&mut writer, &new_source)?)
+        self.access.write(&mut writer, &new_source)
     }
 }

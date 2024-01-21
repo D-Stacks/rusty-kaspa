@@ -847,19 +847,16 @@ impl ConsensusApi for Consensus {
     fn get_block_status(&self, hash: Hash) -> Option<BlockStatus> {
         self.statuses_store.read().get(hash).unwrap_option()
     }
-
-    fn get_blocks_acceptance_data(&self, hashes: Arc<Vec<Hash>>) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
-        Ok(Arc::new(
-            hashes
-                .iter()
-                .copied()
-                .map(|hash| self.acceptance_data_store.get(hash).map_err(|_| ConsensusError::MissingData(hash)))
-                .collect::<ConsensusResult<Vec<_>>>()?,
-        ))
-    }
-
     fn get_block_acceptance_data(&self, hash: Hash) -> ConsensusResult<Arc<AcceptanceData>> {
         self.acceptance_data_store.get(hash).map_err(|_| ConsensusError::MissingData(hash))
+    }
+
+    fn get_blocks_acceptance_data(&self, hashes: &[Hash]) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
+        hashes
+            .iter()
+            .copied()
+            .map(|hash| self.acceptance_data_store.get(hash).unwrap_option().ok_or(ConsensusError::MissingData(hash)))
+            .collect::<ConsensusResult<Vec<_>>>()
     }
 
     fn get_missing_block_body_hashes(&self, high: Hash) -> ConsensusResult<Vec<Hash>> {

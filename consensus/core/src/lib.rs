@@ -4,7 +4,6 @@ extern crate self as consensus_core;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
-use std::sync::Arc;
 
 pub use kaspa_hashes::Hash;
 
@@ -80,20 +79,10 @@ impl HashMapCustomHasher for BlockHashSet {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub struct ChainPath {
-    pub added: Arc<Vec<Hash>>,
-    pub removed: Arc<Vec<Hash>>,
-}
-
-impl ChainPath {
-    pub fn new(added: Arc<Vec<Hash>>, removed: Arc<Vec<Hash>>) -> Self {
-        Self { added, removed }
-    }
-
-    pub fn checkpoint_hash(&self) -> Hash {
-        *self.added.last().unwrap_or(self.removed.last().expect("none-empty chain path"))
-    }
+    pub added: Vec<Hash>,
+    pub removed: Vec<Hash>,
 }
 
 /// `hashes::Hash` writes 4 u64s so we just use the last one as the hash here

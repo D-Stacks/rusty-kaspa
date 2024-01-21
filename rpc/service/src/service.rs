@@ -4,13 +4,11 @@ use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
 use crate::service::NetworkType::{Mainnet, Testnet};
 use async_trait::async_trait;
-
 use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
-
-use kaspa_consensus_core::header::CompactHeaderData;
 use kaspa_consensus_core::{
     block::Block,
+    header::CompactHeaderData,
     coinbase::MinerData,
     config::Config,
     constants::MAX_SOMPI,
@@ -63,12 +61,9 @@ use kaspa_rpc_core::{
 };
 use kaspa_txindex::api::TxIndexProxy;
 use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script};
-use kaspa_utils::arc::ArcExtensions;
-
 use kaspa_utils::{channel::Channel, triggers::SingleTrigger};
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 use kaspa_utxoindex::api::UtxoIndexProxy;
-
 use std::collections::hash_map::Entry;
 use std::{
     collections::HashMap,
@@ -639,17 +634,13 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         request: GetVirtualChainFromBlockRequest,
     ) -> RpcResult<GetVirtualChainFromBlockResponse> {
         let session = self.consensus_manager.consensus().session().await;
-        let virtual_chain = session.async_get_virtual_chain_from_block(request.start_hash).await?;
+        let virtual_chain = session.async_get_virtual_chain_from_block(request.start_hash, None, usize::MAX).await?;
         let accepted_transaction_ids = if request.include_accepted_transaction_ids {
-            self.consensus_converter.get_virtual_chain_accepted_transaction_ids(&session, virtual_chain.clone()).await?
+            self.consensus_converter.get_virtual_chain_accepted_transaction_ids(&session, &virtual_chain).await?
         } else {
             vec![]
         };
-        Ok(GetVirtualChainFromBlockResponse::new(
-            virtual_chain.removed.unwrap_or_clone(),
-            virtual_chain.added.unwrap_or_clone(),
-            accepted_transaction_ids,
-        ))
+        Ok(GetVirtualChainFromBlockResponse::new(virtual_chain.removed, virtual_chain.added, accepted_transaction_ids))
     }
 
     async fn get_block_count_call(&self, _: GetBlockCountRequest) -> RpcResult<GetBlockCountResponse> {

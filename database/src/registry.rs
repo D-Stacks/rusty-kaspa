@@ -56,9 +56,9 @@ pub enum DatabaseStorePrefixes {
     CirculatingSupply = 194,
 
     // 2) TX index
-    TxIndexUnacceptedOffsets = 198,
+    // TxIndexUnacceptedOffsets = 198, - reserved for future use
     TxIndexAcceptedOffsets = 199,
-    TxIndexTips = 200,
+    // TxIndexTips = 200, - reserved for future use
     TxIndexSink = 201,
     TxIndexSource = 202,
     TxIndexMergedBlockAcceptance = 203, // Move to acceptance index eventually.

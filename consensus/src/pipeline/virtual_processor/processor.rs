@@ -325,8 +325,8 @@ impl VirtualStateProcessor {
                 chain_path.removed.iter().copied().map(|removed| self.acceptance_data_store.get(removed).unwrap()).collect_vec();
             self.notification_root
                 .notify(Notification::VirtualChainChanged(VirtualChainChangedNotification::new(
-                    chain_path.added,
-                    chain_path.removed,
+                    chain_path.added.into(),
+                    chain_path.removed.into(),
                     Arc::new(added_chain_blocks_acceptance_data),
                     Arc::new(removed_chain_blocks_acceptance_data),
                 )))

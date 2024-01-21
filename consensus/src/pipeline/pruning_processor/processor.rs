@@ -397,6 +397,7 @@ impl PruningProcessor {
 
                 //let pruned_acceptance_data = self.acceptance_data_store.clone().get(current).unwrap();
                 let chain_acceptance_pruned = if self.notification_root.has_subscription(EventType::ChainAcceptanceDataPruned) // check if someone is subscribed
+                //TODO: are these just sanity checks, that may be removed?
                 & self.reachability_service.is_chain_ancestor_of(current, new_pruning_point) // check if it is a chain block
                 && self.acceptance_data_store.has(current).unwrap()
                 // check if acceptance data has already been pruned

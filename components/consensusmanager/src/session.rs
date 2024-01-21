@@ -17,7 +17,6 @@ use kaspa_consensus_core::{
     BlockHashSet, BlueWorkType, ChainPath, Hash,
 };
 use kaspa_utils::sync::rwlock::*;
-
 use std::{ops::Deref, sync::Arc};
 
 pub use tokio::task::spawn_blocking;
@@ -235,8 +234,8 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(|c| c.is_nearly_synced()).await
     }
 
-    pub async fn async_get_virtual_chain_from_block(&self, hash: Hash) -> ConsensusResult<ChainPath> {
-        self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(hash, None, usize::MAX)).await
+    pub async fn async_get_virtual_chain_from_block(&self, low: Hash, high: Option<Hash>, max_blocks: usize) -> ConsensusResult<ChainPath> {
+        self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(low, high, max_blocks)).await
     }
 
     pub async fn async_get_virtual_parents(&self) -> BlockHashSet {
@@ -353,9 +352,17 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.get_block_status(hash)).await
     }
 
-    pub async fn async_get_blocks_acceptance_data(&self, hashes: Arc<Vec<Hash>>) -> ConsensusResult<Arc<Vec<Arc<AcceptanceData>>>> {
-        self.clone().spawn_blocking(move |c| c.get_blocks_acceptance_data(hashes)).await
+    pub async fn async_get_block_acceptance_data(&self, hash: Hash) -> ConsensusResult<Arc<AcceptanceData>> {
+        self.clone().spawn_blocking(move |c| c.get_block_acceptance_data(hash)).await
     }
+
+    /// Returns acceptance data for a set of blocks belonging to the selected parent chain.
+    ///
+    /// See `self::get_virtual_chain`
+    pub async fn async_get_blocks_acceptance_data(&self, hashes: Vec<Hash>) -> ConsensusResult<Vec<Arc<AcceptanceData>>> {
+        self.clone().spawn_blocking(move |c| c.get_blocks_acceptance_data(&hashes)).await
+    }
+
     pub async fn async_is_chain_block(&self, hash: Hash) -> ConsensusResult<bool> {
         self.clone().spawn_blocking(move |c| c.is_chain_block(hash)).await
     }

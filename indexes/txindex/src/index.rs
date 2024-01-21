@@ -19,7 +19,6 @@ use rocksdb::WriteBatch;
 use crate::{
     config::Config as TxIndexConfig,
     core::api::TxIndexApi,
-    core::errors::TxIndexError,
     core::errors::TxIndexResult,
     stores::{
         TxIndexAcceptedTxOffsetsReader, TxIndexAcceptedTxOffsetsStore, TxIndexMergedBlockAcceptanceReader,
@@ -60,7 +59,9 @@ impl TxIndex {
 
         self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, reindexer.tx_offset_changes)?;
         self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, reindexer.block_acceptance_offsets_changes)?;
-        self.stores.sink_store.set_via_batch_writer(&mut batch, reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
+        self.stores
+            .sink_store
+            .set_via_batch_writer(&mut batch, reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
 
         self.stores.write_batch(batch)
     }
@@ -78,9 +79,8 @@ impl TxIndex {
             session.get_compact_header(sync_to)?.daa_score - session.get_compact_header(sync_from)?.daa_score;
         let mut total_blocks_processed: u64 = 0u64;
         let mut total_txs_processed: u64 = 0u64;
-        let mut percent_completed = 0f64;
-        let mut percent_display_granularity = 1f64;
-        let mut start_time: std::time::Instant;
+        let mut former_percent_completed = 0f64;
+        let percent_display_granularity = 1.0; // in percent 
 
         while sync_from != sync_to {
             let to_process_hashes =
@@ -98,13 +98,13 @@ impl TxIndex {
             let vspcc_notification = if !remove_segment {
                 ConsensusVirtualChainChangedNotification {
                     added_chain_block_hashes: Arc::new(vec![]),
-                    removed_chain_block_hashes: to_process_hashes,
+                    removed_chain_block_hashes: to_process_hashes.into(),
                     added_chain_blocks_acceptance_data: Arc::new(vec![]),
                     removed_chain_blocks_acceptance_data: acceptance_data,
                 }
             } else {
                 ConsensusVirtualChainChangedNotification {
-                    added_chain_block_hashes: to_process_hashes,
+                    added_chain_block_hashes: to_process_hashes.into(),
                     removed_chain_block_hashes: Arc::new(vec![]),
                     added_chain_blocks_acceptance_data: acceptance_data,
                     removed_chain_blocks_acceptance_data: Arc::new(vec![]),
@@ -119,12 +119,12 @@ impl TxIndex {
                 total_txs_processed + txindex_reindexer.tx_offset_changes.added.len() as u64
             };
 
-            let former_percent_completed = percent_completed;
-            percent_completed = (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0;
+            let percent_completed = (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0;
 
             self.update_via_virtual_chain_changed_with_reindexer(txindex_reindexer)?;
 
-            if former_percent_completed + percent_display_granularity >= percent_completed { 
+            if former_percent_completed + percent_display_granularity as f64 >= percent_completed {
+                former_percent_completed = percent_completed;
                 info!(
                     "[{0:?}] {1} {2} Transactions form {3} Blocks, {4:.0} %",
                     self,
@@ -429,7 +429,7 @@ mod tests {
             ],
         }]);
 
-        let virtual_chain = ChainPath::new(Arc::new(vec![block_a, block_b]), Arc::new(Vec::new()));
+        let virtual_chain = ChainPath { added: vec![block_a, block_b], removed: Vec::new() };
 
         let mut batch = WriteBatch::default();
         tc.acceptance_data_store.insert_batch(&mut batch, block_a, acceptance_data_a.clone()).unwrap();
@@ -440,8 +440,8 @@ mod tests {
         tc_db.write(batch).unwrap();
 
         let init_virtual_chain_changed_notification = VirtualChainChangedNotification {
-            added_chain_block_hashes: virtual_chain.clone().added.clone(),
-            removed_chain_block_hashes: virtual_chain.clone().removed.clone(),
+            added_chain_block_hashes: virtual_chain.added.clone().into(),
+            removed_chain_block_hashes: virtual_chain.removed.clone().into(),
             added_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_a.clone(), acceptance_data_b.clone()]),
             removed_chain_blocks_acceptance_data: Arc::new(Vec::new()),
         };
@@ -483,13 +483,13 @@ mod tests {
             ],
         }]);
 
-        let virtual_chain = ChainPath::new(Arc::new(vec![block_h, block_i]), Arc::new(vec![block_a, block_b]));
+        let virtual_chain = ChainPath { added: vec![block_h, block_i], removed: vec![block_a, block_b] };
 
         // Define the notification:
         let test_vspcc_change_notification = VirtualChainChangedNotification {
-            added_chain_block_hashes: virtual_chain.added.clone(),
+            added_chain_block_hashes: virtual_chain.added.clone().into(),
             added_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_h.clone(), acceptance_data_i.clone()]),
-            removed_chain_block_hashes: virtual_chain.removed.clone(),
+            removed_chain_block_hashes: virtual_chain.removed.clone().into(),
             removed_chain_blocks_acceptance_data: Arc::new(vec![acceptance_data_a.clone(), acceptance_data_b.clone()]),
         };
 
@@ -513,7 +513,7 @@ mod tests {
             history_root: block_i,
         };
 
-        let virtual_chain = ChainPath::new(Arc::new(vec![block_i]), Arc::new(vec![]));
+        let virtual_chain = ChainPath { added: vec![block_i], removed: vec![] };
 
         let mut batch = WriteBatch::default();
         tc.acceptance_data_store.delete_batch(&mut batch, block_h).unwrap();

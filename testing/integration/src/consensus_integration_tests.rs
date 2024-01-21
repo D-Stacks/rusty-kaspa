@@ -1093,14 +1093,13 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_eq!(txindex.read().get_source().unwrap().unwrap(), tc_history_root);
     assert_eq!(txindex.read().get_sink().unwrap().unwrap(), tc.get_sink());
 
-    let mut consensus_chain =
-        Arc::try_unwrap(tc.get_virtual_chain_from_block(tc_history_root, None, usize::MAX).unwrap().added).unwrap();
+    let mut consensus_chain = tc.get_virtual_chain_from_block(tc_history_root, None, usize::MAX).unwrap().added;
     consensus_chain.insert(0, tc_history_root);
-    let consensus_acceptance_data = tc.get_blocks_acceptance_data(Arc::new(consensus_chain.clone())).unwrap();
+    let consensus_acceptance_data = tc.get_blocks_acceptance_data(&consensus_chain).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
     for (accepting_block_hash, acceptance_data) in
-        consensus_chain.into_iter().zip(Arc::try_unwrap(consensus_acceptance_data).unwrap().into_iter())
+        consensus_chain.into_iter().zip(consensus_acceptance_data)
     {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
             let indexed_block_acceptance_offset =

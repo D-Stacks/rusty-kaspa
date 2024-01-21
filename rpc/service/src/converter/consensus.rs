@@ -121,27 +121,28 @@ impl ConsensusConverter {
         header: Option<&Header>,
         include_verbose_data: bool,
     ) -> RpcTransaction {
-        RpcTransaction {
-            version: transaction.version,
-            inputs: transaction.inputs.iter().map(|x| self.get_transaction_input(x)).collect(),
-            outputs: transaction.outputs.iter().map(|x| self.get_transaction_output(x)).collect(),
-            lock_time: transaction.lock_time,
-            subnetwork_id: transaction.subnetwork_id.clone(),
-            gas: transaction.gas,
-            payload: transaction.payload.clone(),
-            mass: transaction.mass(),
-            verbose_data: if include_verbose_data {
-                Some(RpcTransactionVerboseData {
-                    transaction_id: transaction.id(),
-                    hash: hash(transaction, false),
-                    mass: consensus.calculate_transaction_compute_mass(transaction),
-                    // TODO: make block_hash an option
-                    block_hash: header.map_or_else(RpcHash::default, |x| x.hash),
-                    block_time: header.map_or(0, |x| x.timestamp),
-                })
-            } else {
-                None
-            },
+        if include_verbose_data {
+            let verbose_data = Some(RpcTransactionVerboseData {
+                transaction_id: transaction.id(),
+                hash: hash(transaction, false),
+                mass: consensus.calculate_transaction_compute_mass(transaction),
+                // TODO: make block_hash an option
+                block_hash: header.map_or_else(RpcHash::default, |x| x.hash),
+                block_time: header.map_or(0, |x| x.timestamp),
+            });
+            RpcTransaction {
+                version: transaction.version,
+                inputs: transaction.inputs.iter().map(|x| self.get_transaction_input(x)).collect(),
+                outputs: transaction.outputs.iter().map(|x| self.get_transaction_output(x)).collect(),
+                lock_time: transaction.lock_time,
+                subnetwork_id: transaction.subnetwork_id.clone(),
+                gas: transaction.gas,
+                payload: transaction.payload.clone(),
+                mass: transaction.mass(),
+                verbose_data,
+            }
+        } else {
+            transaction.into()
         }
     }
 
@@ -160,9 +161,9 @@ impl ConsensusConverter {
     pub async fn get_virtual_chain_accepted_transaction_ids(
         &self,
         consensus: &ConsensusProxy,
-        chain_path: ChainPath,
+        chain_path: &ChainPath,
     ) -> RpcResult<Vec<RpcAcceptedTransactionIds>> {
-        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.clone()).await?;
+        let acceptance_data = consensus.async_get_blocks_acceptance_data(chain_path.added.clone()).await.unwrap();
         Ok(chain_path
             .added
             .iter()

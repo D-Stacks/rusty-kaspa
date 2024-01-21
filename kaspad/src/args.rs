@@ -392,7 +392,7 @@ impl Args {
             enable_unsynced_mining: m.get_one::<bool>("enable-unsynced-mining").cloned().unwrap_or(defaults.enable_unsynced_mining),
             enable_mainnet_mining: m.get_one::<bool>("enable-mainnet-mining").cloned().unwrap_or(defaults.enable_mainnet_mining),
             utxoindex: m.get_one::<bool>("utxoindex").cloned().unwrap_or(defaults.utxoindex),
-            txindex: m.get_one::<bool>("utxoindex").cloned().unwrap_or(defaults.txindex),
+            txindex: m.get_one::<bool>("txindex").cloned().unwrap_or(defaults.txindex),
             testnet: m.get_one::<bool>("testnet").cloned().unwrap_or(defaults.testnet),
             testnet_suffix: m.get_one::<u32>("netsuffix").cloned().unwrap_or(defaults.testnet_suffix),
             devnet: m.get_one::<bool>("devnet").cloned().unwrap_or(defaults.devnet),

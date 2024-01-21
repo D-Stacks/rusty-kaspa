@@ -49,111 +49,90 @@ impl TxIndex {
                 }
             };
         };
-
         let txindex = Arc::new(RwLock::new(txindex));
+        info!("[{0:?}] Initialized", txindex);
         //consensus_manager.register_consensus_reset_handler(Arc::new(TxIndexConsensusResetHandler::new(Arc::downgrade(&txindex))));
         Ok(txindex)
     }
 
+    fn update_via_virtual_chain_changed_with_reindexer(&mut self, reindexer: TxIndexReindexer) -> TxIndexResult<()> {
+        let mut batch = WriteBatch::default();
+
+        self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, reindexer.tx_offset_changes)?;
+        self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, reindexer.block_acceptance_offsets_changes)?;
+        self.stores.sink_store.set_via_batch_writer(&mut batch, reindexer.new_sink.expect("expected a new sink with each new VCC notification"))?;
+
+        self.stores.write_batch(batch)
+    }
+
     // For internal usage only
-    fn _resync_segement(
+    fn sync_segement(
         &mut self,
-        mut start_hash: Hash,
-        end_hash: Hash,
+        mut sync_from: Hash,
+        sync_to: Hash,
+        remove_segment: bool,
         session: &ConsensusSessionBlocking<'_>,
-        // Setting below to true will remove data added along the start_hash -> end_hash path.
-        unsync_segment: bool,
     ) -> TxIndexResult<()> {
-        info!("[{0:?}] Resyncing from {1} to {2}", self, start_hash, end_hash,);
-        let split_hash = session.find_highest_common_chain_block(start_hash, end_hash)?;
-        let split_daa_score = session.get_header(split_hash)?.daa_score;
-        let total_blocks_to_remove = session.get_header(start_hash)?.daa_score - split_daa_score; // start_daa_score - split_daa_score;
-        let total_blocks_to_add = session.get_header(end_hash)?.daa_score - split_daa_score; // end_daa_score - split_daa_score;
+        info!("[{0:?}] {1} From: {2} To: {3}.. ", self, if remove_segment { "Unsyncing" } else { "Resyncing" }, sync_from, sync_to);
+        let total_blocks_to_process =
+            session.get_compact_header(sync_to)?.daa_score - session.get_compact_header(sync_from)?.daa_score;
+        let mut total_blocks_processed: u64 = 0u64;
+        let mut total_txs_processed: u64 = 0u64;
+        let mut percent_completed = 0f64;
+        let mut percent_display_granularity = 1f64;
+        let mut start_time: std::time::Instant;
 
-        let mut total_blocks_removed: u64 = 0u64;
-        let mut total_blocks_added: u64 = 0u64;
-        let mut removed_processed_in_batch = 0u64;
-        let mut added_processed_in_batch = 0u64;
+        while sync_from != sync_to {
+            let to_process_hashes =
+                session.get_virtual_chain_from_block(sync_from, Some(sync_to), self.config.perf.resync_chunksize)?.added;
 
-        // As the `session.get_virtual_chain_from_block` method is exclusive to the start-hash, under the added condition, we commit this separately..
-        if unsync_segment {
-            self.update_via_virtual_chain_changed(ConsensusVirtualChainChangedNotification::new(
-                Arc::new(vec![start_hash]),
-                Arc::new(vec![]),
-                Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
-                Arc::new(vec![]),
-            ))?;
-        } else {
-            self.update_via_virtual_chain_changed(ConsensusVirtualChainChangedNotification::new(
-                Arc::new(vec![]),
-                Arc::new(vec![start_hash]),
-                Arc::new(vec![]),
-                Arc::new(vec![session.get_block_acceptance_data(start_hash)?]),
-            ))?;
-        };
-        while start_hash != end_hash {
-            let mut chain_path =
-                session.get_virtual_chain_from_block(start_hash, Some(end_hash), self.config.perf.resync_chunksize)?;
-
-            // We switch added to removed, and clear removed, as we have no use for the removed data.
-            if unsync_segment {
-                chain_path.removed = chain_path.added;
-                chain_path.added = Arc::new(vec![]);
-            }
-
-            let removed_chain_blocks_acceptance_data = if !chain_path.removed.is_empty() {
-                session.get_blocks_acceptance_data(chain_path.added.clone())?
-            } else {
-                Arc::new(vec![])
-            };
-            removed_processed_in_batch += chain_path.added.len() as u64;
-
-            let added_chain_blocks_acceptance_data = if !chain_path.added.is_empty() {
-                session.get_blocks_acceptance_data(chain_path.removed.clone())?
-            } else {
-                Arc::new(vec![])
-            };
-
-            removed_processed_in_batch += chain_path.added.len() as u64;
-            added_processed_in_batch += chain_path.removed.len() as u64;
-
-            start_hash = chain_path.checkpoint_hash();
-
-            let vspcc_notification = ConsensusVirtualChainChangedNotification::new(
-                chain_path.added,
-                chain_path.removed,
-                added_chain_blocks_acceptance_data,
-                removed_chain_blocks_acceptance_data,
+            let acceptance_data = Arc::new(
+                to_process_hashes.iter().filter_map(|hash| session.get_block_acceptance_data(*hash).ok()).collect::<Vec<_>>(),
             );
 
-            self.update_via_virtual_chain_changed(vspcc_notification)?;
+            total_blocks_processed += to_process_hashes.len() as u64;
 
-            if removed_processed_in_batch != 0 {
-                total_blocks_removed += removed_processed_in_batch;
-                // Log progress
-                info!(
-                    "[{0:?}] Removed {1}, {2} blocks out of {3}, {4:.2} completed",
-                    self,
-                    removed_processed_in_batch,
-                    total_blocks_removed,
-                    total_blocks_to_remove,
-                    total_blocks_removed as f64 / total_blocks_to_remove as f64 * 100.0,
-                );
-                removed_processed_in_batch = 0;
-            }
+            sync_from = to_process_hashes.last().unwrap().clone();
 
-            if added_processed_in_batch != 0 {
-                total_blocks_added += added_processed_in_batch;
-                // Log progress
+            //TODO: make txindex reindex accept a hash and acceptance data vec, for now use a pseudo notification.
+            let vspcc_notification = if !remove_segment {
+                ConsensusVirtualChainChangedNotification {
+                    added_chain_block_hashes: Arc::new(vec![]),
+                    removed_chain_block_hashes: to_process_hashes,
+                    added_chain_blocks_acceptance_data: Arc::new(vec![]),
+                    removed_chain_blocks_acceptance_data: acceptance_data,
+                }
+            } else {
+                ConsensusVirtualChainChangedNotification {
+                    added_chain_block_hashes: to_process_hashes,
+                    removed_chain_block_hashes: Arc::new(vec![]),
+                    added_chain_blocks_acceptance_data: acceptance_data,
+                    removed_chain_blocks_acceptance_data: Arc::new(vec![]),
+                }
+            };
+
+            let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
+
+            total_txs_processed = if remove_segment {
+                total_txs_processed + txindex_reindexer.tx_offset_changes.removed.len() as u64
+            } else {
+                total_txs_processed + txindex_reindexer.tx_offset_changes.added.len() as u64
+            };
+
+            let former_percent_completed = percent_completed;
+            percent_completed = (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0;
+
+            self.update_via_virtual_chain_changed_with_reindexer(txindex_reindexer)?;
+
+            if former_percent_completed + percent_display_granularity >= percent_completed { 
                 info!(
-                    "[{0:?}] Added {1}, {2} blocks out of {3}, {4:.2} completed",
+                    "[{0:?}] {1} {2} Transactions form {3} Blocks, {4:.0} %",
                     self,
-                    added_processed_in_batch,
-                    total_blocks_removed,
-                    total_blocks_to_add,
-                    total_blocks_added as f64 / total_blocks_to_add as f64 * 100.0,
+                    if remove_segment { "Removed:" } else { "Added:" },
+                    total_txs_processed,
+                    total_blocks_processed,
+                    (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0,
                 );
-                added_processed_in_batch = 0;
             }
         }
 
@@ -170,48 +149,33 @@ impl TxIndexApi for TxIndex {
         let session = futures::executor::block_on(consensus.session_blocking());
         // Gather the necessary block hashes
         let txindex_source = self.stores.source_store.get()?;
-        let consensus_history_root = session.get_history_root();
+        let consensus_history_root = session.get_source();
         let txindex_sink = self.stores.sink_store.get()?;
         let consensus_sink = session.get_sink();
 
-        let start_hash = txindex_source
-        .filter(|txindex_source| *txindex_source == consensus_history_root)
-        .unwrap_or({
-            info!(
-                "[{0:?}] txindex source is not synced with consensus history root. txindex source: {1:?}, consensus history root: {2:?} - Resetting the DB",
-                self,
-                txindex_source,
-                consensus_history_root,
-            );
+        let resync_from = txindex_source.filter(|txindex_source| *txindex_source == consensus_history_root).unwrap_or({
+            info!("[{0:?}] Resetting the txindex and consensus sources are not synced", self);
             self.stores.delete_all()?; // we reset the txindex
-            // We can set the source anew after clearing db        
-            self.stores.source_store.set(consensus_history_root)?;
+            self.stores.source_store.set(consensus_history_root)?; // We can set the source anew after clearing db
             consensus_history_root
         });
+        let resync_to = consensus_sink;
 
-        let end_hash = txindex_sink.map_or_else(
-            || Ok::<Hash, TxIndexError>(consensus_sink),
-            |txindex_sink| {
-                if txindex_sink != consensus_sink {
-                    info!(
-                        "[{0:?}] txindex sink is not synced with consensus sink. txindex sink: {1:?}, consensus sink: {2}",
-                        self, txindex_sink, consensus_sink,
-                    );
-                    // If txindex sink is not synced with consensus sink, and not a chain block, we must first unsync from the highest common chain block.
-                    if !session.is_chain_block(txindex_sink)? {
-                        let hccb = session.find_highest_common_chain_block(txindex_sink, consensus_sink)?;
-                        info!(
-                            "[{0:?}] txindex sink is not a chain block, unsyncing from {1} to the highest common chain block: {2}",
-                            self, txindex_sink, hccb,
-                        );
-                        self._resync_segement(txindex_sink, hccb, &session, true)?;
-                    }
-                }
-                Ok(consensus_sink)
-            },
-        )?;
+        let unsync_from = txindex_sink;
+        let unsync_to = if let Some(txindex_sink) = txindex_sink {
+            if txindex_sink != consensus_sink && !session.is_chain_block(txindex_sink)? {
+                Some(session.find_highest_common_chain_block(consensus_sink, txindex_sink)?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
-        self._resync_segement(start_hash, end_hash, &session, false)?;
+        if unsync_from.is_some() && unsync_to.is_some() {
+            self.sync_segement(unsync_from.unwrap(), unsync_to.unwrap(), true, &session)?;
+        }
+        self.sync_segement(resync_from, resync_to, false, &session)?;
         Ok(())
     }
 
@@ -262,18 +226,7 @@ impl TxIndexApi for TxIndex {
             return Ok(());
         }
 
-        let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
-
-        let mut batch = WriteBatch::default();
-
-        self.stores.accepted_tx_offsets_store.write_diff_batch(&mut batch, txindex_reindexer.tx_offset_changes)?;
-        self.stores.merged_block_acceptance_store.write_diff_batch(&mut batch, txindex_reindexer.block_acceptance_offsets_changes)?;
-        self.stores.sink_store.set_via_batch_writer(
-            &mut batch,
-            txindex_reindexer.new_sink.expect("expected a new sink with each new VCC notification"),
-        )?;
-
-        self.stores.write_batch(batch)
+        self.update_via_virtual_chain_changed_with_reindexer(TxIndexReindexer::from(vspcc_notification))
     }
 
     fn update_via_chain_acceptance_data_pruned(

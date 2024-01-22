@@ -1,0 +1,23 @@
+[package]
+name = "kaspa-index-core"
+description = "Kaspa index core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+
+[dependencies]
+derive_more.workspace = true
+kaspa-consensus-core.workspace = true
+kaspa-consensus-notify.workspace = true
+kaspa-hashes.workspace = true
+kaspa-notify.workspace = true
+kaspa-utils.workspace = true
+serde.workspace = true
+paste.workspace = true
+
+[dev-dependencies]
+# parking_lot.workspace = true
+# tokio = { workspace = true, features = ["rt", "macros"] }
+# rand = {workspace = true,  features = [ "small_rng" ]}

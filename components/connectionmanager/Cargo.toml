@@ -1,0 +1,21 @@
+[package]
+name = "kaspa-connectionmanager"
+description = "Kaspa connection manager"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+
+[dependencies]
+duration-string.workspace = true
+futures-util.workspace = true
+itertools.workspace = true
+kaspa-addressmanager.workspace = true
+kaspa-core.workspace = true
+kaspa-p2p-lib.workspace = true
+kaspa-utils.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+tokio.workspace = true

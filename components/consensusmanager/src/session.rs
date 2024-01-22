@@ -4,11 +4,13 @@
 
 use kaspa_consensus_core::{
     acceptance_data::AcceptanceData,
-    api::{BlockCount, BlockValidationFutures, ConsensusApi, ConsensusStats, DynConsensus},
+    api::{BlockValidationFutures, ConsensusApi, DynConsensus},
     block::Block,
+    block_count::BlockCount,
     blockstatus::BlockStatus,
     daa_score_timestamp::DaaScoreTimestamp,
     errors::consensus::ConsensusResult,
+    header::{CompactHeaderData, Header},
     header::{CompactHeaderData, Header},
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalGhostdagData, TrustedBlock},
@@ -186,33 +188,16 @@ impl ConsensusSessionOwned {
         self.consensus.calculate_transaction_storage_mass(transaction)
     }
 
-    pub fn get_virtual_daa_score(&self) -> u64 {
-        // Accessing cached virtual fields is lock-free and does not require spawn_blocking
-        self.consensus.get_virtual_daa_score()
+    pub async fn async_get_virtual_daa_score(&self) -> u64 {
+        self.clone().spawn_blocking(|c| c.get_virtual_daa_score()).await
     }
 
-    pub fn get_virtual_bits(&self) -> u32 {
-        // Accessing cached virtual fields is lock-free and does not require spawn_blocking
-        self.consensus.get_virtual_bits()
+    pub async fn async_get_virtual_bits(&self) -> u32 {
+        self.clone().spawn_blocking(|c| c.get_virtual_bits()).await
     }
 
-    pub fn get_virtual_past_median_time(&self) -> u64 {
-        // Accessing cached virtual fields is lock-free and does not require spawn_blocking
-        self.consensus.get_virtual_past_median_time()
-    }
-
-    pub fn get_virtual_parents(&self) -> BlockHashSet {
-        // Accessing cached virtual fields is lock-free and does not require spawn_blocking
-        self.consensus.get_virtual_parents()
-    }
-
-    pub fn get_virtual_parents_len(&self) -> usize {
-        // Accessing cached virtual fields is lock-free and does not require spawn_blocking
-        self.consensus.get_virtual_parents_len()
-    }
-
-    pub async fn async_get_stats(&self) -> ConsensusStats {
-        self.clone().spawn_blocking(|c| c.get_stats()).await
+    pub async fn async_get_virtual_past_median_time(&self) -> u64 {
+        self.clone().spawn_blocking(|c| c.get_virtual_past_median_time()).await
     }
 
     pub async fn async_get_virtual_merge_depth_root(&self) -> Option<Hash> {
@@ -259,6 +244,14 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(low, high, max_blocks)).await
     }
 
+    pub async fn async_get_virtual_parents(&self) -> BlockHashSet {
+        self.clone().spawn_blocking(|c| c.get_virtual_parents()).await
+    }
+
+    pub async fn async_get_virtual_parents_len(&self) -> usize {
+        self.clone().spawn_blocking(|c| c.get_virtual_parents_len()).await
+    }
+
     pub async fn async_get_virtual_utxos(
         &self,
         from_outpoint: Option<TransactionOutpoint>,
@@ -286,6 +279,10 @@ impl ConsensusSessionOwned {
 
     pub async fn async_get_header(&self, hash: Hash) -> ConsensusResult<Arc<Header>> {
         self.clone().spawn_blocking(move |c| c.get_header(hash)).await
+    }
+
+    pub async fn async_get_compact_header(&self, hash: Hash) -> ConsensusResult<CompactHeaderData> {
+        self.clone().spawn_blocking(move |c| c.get_compact_header(hash)).await
     }
 
     pub async fn async_get_compact_header(&self, hash: Hash) -> ConsensusResult<CompactHeaderData> {
@@ -430,6 +427,10 @@ impl ConsensusSessionOwned {
 
     pub async fn async_finality_point(&self) -> Hash {
         self.clone().spawn_blocking(move |c| c.finality_point()).await
+    }
+
+    pub async fn async_get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {
+        self.clone().spawn_blocking(move |c| c.get_block_transactions(hash)).await
     }
 
     pub async fn async_get_block_transactions(&self, hash: Hash) -> ConsensusResult<Arc<Vec<Transaction>>> {

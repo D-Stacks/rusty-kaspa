@@ -10,6 +10,7 @@ pub use kaspa_hashes::Hash;
 pub mod acceptance_data;
 pub mod api;
 pub mod block;
+pub mod block_count;
 pub mod blockhash;
 pub mod blockstatus;
 pub mod coinbase;

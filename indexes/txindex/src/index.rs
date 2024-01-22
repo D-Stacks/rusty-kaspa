@@ -77,10 +77,11 @@ impl TxIndex {
         info!("[{0:?}] {1} From: {2} To: {3}.. ", self, if remove_segment { "Unsyncing" } else { "Resyncing" }, sync_from, sync_to);
         let total_blocks_to_process =
             session.get_compact_header(sync_to)?.daa_score - session.get_compact_header(sync_from)?.daa_score;
-        let mut total_blocks_processed: u64 = 0u64;
-        let mut total_txs_processed: u64 = 0u64;
-        let mut former_percent_completed = 0f64;
-        let percent_display_granularity = 1.0; // in percent 
+        let mut total_blocks_processed = (0u64, 0u64); // .0 holds the value of the former display
+        let mut total_txs_processed  = (0u64, 0u64); // .0 holds the value of the former display
+        let mut percent_completed = (0f64, 0f64); // .0 holds the value of the former display
+        let percent_display_granularity = 1.0; // in percent
+        let mut instant = std::time::Instant::now();
 
         while sync_from != sync_to {
             let to_process_hashes =
@@ -90,9 +91,7 @@ impl TxIndex {
                 to_process_hashes.iter().filter_map(|hash| session.get_block_acceptance_data(*hash).ok()).collect::<Vec<_>>(),
             );
 
-            total_blocks_processed += to_process_hashes.len() as u64;
-
-            sync_from = to_process_hashes.last().unwrap().clone();
+            sync_from = *to_process_hashes.last().unwrap();
 
             //TODO: make txindex reindex accept a hash and acceptance data vec, for now use a pseudo notification.
             let vspcc_notification = if !remove_segment {
@@ -113,29 +112,34 @@ impl TxIndex {
 
             let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
 
-            total_txs_processed = if remove_segment {
-                total_txs_processed + txindex_reindexer.tx_offset_changes.removed.len() as u64
-            } else {
-                total_txs_processed + txindex_reindexer.tx_offset_changes.added.len() as u64
-            };
-
-            let percent_completed = (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0;
+            total_blocks_processed.1 += (txindex_reindexer.block_acceptance_offsets_changes.removed.len() + txindex_reindexer.block_acceptance_offsets_changes.added.len()) as u64;
+            total_txs_processed.1 += (txindex_reindexer.tx_offset_changes.removed.len() + txindex_reindexer.tx_offset_changes.added.len()) as u64;
+            percent_completed.1 = (total_blocks_processed.1 as f64 / total_blocks_to_process as f64) * 100.0;
 
             self.update_via_virtual_chain_changed_with_reindexer(txindex_reindexer)?;
 
-            if former_percent_completed + percent_display_granularity as f64 >= percent_completed {
-                former_percent_completed = percent_completed;
+            let is_end = sync_from == sync_to;
+
+            if percent_completed.0 + percent_display_granularity <= percent_completed.1 || is_end {             
+                let total_txs_processed_diff = total_txs_processed.1 - total_txs_processed.0;
+                let total_blocks_processed_diff = total_blocks_processed.1 - total_blocks_processed.0;
+
                 info!(
-                    "[{0:?}] {1} {2} Transactions form {3} Blocks, {4:.0} %",
+                    "[{0:?}] {1} - Txs: {2} ({3:.0}/s); Blocks: {4} ({5:.0}/s); {6:.0}%",
                     self,
-                    if remove_segment { "Removed:" } else { "Added:" },
-                    total_txs_processed,
-                    total_blocks_processed,
-                    (total_blocks_processed as f64 / total_blocks_to_process as f64) * 100.0,
+                    if remove_segment { "Removed" } else { "Added" },
+                    total_txs_processed.1,
+                    total_txs_processed_diff as f64 / instant.elapsed().as_secs_f64(),
+                    total_blocks_processed.1,
+                    total_blocks_processed_diff as f64 / instant.elapsed().as_secs_f64(),
+                    if is_end { 100.0 } else { percent_completed.1 },
                 );
+                percent_completed.0 = percent_completed.1; 
+                total_blocks_processed.0 = total_blocks_processed.1; 
+                total_txs_processed.0 = total_txs_processed.1; 
+                instant = std::time::Instant::now();
             }
         }
-
         Ok(())
     }
 }

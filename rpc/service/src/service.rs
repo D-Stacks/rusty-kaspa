@@ -8,10 +8,10 @@ use kaspa_consensus::pipeline::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
 use kaspa_consensus_core::{
     block::Block,
-    header::CompactHeaderData,
     coinbase::MinerData,
     config::Config,
     constants::MAX_SOMPI,
+    header::CompactHeaderData,
     network::NetworkType,
     tx::{Transaction, COINBASE_TRANSACTION_INDEX},
 };

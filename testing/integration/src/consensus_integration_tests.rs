@@ -1098,9 +1098,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     let consensus_acceptance_data = tc.get_blocks_acceptance_data(&consensus_chain).unwrap();
     let mut accepted_block_count = 0;
     let mut accepted_tx_count = 0;
-    for (accepting_block_hash, acceptance_data) in
-        consensus_chain.into_iter().zip(consensus_acceptance_data)
-    {
+    for (accepting_block_hash, acceptance_data) in consensus_chain.into_iter().zip(consensus_acceptance_data) {
         for (i, mergeset) in acceptance_data.iter().enumerate() {
             let indexed_block_acceptance_offset =
                 txindex.read().get_merged_block_acceptance_offset(mergeset.block_hash).unwrap().unwrap();

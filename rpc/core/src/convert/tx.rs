@@ -29,8 +29,8 @@ impl From<(&TxOffset, &CompactHeaderData)> for RpcTransactionInclusionData {
         Self {
             including_block_hash: item.0.including_block,
             including_block_transaction_index: item.0.transaction_index,
-            including_block_daa_score: item.1.timestamp,
-            including_block_time: item.1.daa_score,
+            including_block_daa_score: item.1.daa_score,
+            including_block_time: item.1.timestamp,
         }
     }
 }

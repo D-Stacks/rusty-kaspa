@@ -73,11 +73,11 @@ pub fn validate_args(args: &Args) -> ConsensusConfigResult<()> {
     #[cfg(feature = "devnet-prealloc")]
     {
         if args.num_prealloc_utxos.is_some() && !(args.devnet || args.simnet) {
-            return Err(consensus_ConfigError::PreallocUtxosOnNonDevnet);
+            return Err(ConsensusConfigError::PreallocUtxosOnNonDevnet);
         }
 
         if args.prealloc_address.is_some() ^ args.num_prealloc_utxos.is_some() {
-            return Err(consensus_ConfigError::MissingPreallocNumOrAddress);
+            return Err(ConsensusConfigError::MissingPreallocNumOrAddress);
         }
     }
 

@@ -78,7 +78,7 @@ impl TxIndex {
         let total_blocks_to_process =
             session.get_compact_header(sync_to)?.daa_score - session.get_compact_header(sync_from)?.daa_score;
         let mut total_blocks_processed = (0u64, 0u64); // .0 holds the value of the former display
-        let mut total_txs_processed  = (0u64, 0u64); // .0 holds the value of the former display
+        let mut total_txs_processed = (0u64, 0u64); // .0 holds the value of the former display
         let mut percent_completed = (0f64, 0f64); // .0 holds the value of the former display
         let percent_display_granularity = 1.0; // in percent
         let mut instant = std::time::Instant::now();
@@ -112,15 +112,17 @@ impl TxIndex {
 
             let txindex_reindexer = TxIndexReindexer::from(vspcc_notification);
 
-            total_blocks_processed.1 += (txindex_reindexer.block_acceptance_offsets_changes.removed.len() + txindex_reindexer.block_acceptance_offsets_changes.added.len()) as u64;
-            total_txs_processed.1 += (txindex_reindexer.tx_offset_changes.removed.len() + txindex_reindexer.tx_offset_changes.added.len()) as u64;
+            total_blocks_processed.1 += (txindex_reindexer.block_acceptance_offsets_changes.removed.len()
+                + txindex_reindexer.block_acceptance_offsets_changes.added.len()) as u64;
+            total_txs_processed.1 +=
+                (txindex_reindexer.tx_offset_changes.removed.len() + txindex_reindexer.tx_offset_changes.added.len()) as u64;
             percent_completed.1 = (total_blocks_processed.1 as f64 / total_blocks_to_process as f64) * 100.0;
 
             self.update_via_virtual_chain_changed_with_reindexer(txindex_reindexer)?;
 
             let is_end = sync_from == sync_to;
 
-            if percent_completed.0 + percent_display_granularity <= percent_completed.1 || is_end {             
+            if percent_completed.0 + percent_display_granularity <= percent_completed.1 || is_end {
                 let total_txs_processed_diff = total_txs_processed.1 - total_txs_processed.0;
                 let total_blocks_processed_diff = total_blocks_processed.1 - total_blocks_processed.0;
 
@@ -134,9 +136,9 @@ impl TxIndex {
                     total_blocks_processed_diff as f64 / instant.elapsed().as_secs_f64(),
                     if is_end { 100.0 } else { percent_completed.1 },
                 );
-                percent_completed.0 = percent_completed.1; 
-                total_blocks_processed.0 = total_blocks_processed.1; 
-                total_txs_processed.0 = total_txs_processed.1; 
+                percent_completed.0 = percent_completed.1;
+                total_blocks_processed.0 = total_blocks_processed.1;
+                total_txs_processed.0 = total_txs_processed.1;
                 instant = std::time::Instant::now();
             }
         }

@@ -13,6 +13,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -20,6 +21,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -65,16 +69,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "once_cell",
  "version_check",
 ]
 
 [[package]]
 name = "ahash"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -90,6 +99,14 @@ dependencies = [
  "cfg-if 1.0.0",
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
+dependencies = [
+ "cfg-if 1.0.0",
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "once_cell",
  "version_check",
  "zerocopy",
@@ -137,6 +154,7 @@ dependencies = [
 [[package]]
 name = "anstream"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96b09b5178381e0874812a9b157f7fe84982617e48f71f4e3235482775e5b540"
@@ -145,6 +163,11 @@ version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "418c75fa768af9c03be99d17643f93f79bbba589895012a80e3452a19ddda15b"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.6.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "418c75fa768af9c03be99d17643f93f79bbba589895012a80e3452a19ddda15b"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -158,6 +181,7 @@ dependencies = [
 [[package]]
 name = "anstyle"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8901269c6307e8d93993578286ac0edf7f195079ffff5ebdeea6a59ffb7e36bc"
@@ -166,6 +190,11 @@ version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "anstyle-parse"
@@ -198,12 +227,17 @@ dependencies = [
 [[package]]
 name = "anyhow"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ad32ce52e4161730f7098c077cd2ed6229b5804ccf99e5366be1ab72a98b4e1"
 =======
 version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+version = "1.0.82"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "f538837af36e6f6a9be0faa67f9a314f8119e4e4b5867c6ab40ed60360142519"
 
 [[package]]
@@ -270,6 +304,7 @@ dependencies = [
 [[package]]
 name = "async-channel"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f28243a43d821d11341ab73c80bed182dc015c514b951616cf79bd4af39af0c3"
@@ -286,6 +321,15 @@ dependencies = [
  "event-listener 5.3.0",
  "event-listener-strategy 0.5.2",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d4d23bcc79e27423727b36823d86233aad06dfea531837b038394d11e9928"
+dependencies = [
+ "concurrent-queue",
+ "event-listener 5.3.0",
+ "event-listener-strategy 0.5.2",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "futures-core",
  "pin-project-lite",
 ]
@@ -296,6 +340,7 @@ version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b10202063978b3351199d68f8b22c4e47e4b1b822f8d43fd862d5ea8c006b29a"
 dependencies = [
+<<<<<<< HEAD
 <<<<<<< HEAD
  "async-lock 3.3.0",
  "async-task",
@@ -308,6 +353,12 @@ dependencies = [
  "fastrand 2.1.0",
  "futures-lite 2.3.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-task",
+ "concurrent-queue",
+ "fastrand 2.1.0",
+ "futures-lite 2.3.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "slab",
 ]
 
@@ -317,6 +368,7 @@ version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05b1b633a2115cd122d73b955eadd9916c18c8f510ec9cd1686404c60ad1c29c"
 dependencies = [
+<<<<<<< HEAD
 <<<<<<< HEAD
  "async-channel 2.2.0",
  "async-executor",
@@ -332,6 +384,14 @@ dependencies = [
  "blocking",
  "futures-lite 2.3.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+ "async-executor",
+ "async-io 2.3.2",
+ "async-lock 3.3.0",
+ "blocking",
+ "futures-lite 2.3.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "once_cell",
 ]
 
@@ -358,6 +418,7 @@ dependencies = [
 [[package]]
 name = "async-io"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f97ab0c5b00a7cdbe5a371b9a782ee7be1316095885c8a4ea1daf490eb0ef65"
@@ -366,11 +427,17 @@ version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcccb0f599cfa2f8ace422d3555572f47424da5648a4382a9dd0310ff8210884"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcccb0f599cfa2f8ace422d3555572f47424da5648a4382a9dd0310ff8210884"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "async-lock 3.3.0",
  "cfg-if 1.0.0",
  "concurrent-queue",
  "futures-io",
+<<<<<<< HEAD
 <<<<<<< HEAD
  "futures-lite 2.2.0",
  "parking",
@@ -382,6 +449,12 @@ dependencies = [
  "polling 3.7.0",
  "rustix 0.38.34",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "futures-lite 2.3.0",
+ "parking",
+ "polling 3.7.0",
+ "rustix 0.38.34",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "slab",
  "tracing",
  "windows-sys 0.52.0",
@@ -455,6 +528,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -462,10 +536,14 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
 name = "async-task"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "4.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -499,6 +577,21 @@ dependencies = [
  "quote",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "4.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
+
+[[package]]
+name = "async-trait"
+version = "0.1.80"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6fa2087f2753a7da8cc1c0dbfcf89579dd57458e36769de5ac750b4671737ca"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -665,14 +758,20 @@ version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "base64ct"
@@ -732,6 +831,7 @@ dependencies = [
  "shlex",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -739,6 +839,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -750,6 +853,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 [[package]]
 name = "bitflags"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
@@ -758,6 +862,11 @@ version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "blake2"
@@ -795,6 +904,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "495f7104e962b7356f0aeb34247aca1fe7d2e783b346582db7f2904cb5717e88"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
@@ -807,6 +917,13 @@ dependencies = [
 =======
  "futures-lite 2.3.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+ "async-lock 3.3.0",
+ "async-task",
+ "futures-io",
+ "futures-lite 2.3.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "piper",
 ]
 
@@ -868,6 +985,7 @@ dependencies = [
 [[package]]
 name = "bumpalo"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "3.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3b1be7772ee4501dba05acbe66bb1e8760f6a6c474a36035631638e4415f130"
@@ -876,6 +994,11 @@ version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "byteorder"
@@ -912,6 +1035,7 @@ dependencies = [
 [[package]]
 name = "cargo-platform"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "694c8807f2ae16faecc43dc17d74b3eb042482789fd0eb64b39a2e04e087053f"
@@ -920,6 +1044,11 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24b1f0365a6c6bb4020cd05806fd0d33c44d38046b8bd7f0e40814b9763cabfc"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24b1f0365a6c6bb4020cd05806fd0d33c44d38046b8bd7f0e40814b9763cabfc"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "serde",
 ]
@@ -947,6 +1076,7 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 [[package]]
 name = "cc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f9fa1897e4325be0d68d48df6aa1a71ac2ed4d27723887e7754192705350730"
@@ -955,6 +1085,11 @@ version = "1.0.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "065a29261d53ba54260972629f9ca6bffa69bac13cd1fed61420f7fa68b9f8bd"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.96"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "065a29261d53ba54260972629f9ca6bffa69bac13cd1fed61420f7fa68b9f8bd"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "libc",
  "once_cell",
@@ -1035,6 +1170,7 @@ dependencies = [
 [[package]]
 name = "chrono"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bc015644b92d5890fab7489e49d21f879d5c990186827d42ec511919404f38b"
@@ -1043,6 +1179,11 @@ version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -1051,10 +1192,14 @@ dependencies = [
  "serde",
  "wasm-bindgen",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "windows-targets 0.52.2",
 =======
  "windows-targets 0.52.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "windows-targets 0.52.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1124,6 +1269,7 @@ dependencies = [
 [[package]]
 name = "clap"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c918d541ef2913577a0f9566e9ce27cb35b6df072075769e0b26cb5a554520da"
@@ -1132,6 +1278,11 @@ version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "4.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1139,6 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1148,19 +1300,29 @@ version = "4.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "4.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "anstream",
  "anstyle",
  "clap_lex",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "strsim 0.11.0",
 =======
  "strsim 0.11.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "strsim 0.11.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
 name = "clap_derive"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "4.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1170,10 +1332,16 @@ version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "4.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "heck",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
  "syn 2.0.50",
@@ -1183,6 +1351,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1300,10 +1471,14 @@ dependencies = [
  "cast",
  "ciborium",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "clap 4.5.1",
 =======
  "clap 4.5.4",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "clap 4.5.4",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "criterion-plot",
  "is-terminal",
  "itertools 0.10.5",
@@ -1337,6 +1512,7 @@ checksum = "7059fff8937831a9ae6f0fe4d658ffabf58f2ca96aa9dec1c889f936f705f216"
 [[package]]
 name = "crossbeam-channel"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "176dc175b78f56c0f321911d9c8eb2b77a78a4860b9c19db83835fea1a46649b"
@@ -1345,6 +1521,11 @@ version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab3db02a9c5b5121e1e42fbdb1aeb65f5e02624cc58c43f2884c6ccac0b82f95"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab3db02a9c5b5121e1e42fbdb1aeb65f5e02624cc58c43f2884c6ccac0b82f95"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "crossbeam-utils",
 ]
@@ -1381,10 +1562,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f476fe445d41c9e991fd07515a6f463074b782242ccf4a5b7b1d1012e70824df"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "bitflags 2.4.2",
 =======
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "crossterm_winapi",
  "libc",
  "mio",
@@ -1421,6 +1606,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 <<<<<<< HEAD
 name = "ctrlc"
 version = "3.4.2"
@@ -1468,6 +1654,46 @@ checksum = "672465ae37dc1bc6380a6547a8883d5dd397b0f1faaad4f265726cc7042a5345"
 dependencies = [
  "nix",
  "windows-sys 0.52.0",
+=======
+name = "crypto_box"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16182b4f39a82ec8a6851155cc4c0cda3065bb1db33651726a29e1951de0f009"
+dependencies = [
+ "aead",
+ "chacha20",
+ "crypto_secretbox",
+ "curve25519-dalek",
+ "salsa20",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "crypto_secretbox"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9d6cf87adf719ddf43a805e92c6870a531aedda35ff640442cbaf8674e141e1"
+dependencies = [
+ "aead",
+ "chacha20",
+ "cipher",
+ "generic-array 0.14.7",
+ "poly1305",
+ "salsa20",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "ctrlc"
+version = "3.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "672465ae37dc1bc6380a6547a8883d5dd397b0f1faaad4f265726cc7042a5345"
+dependencies = [
+ "nix",
+ "windows-sys 0.52.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1495,7 +1721,10 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.60",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1563,6 +1792,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -1570,6 +1800,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1646,6 +1879,7 @@ checksum = "3c877555693c14d2f84191cfd3ad8582790fc52b5e2274b40b59cf5f5cea25c7"
 [[package]]
 name = "deunicode"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6e854126756c496b8c81dec88f9a706b15b875c5849d4097a3854476b9fdf94"
@@ -1654,6 +1888,11 @@ version = "1.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322ef0094744e63628e6f0eb2295517f79276a5b342a4c2ff3042566ca181d4e"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "322ef0094744e63628e6f0eb2295517f79276a5b342a4c2ff3042566ca181d4e"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "dhat"
@@ -1724,6 +1963,7 @@ checksum = "6fcc1d9ae294a15ed05aeae8e11ee5f2b3fe971c077d45a42fb20825fba6ee13"
 [[package]]
 name = "either"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
@@ -1732,6 +1972,11 @@ version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a47c1c47d2f5964e29c61246e81db715514cd532db6b5116a25ea3c03d6780a2"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a47c1c47d2f5964e29c61246e81db715514cd532db6b5116a25ea3c03d6780a2"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "encode_unicode"
@@ -1808,6 +2053,7 @@ dependencies = [
 [[package]]
 name = "event-listener"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7ad6fd685ce13acd6d9541a30f6db6567a7a24c9ffd4ba2955d29e3f22c8b27"
@@ -1816,6 +2062,11 @@ version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d9944b8ca13534cdfb2800775f8dd4902ff3fc75a50101466decadfdf322a24"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "5.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d9944b8ca13534cdfb2800775f8dd4902ff3fc75a50101466decadfdf322a24"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "concurrent-queue",
  "parking",
@@ -1835,18 +2086,24 @@ dependencies = [
 [[package]]
 name = "event-listener-strategy"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feedafcaa9b749175d5ac357452a9d41ea2911da598fde46ce1fe02c37751291"
 dependencies = [
  "event-listener 5.1.0",
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f214dc438f977e6d4e3500aaa277f5ad94ca83fbbd9b1a15713ce2344ccc5a1"
 dependencies = [
  "event-listener 5.3.0",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "pin-project-lite",
 ]
 
@@ -1870,6 +2127,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -1877,6 +2135,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -1984,6 +2245,7 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1998,6 +2260,11 @@ name = "futures"
 version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+name = "futures"
+version = "0.3.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "645c6916888f6cb6350d2550b80fb63e734897a8498abe35cfb732b6487804b0"
 dependencies = [
  "futures-channel",
@@ -2060,6 +2327,7 @@ dependencies = [
 [[package]]
 name = "futures-lite"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "445ba825b27408685aaecefd65178908c36c6e96aaf6d8599419d46e624192ba"
@@ -2068,6 +2336,11 @@ version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52527eb5074e35e9339c6b4e8d12600c7128b68fb25dcb9fa9dec18f7c25f3a5"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52527eb5074e35e9339c6b4e8d12600c7128b68fb25dcb9fa9dec18f7c25f3a5"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "fastrand 2.1.0",
  "futures-core",
@@ -2086,6 +2359,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -2093,6 +2367,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -2155,7 +2432,10 @@ name = "getrandom"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94b22e06ecb0110981051723910cbf0b5f5e09a2062dd7663334ee79a9d1286c"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "cfg-if 1.0.0",
  "js-sys",
@@ -2191,6 +2471,7 @@ dependencies = [
 [[package]]
 name = "h2"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.3.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb2c4422095b67ee78da96fbb51a4cc413b3b25883c7717ff7ca1ab31022c9c9"
@@ -2199,6 +2480,11 @@ version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.3.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "bytes",
  "fnv",
@@ -2206,12 +2492,17 @@ dependencies = [
  "futures-sink",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "http",
  "indexmap 2.2.3",
 =======
  "http 0.2.12",
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "http 0.2.12",
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "slab",
  "tokio",
  "tokio-util",
@@ -2221,6 +2512,7 @@ dependencies = [
 [[package]]
 name = "half"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc52e53916c08643f1b56ec082790d1e86a32e58dc5268f897f313fbae7b4872"
@@ -2229,6 +2521,11 @@ version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "cfg-if 1.0.0",
  "crunchy",
@@ -2263,6 +2560,7 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 <<<<<<< HEAD
+<<<<<<< HEAD
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
  "ahash 0.8.9",
@@ -2271,6 +2569,11 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash 0.8.11",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "ahash 0.8.11",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -2304,6 +2607,7 @@ dependencies = [
 [[package]]
 name = "hermit-abi"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd5256b483761cd23699d0da46cc6fd2ee3be420bbe6d020ae4a091e70b7e9fd"
@@ -2312,6 +2616,11 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "hex"
@@ -2493,6 +2802,7 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "iana-time-zone"
 version = "0.1.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2500,6 +2810,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "hyper-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "hyper-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
 dependencies = [
  "bytes",
@@ -2529,7 +2844,10 @@ dependencies = [
 name = "iana-time-zone"
 version = "0.1.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "e7ffbb5a1b541ea2561f8c41c087286cc091e21e556a4f09a8f6cbf17b69b141"
 dependencies = [
  "android_system_properties",
@@ -2615,6 +2933,7 @@ dependencies = [
 [[package]]
 name = "indexmap"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "233cf39063f058ea2caae4091bf4a3ef70a653afbc026f5c4a4135d114e3c177"
@@ -2623,6 +2942,11 @@ version = "2.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
@@ -2680,10 +3004,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eae7b9aee968036d54dce06cebaefd919e4472e753296daccd6d344e3e2df0c2"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "hermit-abi 0.3.6",
 =======
  "hermit-abi 0.3.9",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "hermit-abi 0.3.9",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libc",
  "windows-sys 0.48.0",
 ]
@@ -2701,10 +3029,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "hermit-abi 0.3.6",
 =======
  "hermit-abi 0.3.9",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "hermit-abi 0.3.9",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libc",
  "windows-sys 0.52.0",
 ]
@@ -2741,6 +3073,7 @@ checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
+<<<<<<< HEAD
 
 [[package]]
 name = "itoa"
@@ -2754,6 +3087,19 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 name = "jobserver"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+
+[[package]]
+name = "itoa"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
+name = "jobserver"
+version = "0.1.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
 dependencies = [
  "libc",
@@ -2823,10 +3169,14 @@ dependencies = [
  "bs58",
  "faster-hex 0.6.1",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "hmac",
  "js-sys",
  "kaspa-utils",
@@ -2913,10 +3263,14 @@ version = "0.14.1"
 dependencies = [
  "arc-swap",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bincode",
  "criterion",
  "crossbeam-channel",
@@ -2924,10 +3278,14 @@ dependencies = [
  "flate2",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-consensus-core",
  "kaspa-consensus-notify",
@@ -2998,10 +3356,14 @@ dependencies = [
  "faster-hex 0.6.1",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "js-sys",
  "kaspa-addresses",
@@ -3032,10 +3394,14 @@ name = "kaspa-consensus-notify"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "cfg-if 1.0.0",
  "derive_more",
  "futures",
@@ -3140,10 +3506,14 @@ dependencies = [
  "enum-primitive-derive",
  "faster-hex 0.6.1",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-hashes",
  "kaspa-utils",
@@ -3163,10 +3533,14 @@ name = "kaspa-grpc-client"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-stream",
  "async-trait",
  "faster-hex 0.6.1",
@@ -3198,10 +3572,14 @@ name = "kaspa-grpc-core"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-stream",
  "async-trait",
  "faster-hex 0.6.1",
@@ -3231,10 +3609,14 @@ name = "kaspa-grpc-server"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-stream",
  "async-trait",
  "faster-hex 0.6.1",
@@ -3291,10 +3673,14 @@ name = "kaspa-index-core"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "derive_more",
  "futures",
@@ -3314,10 +3700,14 @@ name = "kaspa-index-processor"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "derive_more",
  "futures",
@@ -3437,10 +3827,14 @@ name = "kaspa-notify"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "borsh",
  "criterion",
@@ -3479,10 +3873,14 @@ dependencies = [
  "chrono",
  "futures",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-addressmanager",
  "kaspa-connectionmanager",
@@ -3570,8 +3968,11 @@ name = "kaspa-resolver"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "ahash 0.8.11",
  "axum 0.7.5",
  "cfg-if 1.0.0",
@@ -3603,7 +4004,10 @@ name = "kaspa-rpc-core"
 version = "0.14.1"
 dependencies = [
  "async-channel 2.2.1",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "borsh",
  "cfg-if 1.0.0",
@@ -3686,6 +4090,7 @@ version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.1.1",
@@ -3694,6 +4099,10 @@ dependencies = [
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
  "async-trait",
 >>>>>>> 5c437cb3 (Address Tracker for subscriptions to changed UTXOs notifications (#427))
+=======
+ "async-channel 2.2.1",
+ "async-trait",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bincode",
  "chrono",
  "clap 4.5.4",
@@ -3704,10 +4113,14 @@ dependencies = [
  "flate2",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-addresses",
  "kaspa-alloc",
@@ -3761,10 +4174,14 @@ dependencies = [
  "criterion",
  "hex",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-addresses",
  "kaspa-consensus-core",
@@ -3795,10 +4212,14 @@ name = "kaspa-utils"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "bincode",
  "borsh",
@@ -3890,6 +4311,7 @@ version = "0.14.1"
 dependencies = [
  "aes",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "ahash 0.8.9",
  "argon2",
  "async-channel 2.2.0",
@@ -3904,6 +4326,14 @@ dependencies = [
  "async-trait",
  "base64 0.21.7",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "ahash 0.8.11",
+ "argon2",
+ "async-channel 2.2.1",
+ "async-std",
+ "async-trait",
+ "base64 0.21.7",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "borsh",
  "cfb-mode",
  "cfg-if 1.0.0",
@@ -4128,10 +4558,14 @@ version = "0.14.1"
 dependencies = [
  "async-trait",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "clap 4.5.1",
 =======
  "clap 4.5.4",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "clap 4.5.4",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "kaspa-consensus-core",
  "kaspa-grpc-client",
  "kaspa-rpc-core",
@@ -4206,12 +4640,17 @@ name = "kaspad"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
  "clap 4.5.1",
 =======
  "async-channel 2.2.1",
  "clap 4.5.4",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+ "clap 4.5.4",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "dhat",
  "dirs",
  "futures-util",
@@ -4293,6 +4732,7 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 [[package]]
 name = "libc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.153"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
@@ -4319,6 +4759,20 @@ dependencies = [
  "cfg-if 1.0.0",
  "windows-targets 0.52.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.2.154"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae743338b92ff9146ce83992f766a31066a91a8c84a45e0e9f21e7cf6de6d346"
+
+[[package]]
+name = "libloading"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
+dependencies = [
+ "cfg-if 1.0.0",
+ "windows-targets 0.52.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -4344,10 +4798,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "bitflags 2.4.2",
 =======
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libc",
 ]
 
@@ -4370,6 +4828,7 @@ dependencies = [
 [[package]]
 name = "libz-sys"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "037731f5d3aaa87a5675e895b63ddff1a87624bc29f77004ea829809654e48f6"
@@ -4378,6 +4837,11 @@ version = "1.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e143b5e666b2695d28f6bca6497720813f699c9602dd7f5cac91008b8ada7f9"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e143b5e666b2695d28f6bca6497720813f699c9602dd7f5cac91008b8ada7f9"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "cc",
  "pkg-config",
@@ -4524,6 +4988,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -4531,6 +4996,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -4543,6 +5011,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -4550,6 +5019,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -4564,6 +5036,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -4571,10 +5044,14 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
 name = "malachite-base"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4588,6 +5065,13 @@ checksum = "d073a3d1e4e037975af5ef176a2632672e25e8ddbe8e1811745c2e0726b6ad94"
 dependencies = [
  "hashbrown 0.14.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d073a3d1e4e037975af5ef176a2632672e25e8ddbe8e1811745c2e0726b6ad94"
+dependencies = [
+ "hashbrown 0.14.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "libm",
  "ryu",
@@ -4595,6 +5079,7 @@ dependencies = [
 
 [[package]]
 name = "malachite-nz"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4604,6 +5089,11 @@ version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2546fc6ae29728079e87a2a0f011509e6060713b65e62ee46ba5d413b495ebc7"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2546fc6ae29728079e87a2a0f011509e6060713b65e62ee46ba5d413b495ebc7"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "itertools 0.11.0",
  "libm",
@@ -4638,6 +5128,7 @@ dependencies = [
 [[package]]
 name = "memchr"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
@@ -4646,6 +5137,11 @@ version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "mimalloc"
@@ -4700,6 +5196,27 @@ name = "multimap"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defc4c55412d89136f966bbb339008b474350e5e6e78d2714439c386b3137a03"
+<<<<<<< HEAD
+=======
+
+[[package]]
+name = "nalgebra"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0abb021006c01b126a936a8dd1351e0720d83995f4fc942d0d426c654f990745"
+dependencies = [
+ "alga",
+ "approx",
+ "generic-array 0.13.3",
+ "matrixmultiply",
+ "num-complex 0.2.4",
+ "num-rational 0.2.4",
+ "num-traits",
+ "rand 0.7.3",
+ "rand_distr 0.2.2",
+ "typenum",
+]
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "nanoid"
@@ -4760,10 +5277,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "bitflags 2.4.2",
 =======
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "cfg-if 1.0.0",
  "cfg_aliases",
  "libc",
@@ -4810,10 +5331,14 @@ checksum = "3135b08af27d103b0a51f2ae0f8632117b7b185ccf931445affa8df530576a41"
 dependencies = [
  "num-bigint",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "num-complex",
 =======
  "num-complex 0.4.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "num-complex 0.4.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "num-integer",
  "num-iter",
  "num-rational",
@@ -4842,6 +5367,7 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4864,13 +5390,30 @@ dependencies = [
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "num-complex"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23c6602fda94a57c990fe0df199a035d83576b496aa29f4e634a8ac6004e68a6"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-conv"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 
 [[package]]
 name = "num-integer"
 version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
 dependencies = [
  "num-traits",
@@ -4879,12 +5422,17 @@ dependencies = [
 [[package]]
 name = "num-iter"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d869c01cc0c455284163fd0092f1f93835385ccab5a98a0dcc497b2f8bf055a9"
 =======
 version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "1429034a0490724d0075ebb2bc9e875d6503c3cf69e235a8941aa757d83ef5bf"
 dependencies = [
  "autocfg",
@@ -4919,6 +5467,7 @@ dependencies = [
 [[package]]
 name = "num-traits"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da0df0e5185db44f69b44f26786fe401b6c293d1907744beaa7fa62b2e5a517a"
@@ -4927,6 +5476,11 @@ version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "autocfg",
  "libm",
@@ -4939,10 +5493,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "hermit-abi 0.3.6",
 =======
  "hermit-abi 0.3.9",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "hermit-abi 0.3.9",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libc",
 ]
 
@@ -5008,10 +5566,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95a0481286a310808298130d22dd1fef0fa571e05a8f44ec801801e84b216b1f"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "bitflags 2.4.2",
 =======
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "cfg-if 1.0.0",
  "foreign-types",
  "libc",
@@ -5030,6 +5592,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -5037,6 +5600,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5057,6 +5623,7 @@ dependencies = [
 [[package]]
 name = "openssl-sys"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.9.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dda2b0f344e78efc2facf7d195d098df0dd72151b26ab98da807afc26c198dff"
@@ -5065,6 +5632,11 @@ version = "0.9.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c597637d56fbc83893a35eb0dd04b2b8e7a50c91e64e9493e398b5df4fb45fa2"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.9.102"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c597637d56fbc83893a35eb0dd04b2b8e7a50c91e64e9493e398b5df4fb45fa2"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "cc",
  "libc",
@@ -5151,6 +5723,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -5158,6 +5731,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5207,14 +5783,19 @@ checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
 dependencies = [
  "fixedbitset",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "indexmap 2.2.3",
 =======
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
 name = "pin-project"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5224,12 +5805,18 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bf43b791c5b9e34c3d182969b4abb522f9343702850a2e57f460d00d09b4b3"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6bf43b791c5b9e34c3d182969b4abb522f9343702850a2e57f460d00d09b4b3"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5251,6 +5838,15 @@ dependencies = [
  "quote",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f38a4412a78282e09a2cf38d195ea5420d15ba0602cb375210efbc877243965"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5282,14 +5878,20 @@ version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "platforms"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db23d408679286588f4d4644f965003d056e3dd5abcaaa938116871d7ce2fee7"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "polling"
@@ -5310,6 +5912,7 @@ dependencies = [
 [[package]]
 name = "polling"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24f040dee2588b4963afb4e420540439d126f73fdacf4a9c486a96d840bac3c9"
@@ -5318,16 +5921,25 @@ version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645493cf344456ef24219d02a768cf1fb92ddf8c92161679ae3d91b91a637be3"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "3.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "645493cf344456ef24219d02a768cf1fb92ddf8c92161679ae3d91b91a637be3"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "cfg-if 1.0.0",
  "concurrent-queue",
  "hermit-abi 0.3.9",
  "pin-project-lite",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "rustix 0.38.31",
 =======
  "rustix 0.38.34",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "rustix 0.38.34",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "tracing",
  "windows-sys 0.52.0",
 ]
@@ -5364,6 +5976,7 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 [[package]]
 name = "prettyplease"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a41cf62165e97c7f814d2221421dbb9afcbcdb0a88068e5ea206e19951c2cbb5"
@@ -5382,6 +5995,14 @@ dependencies = [
  "proc-macro2",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ac2cf0f2e4f42b49f5ffd07dae8d746508ef7526c13940e5f524012ae6c6550"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5454,6 +6075,7 @@ dependencies = [
  "regex",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -5461,6 +6083,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "tempfile",
 ]
 
@@ -5476,6 +6101,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -5483,6 +6109,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5569,8 +6198,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "getrandom 0.2.14",
 ]
 
@@ -5597,6 +6229,7 @@ dependencies = [
 [[package]]
 name = "rayon"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa7237101a77a10773db45d62004a272517633fbcc3df19d96455ede1122e051"
@@ -5605,6 +6238,11 @@ version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "either",
  "rayon-core",
@@ -5645,8 +6283,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469052894dcb553421e483e4209ee581a45100d31b4018de03e5a7ad86374a7e"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bitflags 2.5.0",
 ]
 
@@ -5657,13 +6298,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd283d9651eeda4b2a83a43c1c91b266c40fd76ecd39a50a8c630ae69dc72891"
 dependencies = [
  "getrandom 0.2.14",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libredox",
  "thiserror",
 ]
 
 [[package]]
 name = "regex"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "1.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5673,6 +6318,11 @@ version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -5683,6 +6333,7 @@ dependencies = [
 [[package]]
 name = "regex-automata"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bb987efffd3c6d0d8f5f89510bb458559eab11e4f869acb20bf845e016259cd"
@@ -5691,6 +6342,11 @@ version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86b83b8b9847f9bf95ef68afb0b8e6cdb80f498442f5179a29fad448fcc1eaea"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86b83b8b9847f9bf95ef68afb0b8e6cdb80f498442f5179a29fad448fcc1eaea"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -5752,10 +6408,14 @@ dependencies = [
  "cc",
  "cfg-if 1.0.0",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "libc",
  "spin",
  "untrusted",
@@ -5795,12 +6455,17 @@ name = "rothschild"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
  "clap 4.5.1",
 =======
  "async-channel 2.2.1",
  "clap 4.5.4",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+ "clap 4.5.4",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "criterion",
  "faster-hex 0.6.1",
  "itertools 0.11.0",
@@ -5857,6 +6522,7 @@ dependencies = [
 [[package]]
 name = "rustix"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.38.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ea3e1a662af26cd7a3ba09c0297a31af215563ecf42817c98df621387f4e949"
@@ -5869,6 +6535,13 @@ checksum = "70dc5ec042f7a43c4a73241207cecc9873a06d45debb38b329f8541d85c2730f"
 dependencies = [
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.38.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70dc5ec042f7a43c4a73241207cecc9873a06d45debb38b329f8541d85c2730f"
+dependencies = [
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "errno",
  "libc",
  "linux-raw-sys 0.4.13",
@@ -5894,10 +6567,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "base64",
 =======
  "base64 0.21.7",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "base64 0.21.7",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -5922,7 +6599,10 @@ version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "salsa20"
@@ -5932,7 +6612,10 @@ checksum = "97a22f5af31f73a954c10289c93e8a50cc23d971e80ee446f1f6f7137a088213"
 dependencies = [
  "cipher",
 ]
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "same-file"
@@ -6044,6 +6727,7 @@ dependencies = [
 [[package]]
 name = "serde"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fb1c873e1b9b056a4dc4c0c198b24c3ffa059243875552b2bd0933b1aee4ce2"
@@ -6052,6 +6736,11 @@ version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.200"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "serde_derive",
 ]
@@ -6080,6 +6769,7 @@ dependencies = [
 [[package]]
 name = "serde_derive"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
@@ -6100,10 +6790,20 @@ dependencies = [
  "quote",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.200"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
 name = "serde_json"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "1.0.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6113,6 +6813,11 @@ version = "1.0.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e17db7126d17feb94eb3fad46bf1a96b034e8aacbc2e775fe81505f8b0b2813"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.116"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e17db7126d17feb94eb3fad46bf1a96b034e8aacbc2e775fe81505f8b0b2813"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "itoa",
  "ryu",
@@ -6139,6 +6844,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -6146,6 +6852,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -6202,6 +6911,7 @@ dependencies = [
 [[package]]
 name = "serde_yaml"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.9.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd075d994154d4a774f95b51fb96bdc2832b0ea48425c92546073816cda1f2f"
@@ -6214,6 +6924,13 @@ checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
 dependencies = [
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.9.34+deprecated"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itoa",
  "ryu",
  "serde",
@@ -6254,6 +6971,7 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6261,6 +6979,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "sharded-slab"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
@@ -6270,7 +6993,10 @@ dependencies = [
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
@@ -6308,6 +7034,7 @@ name = "simpa"
 version = "0.14.1"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
  "clap 4.5.1",
  "dhat",
@@ -6322,6 +7049,14 @@ dependencies = [
  "futures-util",
  "indexmap 2.2.6",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+ "clap 4.5.4",
+ "dhat",
+ "futures",
+ "futures-util",
+ "indexmap 2.2.6",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "itertools 0.11.0",
  "kaspa-alloc",
  "kaspa-consensus",
@@ -6363,6 +7098,7 @@ dependencies = [
 [[package]]
 name = "smallvec"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
@@ -6371,6 +7107,11 @@ version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "serde",
 ]
@@ -6441,6 +7182,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "strsim"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
 name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6461,6 +7208,7 @@ dependencies = [
 name = "syn"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "2.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74f1bdc9872430ce9b75da68329d1c1746faf50ffac5f19e02b71e37ff881ffb"
@@ -6474,6 +7222,11 @@ version = "2.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "909518bc7b1c9b779f1bbf07f2929d35af9f0f37e47c6e9ef7f9dddc1e1821f3"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "2.0.60"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "909518bc7b1c9b779f1bbf07f2929d35af9f0f37e47c6e9ef7f9dddc1e1821f3"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6487,6 +7240,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 
 [[package]]
+<<<<<<< HEAD
 <<<<<<< HEAD
 name = "tempfile"
 version = "3.10.0"
@@ -6508,6 +7262,19 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
 dependencies = [
+=======
+name = "sync_wrapper"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
+
+[[package]]
+name = "system-configuration"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
+dependencies = [
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bitflags 1.3.2",
  "core-foundation",
  "system-configuration-sys",
@@ -6532,7 +7299,10 @@ dependencies = [
  "cfg-if 1.0.0",
  "fastrand 2.1.0",
  "rustix 0.38.34",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "windows-sys 0.52.0",
 ]
 
@@ -6568,6 +7338,7 @@ dependencies = [
 [[package]]
 name = "thiserror"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e45bcbe8ed29775f228095caf2cd67af7a4ccf756ebff23a306bf3e8b47b24b"
@@ -6576,12 +7347,18 @@ version = "1.0.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0126ad08bff79f29fc3ae6a55cc72352056dfff61e3ff8bb7129476d44b23aa"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.59"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0126ad08bff79f29fc3ae6a55cc72352056dfff61e3ff8bb7129476d44b23aa"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6603,6 +7380,15 @@ dependencies = [
  "quote",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.0.59"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1cd413b5d558b4c5bf3680e324a6fa5014e7b7c067a51e69dbdf47eb7148b66"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -6623,6 +7409,7 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "time"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6631,6 +7418,11 @@ checksum = "c8248b6521bb14bc45b4067159b9b6ad792e2d6d754d6c41fb50e29fefe38749"
 name = "thread_local"
 version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "thread_local"
+version = "1.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "8b9ef9bad013ada3808854ceac7b46812a6465ba368859a37e2100283d2d719c"
 dependencies = [
  "cfg-if 1.0.0",
@@ -6642,7 +7434,10 @@ name = "time"
 version = "0.3.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "deranged",
  "itoa",
@@ -6664,6 +7459,7 @@ checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
 [[package]]
 name = "time-macros"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ba3a3ef41e6672a2f0f001392bb5dcd3ff0a9992d618ca761a11c3121547774"
@@ -6672,6 +7468,11 @@ version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "num-conv",
  "time-core",
@@ -6705,6 +7506,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "tokio"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "1.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61285f6515fa018fb2d1e46eb21223fff441ee8db5d0f1435e8ab4f5cdb80931"
@@ -6713,6 +7515,11 @@ version = "1.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1adbebffeca75fcfd058afa480fb6c0b81e165a0323f9c9d39c9697e37c46787"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "1.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1adbebffeca75fcfd058afa480fb6c0b81e165a0323f9c9d39c9697e37c46787"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "backtrace",
  "bytes",
@@ -6746,6 +7553,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -6753,6 +7561,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -6865,12 +7676,17 @@ dependencies = [
  "async-stream",
  "async-trait",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "axum",
  "base64",
 =======
  "axum 0.6.20",
  "base64 0.21.7",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "axum 0.6.20",
+ "base64 0.21.7",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bytes",
  "flate2",
  "h2",
@@ -6904,6 +7720,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -6911,6 +7728,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -6940,10 +7760,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c5bb1d698276a2443e5ecfabc1008bf15a36c12e6a7176e7bf089ea9131140"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "bitflags 2.4.2",
 =======
  "bitflags 2.5.0",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "bitflags 2.5.0",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "bytes",
  "futures-core",
  "futures-util",
@@ -7005,6 +7829,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -7012,6 +7837,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7157,6 +7985,7 @@ dependencies = [
 [[package]]
 name = "unsafe-libyaml"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab4c90930b95a82d00dc9e9ac071b4991924390d46cbd0dfe566148667605e4b"
@@ -7165,6 +7994,11 @@ version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "untrusted"
@@ -7202,10 +8036,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7215,16 +8053,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "rand 0.8.5",
  "serde",
  "wasm-bindgen",
 ]
 
 [[package]]
+<<<<<<< HEAD
 <<<<<<< HEAD
 name = "value-bag"
 version = "1.7.0"
@@ -7234,6 +8077,11 @@ checksum = "126e423afe2dd9ac52142e7e9d5ce4135d7e13776c529d27fd6bc49f19e3280b"
 name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
@@ -7241,7 +8089,10 @@ name = "value-bag"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a84c137d37ab0142f0f2ddfe332651fdbf252e7b7dbb4e67b6c1f1b2e925101"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "vcpkg"
@@ -7332,6 +8183,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -7339,6 +8191,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "wasm-bindgen-shared",
 ]
 
@@ -7374,6 +8229,7 @@ dependencies = [
  "quote",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  "syn 2.0.50",
 =======
  "syn 2.0.49",
@@ -7381,6 +8237,9 @@ dependencies = [
 =======
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -7436,10 +8295,14 @@ dependencies = [
  "home",
  "once_cell",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "rustix 0.38.31",
 =======
  "rustix 0.38.34",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "rustix 0.38.34",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7480,10 +8343,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ab640c8d7e35bf8ba19b884ba838ceb4fba93a4e8c65a9059d08afcfc683d9"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "windows-targets 0.52.2",
 =======
  "windows-targets 0.52.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "windows-targets 0.52.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7502,10 +8369,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "windows-targets 0.52.2",
 =======
  "windows-targets 0.52.5",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "windows-targets 0.52.5",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7526,6 +8397,7 @@ dependencies = [
 [[package]]
 name = "windows-targets"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98532992affa02e52709d5b4d145a3668ae10d9081eea4a7f26f719a8476f71"
@@ -7542,6 +8414,12 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f0713a46559409d202e70e28227288446bf7841d3211583a4b53e3f6d96e7eb"
 dependencies = [
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f0713a46559409d202e70e28227288446bf7841d3211583a4b53e3f6d96e7eb"
+dependencies = [
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "windows_aarch64_gnullvm 0.52.5",
  "windows_aarch64_msvc 0.52.5",
  "windows_i686_gnu 0.52.5",
@@ -7550,7 +8428,10 @@ dependencies = [
  "windows_x86_64_gnu 0.52.5",
  "windows_x86_64_gnullvm 0.52.5",
  "windows_x86_64_msvc 0.52.5",
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]
@@ -7562,6 +8443,7 @@ checksum = "2b38e32f0abccf9987a4e3079dfb67dcd799fb61361e53e2882c3cbaf0d905d8"
 [[package]]
 name = "windows_aarch64_gnullvm"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7269c1442e75af9fa59290383f7665b828efc76c429cc0b7f2ecb33cf51ebae"
@@ -7570,6 +8452,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7088eed71e8b8dda258ecc8bac5fb1153c5cffaf2578fc8ff5d61e23578d3263"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7088eed71e8b8dda258ecc8bac5fb1153c5cffaf2578fc8ff5d61e23578d3263"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_aarch64_msvc"
@@ -7580,6 +8467,7 @@ checksum = "dc35310971f3b2dbbf3f0690a219f40e2d9afcf64f9ab7cc1be722937c26b4bc"
 [[package]]
 name = "windows_aarch64_msvc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f70ab2cebf332b7ecbdd98900c2da5298a8c862472fb35c75fc297eabb9d89b8"
@@ -7588,6 +8476,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9985fd1504e250c615ca5f281c3f7a6da76213ebd5ccc9561496568a2752afb6"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9985fd1504e250c615ca5f281c3f7a6da76213ebd5ccc9561496568a2752afb6"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_i686_gnu"
@@ -7598,12 +8491,17 @@ checksum = "a75915e7def60c94dcef72200b9a8e58e5091744960da64ec734a6c6e9b3743e"
 [[package]]
 name = "windows_i686_gnu"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "679f235acf6b1639408c0f6db295697a19d103b0cdc88146aa1b992c580c647d"
 =======
 version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 checksum = "88ba073cf16d5372720ec942a8ccbf61626074c6d4dd2e745299726ce8b89670"
 
 [[package]]
@@ -7611,7 +8509,10 @@ name = "windows_i686_gnullvm"
 version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87f4261229030a858f36b459e748ae97545d6f1ec60e5e0d6a3d32e0dc232ee9"
+<<<<<<< HEAD
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_i686_msvc"
@@ -7622,6 +8523,7 @@ checksum = "8f55c233f70c4b27f66c523580f78f1004e8b5a8b659e05a4eb49d4166cca406"
 [[package]]
 name = "windows_i686_msvc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3480ac194b55ae274a7e135c21645656825da4a7f5b6e9286291b2113c94a78b"
@@ -7630,6 +8532,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db3c2bf3d13d5b658be73463284eaf12830ac9a26a90c717b7f771dfe97487bf"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db3c2bf3d13d5b658be73463284eaf12830ac9a26a90c717b7f771dfe97487bf"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -7640,6 +8547,7 @@ checksum = "53d40abd2583d23e4718fddf1ebec84dbff8381c07cae67ff7768bbf19c6718e"
 [[package]]
 name = "windows_x86_64_gnu"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42c46bab241c121402d1cb47d028ea3680ee2f359dcc287482dcf7fdddc73363"
@@ -7648,6 +8556,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e4246f76bdeff09eb48875a0fd3e2af6aada79d409d33011886d3e1581517d9"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e4246f76bdeff09eb48875a0fd3e2af6aada79d409d33011886d3e1581517d9"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_x86_64_gnullvm"
@@ -7658,6 +8571,7 @@ checksum = "0b7b52767868a23d5bab768e390dc5f5c55825b6d30b86c844ff2dc7414044cc"
 [[package]]
 name = "windows_x86_64_gnullvm"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc885a4332ee1afb9a1bacf11514801011725570d35675abc229ce7e3afe4d20"
@@ -7666,6 +8580,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "852298e482cd67c356ddd9570386e2862b5673c85bd5f88df9ab6802b334c596"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "852298e482cd67c356ddd9570386e2862b5673c85bd5f88df9ab6802b334c596"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "windows_x86_64_msvc"
@@ -7676,6 +8595,7 @@ checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
 [[package]]
 name = "windows_x86_64_msvc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.52.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e440c60457f84b0bee09208e62acc7ade264b38c4453f6312b8c9ab1613e73c"
@@ -7684,6 +8604,11 @@ version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bec47e5bfd1bff0eeaf6d8b485cc1074891a197ab4225d504cb7a1ab88b02bf0"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.52.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bec47e5bfd1bff0eeaf6d8b485cc1074891a197ab4225d504cb7a1ab88b02bf0"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 
 [[package]]
 name = "winnow"
@@ -7726,10 +8651,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bcea01cb6122ac3f20dc14f8e4104e2c0cd9c718c17ddb3fc115f9b2ed99f9ae"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "async-channel 2.2.0",
 =======
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-std",
  "borsh",
  "bs58",
@@ -7739,10 +8668,14 @@ dependencies = [
  "faster-hex 0.9.0",
  "futures",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "instant",
  "js-sys",
  "rand 0.8.5",
@@ -7866,10 +8799,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "010fff3468303b39fb0d5d267847a3d293ed083afbf83f4184fb1a749be56010"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "ahash 0.8.9",
 =======
  "ahash 0.8.11",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "ahash 0.8.11",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-trait",
  "borsh",
  "futures",
@@ -7919,10 +8856,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14784fbad27d0403fc752d835c4c4683cfc6af970a484ea83f40ce7ad6dc7745"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "ahash 0.8.9",
 =======
  "ahash 0.8.11",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "ahash 0.8.11",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-std",
  "async-trait",
  "borsh",
@@ -7930,10 +8871,14 @@ dependencies = [
  "futures",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "getrandom",
 =======
  "getrandom 0.2.14",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "getrandom 0.2.14",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "manual_future",
  "rand 0.8.5",
  "serde",
@@ -7971,10 +8916,14 @@ checksum = "762861614298160b9205302bec4f2b7eb45853413d10a90ad8edca44bafc324b"
 dependencies = [
  "async-std",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "base64",
 =======
  "base64 0.21.7",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "base64 0.21.7",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "cfg-if 1.0.0",
  "chrome-sys",
  "faster-hex 0.9.0",
@@ -8110,12 +9059,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6967baf2bd85deb2a014a32d34c1664ded9333e10d11d43ffc179fa09cc55db8"
 dependencies = [
 <<<<<<< HEAD
+<<<<<<< HEAD
  "ahash 0.8.9",
  "async-channel 2.2.0",
 =======
  "ahash 0.8.11",
  "async-channel 2.2.1",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+ "ahash 0.8.11",
+ "async-channel 2.2.1",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
  "async-std",
  "async-trait",
  "cfg-if 1.0.0",
@@ -8161,6 +9115,7 @@ checksum = "927da81e25be1e1a2901d59b81b37dd2efd1fc9c9345a55007f09bf5a2d3ee03"
 [[package]]
 name = "zerocopy"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74d4d3961e53fa4c9a25a8637fc2bfaf2595b3d3ae34875568a5cf64787716be"
@@ -8169,12 +9124,18 @@ version = "0.7.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "087eca3c1eaf8c47b94d02790dd086cd594b912d2043d4de4bfdd466b3befb7c"
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "087eca3c1eaf8c47b94d02790dd086cd594b912d2043d4de4bfdd466b3befb7c"
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
+<<<<<<< HEAD
 <<<<<<< HEAD
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8196,6 +9157,15 @@ dependencies = [
  "quote",
  "syn 2.0.60",
 >>>>>>> 4364f37f (WASM SDK update, public node resolver and TypeScript bindings (#459))
+=======
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f4b6c273f496d8fd4eaf18853e6b448760225dc030ff2c485a786859aea6393"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+>>>>>>> 6a56461ff1249e11e3124090253ca0bf128f7189
 ]
 
 [[package]]

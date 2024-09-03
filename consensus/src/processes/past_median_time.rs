@@ -1,5 +1,6 @@
 use crate::model::stores::{block_window_cache::BlockWindowHeap, headers::HeaderStoreReader};
 use kaspa_consensus_core::errors::block::RuleError;
+use kaspa_core::info;
 use std::sync::Arc;
 
 /// A past median manager conforming to the legacy golang implementation
@@ -41,6 +42,7 @@ impl<T: HeaderStoreReader> SampledPastMedianTimeManager<T> {
     }
 
     pub fn calc_past_median_time(&self, window: &BlockWindowHeap) -> Result<u64, RuleError> {
+        let time = std::time::Instant::now();
         // The past median time is actually calculated taking the average of the 11 values closest to the center
         // of the sorted timestamps
         const AVERAGE_FRAME_SIZE: usize = 11;

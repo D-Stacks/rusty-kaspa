@@ -5,6 +5,7 @@ use crate::processes::window::WindowManager;
 use kaspa_consensus_core::header::Header;
 use kaspa_hashes::Hash;
 use std::collections::HashSet;
+use std::sync::atomic::Ordering;
 
 impl HeaderProcessor {
     pub fn post_pow_validation(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
@@ -18,41 +19,49 @@ impl HeaderProcessor {
     }
 
     pub fn check_median_timestamp(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let (past_median_time, window) = self.window_manager.calc_past_median_time(ctx.ghostdag_data())?;
         ctx.block_window_for_past_median_time = Some(window);
 
         if header.timestamp <= past_median_time {
             return Err(RuleError::TimeTooOld(header.timestamp, past_median_time));
         }
-
+        self.benching.check_median_timestamp_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     pub fn check_merge_size_limit(&self, ctx: &mut HeaderProcessingContext) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let mergeset_size = ctx.ghostdag_data().mergeset_size() as u64;
         if mergeset_size > self.mergeset_size_limit {
             return Err(RuleError::MergeSetTooBig(mergeset_size, self.mergeset_size_limit));
         }
+        self.benching.check_merge_size_limit_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_blue_score(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let gd_blue_score = ctx.ghostdag_data().blue_score;
         if gd_blue_score != header.blue_score {
             return Err(RuleError::UnexpectedHeaderBlueScore(gd_blue_score, header.blue_score));
         }
+        self.benching.check_blue_score_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_blue_work(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let gd_blue_work = ctx.ghostdag_data().blue_work;
         if gd_blue_work != header.blue_work {
             return Err(RuleError::UnexpectedHeaderBlueWork(gd_blue_work, header.blue_work));
         }
+        self.benching.check_blue_work_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     pub fn check_indirect_parents(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let expected_block_parents = self.parents_manager.calc_block_parents(ctx.pruning_point(), header.direct_parents());
         if header.parents_by_level.len() != expected_block_parents.len()
             || !expected_block_parents.iter().enumerate().all(|(block_level, expected_level_parents)| {
@@ -70,18 +79,22 @@ impl HeaderProcessor {
                 TwoDimVecDisplay(header.parents_by_level.clone()),
             ));
         };
+        self.benching.check_indirect_parents_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     pub fn check_pruning_point(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let expected = self.pruning_point_manager.expected_header_pruning_point(ctx.ghostdag_data().to_compact(), ctx.pruning_info);
         if expected != header.pruning_point {
             return Err(RuleError::WrongHeaderPruningPoint(expected, header.pruning_point));
         }
+        self.benching.check_pruning_point_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     pub fn check_bounded_merge_depth(&self, ctx: &mut HeaderProcessingContext) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let ghostdag_data = ctx.ghostdag_data();
         let merge_depth_root = self.depth_manager.calc_merge_depth_root(ghostdag_data, ctx.pruning_point());
         let finality_point = self.depth_manager.calc_finality_point(ghostdag_data, ctx.pruning_point());
@@ -102,6 +115,7 @@ impl HeaderProcessor {
 
         ctx.merge_depth_root = Some(merge_depth_root);
         ctx.finality_point = Some(finality_point);
+        self.benching.check_bounded_merge_depth_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 }

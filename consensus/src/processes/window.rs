@@ -13,11 +13,13 @@ use kaspa_consensus_core::{
     errors::{block::RuleError, difficulty::DifficultyResult},
     BlockHashSet, BlueWorkType,
 };
+use kaspa_core::info;
 use kaspa_hashes::Hash;
 use kaspa_math::Uint256;
 use kaspa_utils::refs::Refs;
 use once_cell::unsync::Lazy;
-use std::{cmp::Reverse, iter::once, ops::Deref, sync::Arc};
+use core::panic;
+use std::{cmp::Reverse, iter::once, ops::Deref, sync::{atomic::{AtomicU64, AtomicUsize, Ordering}, Arc}, time::Duration};
 
 use super::{
     difficulty::{FullDifficultyManager, SampledDifficultyManager},
@@ -45,6 +47,7 @@ impl DaaWindow {
 }
 
 pub trait WindowManager {
+    fn maybe_log_perf(&self);
     fn block_window(&self, ghostdag_data: &GhostdagData, window_type: WindowType) -> Result<Arc<BlockWindowHeap>, RuleError>;
     fn calc_daa_window(&self, ghostdag_data: &GhostdagData, window: Arc<BlockWindowHeap>) -> DaaWindow;
     fn block_daa_window(&self, ghostdag_data: &GhostdagData) -> Result<DaaWindow, RuleError>;
@@ -230,6 +233,10 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader> Wi
     fn sample_rate(&self, _ghostdag_data: &GhostdagData, _window_type: WindowType) -> u64 {
         1
     }
+
+    fn maybe_log_perf(&self) {
+        // No-op
+    }
 }
 
 type DaaStatus = Option<(u64, BlockHashSet)>;
@@ -256,6 +263,14 @@ pub struct SampledWindowManager<T: GhostdagStoreReader, U: BlockWindowCacheReade
     past_median_time_sample_rate: u64,
     difficulty_manager: SampledDifficultyManager<V>,
     past_median_time_manager: SampledPastMedianTimeManager<V>,
+    cache_hits_pmt: Arc<AtomicUsize>,
+    cache_misses_pmt: Arc<AtomicUsize>,
+    cache_hits_daa: Arc<AtomicUsize>,
+    cache_misses_daa: Arc<AtomicUsize>,
+    time_taken_to_build_window_miss_pmt: Arc<AtomicU64>,
+    time_taken_to_build_window_hit_pmt: Arc<AtomicU64>,
+    time_taken_to_build_window_miss_daa: Arc<AtomicU64>,
+    time_taken_to_build_window_hit_daa: Arc<AtomicU64>,
 }
 
 impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W: DaaStoreReader> SampledWindowManager<T, U, V, W> {
@@ -276,6 +291,7 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
         past_median_time_window_size: usize,
         past_median_time_sample_rate: u64,
     ) -> Self {
+       
         let difficulty_manager = SampledDifficultyManager::new(
             headers_store.clone(),
             genesis.bits,
@@ -301,7 +317,69 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
             past_median_time_sample_rate,
             difficulty_manager,
             past_median_time_manager,
+            cache_hits_pmt: Arc::new(AtomicUsize::default()),
+            cache_misses_pmt: Arc::new(AtomicUsize::default()),
+            cache_hits_daa: Arc::new(AtomicUsize::default()),
+            cache_misses_daa: Arc::new(AtomicUsize::default()),
+            time_taken_to_build_window_miss_pmt: Arc::new(AtomicU64::default()),
+            time_taken_to_build_window_hit_pmt: Arc::new(AtomicU64::default()),
+            time_taken_to_build_window_miss_daa: Arc::new(AtomicU64::default()),
+            time_taken_to_build_window_hit_daa: Arc::new(AtomicU64::default()),
         }
+    }
+
+    fn gather_data(&self, time_taken_to_build_window: &Duration, is_cache_hit: bool, window_type: WindowType) {
+        match window_type {
+            WindowType::SampledMedianTimeWindow => {
+                if is_cache_hit {
+                    self.cache_hits_pmt.fetch_add(1, Ordering::SeqCst);
+                    self.time_taken_to_build_window_hit_pmt.fetch_add(time_taken_to_build_window.as_micros().try_into().unwrap(), Ordering::SeqCst);
+                } else {
+                    self.cache_misses_pmt.fetch_add(1, Ordering::SeqCst);
+                    self.time_taken_to_build_window_miss_pmt.fetch_add(time_taken_to_build_window.as_micros().try_into().unwrap(), Ordering::SeqCst);
+                }
+            }
+            WindowType::SampledDifficultyWindow => {
+                if is_cache_hit {
+                    self.cache_hits_daa.fetch_add(1, Ordering::SeqCst);
+                    self.time_taken_to_build_window_hit_daa.fetch_add(time_taken_to_build_window.as_micros().try_into().unwrap(), Ordering::SeqCst);
+                } else {
+                    self.cache_misses_daa.fetch_add(1, Ordering::SeqCst);
+                    self.time_taken_to_build_window_miss_daa.fetch_add(time_taken_to_build_window.as_micros().try_into().unwrap(), Ordering::SeqCst);
+                }
+            }
+            _ => panic!("unexpected window type"),
+        }
+    }
+
+    fn log_perf(&self) {
+        
+        let cache_hits_pmt = self.cache_hits_pmt.load(Ordering::SeqCst);
+        let cache_misses_pmt = self.cache_misses_pmt.load(Ordering::SeqCst);
+        let cache_hits_daa = self.cache_hits_daa.load(Ordering::SeqCst);
+        let cache_misses_daa = self.cache_misses_daa.load(Ordering::SeqCst);
+
+        let time_taken_to_build_window_hit_pmt = Duration::from_micros(self.time_taken_to_build_window_hit_pmt.load(Ordering::SeqCst));
+        let time_taken_to_build_window_miss_pmt = Duration::from_micros(self.time_taken_to_build_window_miss_pmt.load(Ordering::SeqCst));
+        let time_taken_to_build_window_hit_daa = Duration::from_micros(self.time_taken_to_build_window_hit_daa.load(Ordering::SeqCst));
+        let time_taken_to_build_window_miss_daa = Duration::from_micros(self.time_taken_to_build_window_miss_daa.load(Ordering::SeqCst));
+
+        info!(
+            "
+            cache_hits_pmt: {:?}, time_taken_to_build_window_hit_pmt {:?}\n 
+            cache_misses_pmt: {:?}, time_taken_to_build_window_miss_pmt {:?} \n
+            cache_hits_daa: {:?}, time_taken_to_build_window_hit_daa {:?} \n
+            cache_misses_daa: {:?}, time_taken_to_build_window_miss_daa {:?} \n
+            ",
+            cache_hits_pmt,
+            time_taken_to_build_window_hit_pmt,
+            cache_misses_pmt,
+            time_taken_to_build_window_miss_pmt,
+            cache_hits_daa,
+            time_taken_to_build_window_hit_daa,
+            cache_misses_daa,
+            time_taken_to_build_window_miss_daa,
+        );
     }
 
     fn build_block_window(
@@ -310,6 +388,9 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
         window_type: WindowType,
         mut mergeset_non_daa_inserter: impl FnMut(Hash),
     ) -> Result<Arc<BlockWindowHeap>, RuleError> {
+        let mut is_cache_hit = false;
+        let time = std::time::Instant::now();
+
         let window_size = self.window_size(ghostdag_data, window_type);
         let sample_rate = self.sample_rate(ghostdag_data, window_type);
 
@@ -334,6 +415,7 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
 
         if let Some(cache) = cache {
             if let Some(selected_parent_binary_heap) = cache.get(&ghostdag_data.selected_parent) {
+                is_cache_hit = true;
                 // Only use the cached window if it originates from here
                 if let WindowOrigin::Sampled = selected_parent_binary_heap.origin() {
                     let selected_parent_blue_work = self.ghostdag_store.get_blue_work(ghostdag_data.selected_parent).unwrap();
@@ -352,8 +434,10 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
                     }
 
                     return if let Ok(heap) = Lazy::into_value(heap) {
+                        self.gather_data(&time.elapsed(), is_cache_hit, window_type);
                         Ok(Arc::new(heap.binary_heap))
                     } else {
+                        self.gather_data(&time.elapsed(), is_cache_hit, window_type);
                         Ok(selected_parent_binary_heap.clone())
                     };
                 }
@@ -403,6 +487,8 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
 
             current_ghostdag = parent_ghostdag;
         }
+
+        self.gather_data(&time.elapsed(), is_cache_hit, window_type);
 
         Ok(Arc::new(window_heap.binary_heap))
     }
@@ -516,6 +602,10 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
             WindowType::FullDifficultyWindow | WindowType::VaryingWindow(_) => 1,
         }
     }
+    
+    fn maybe_log_perf(&self) {
+        self.log_perf();
+    }
 }
 
 /// A window manager handling either full (un-sampled) or sampled windows depending on an activation DAA score
@@ -623,6 +713,10 @@ impl<T: GhostdagStoreReader, U: BlockWindowCacheReader, V: HeaderStoreReader, W:
             true => self.sampled_window_manager.calc_past_median_time(ghostdag_data),
             false => self.full_window_manager.calc_past_median_time(ghostdag_data),
         }
+    }
+
+    fn maybe_log_perf(&self) {
+        self.sampled_window_manager.log_perf();
     }
 
     fn estimate_network_hashes_per_second(&self, window: Arc<BlockWindowHeap>) -> DifficultyResult<u64> {

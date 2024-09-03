@@ -10,6 +10,7 @@ use kaspa_consensus_core::BlockLevel;
 use kaspa_core::time::unix_now;
 use kaspa_database::prelude::StoreResultExtensions;
 use std::cmp::max;
+use std::sync::atomic::Ordering;
 
 impl HeaderProcessor {
     /// Validates the header in isolation including pow check against header declared bits.
@@ -18,7 +19,7 @@ impl HeaderProcessor {
         self.check_header_version(header)?;
         self.check_block_timestamp_in_isolation(header)?;
         self.check_parents_limit(header)?;
-        Self::check_parents_not_origin(header)?;
+        self.check_parents_not_origin(header)?;
         self.check_pow_and_calc_block_level(header)
     }
 
@@ -29,22 +30,27 @@ impl HeaderProcessor {
     }
 
     fn check_header_version(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         if header.version != constants::BLOCK_VERSION {
             return Err(RuleError::WrongBlockVersion(header.version));
         }
+        self.benching.check_header_version_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_block_timestamp_in_isolation(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         // Timestamp deviation tolerance is in seconds so we multiply by 1000 to get milliseconds (without BPS dependency)
         let max_block_time = unix_now() + self.timestamp_deviation_tolerance * 1000;
         if header.timestamp > max_block_time {
             return Err(RuleError::TimeTooFarIntoTheFuture(header.timestamp, max_block_time));
         }
+        self.benching.check_block_timestamp_in_isolation_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_parents_limit(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         if header.direct_parents().is_empty() {
             return Err(RuleError::NoParents);
         }
@@ -52,19 +58,21 @@ impl HeaderProcessor {
         if header.direct_parents().len() > self.max_block_parents as usize {
             return Err(RuleError::TooManyParents(header.direct_parents().len(), self.max_block_parents as usize));
         }
-
+        self.benching.check_parents_limit_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
-    fn check_parents_not_origin(header: &Header) -> BlockProcessResult<()> {
+    fn check_parents_not_origin(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         if header.direct_parents().iter().any(|&parent| parent.is_origin()) {
             return Err(RuleError::OriginParent);
         }
-
+        self.benching.check_parents_not_origin_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_parents_exist(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let mut missing_parents = Vec::new();
         for parent in header.direct_parents() {
             match self.statuses_store.read().get(*parent).unwrap_option() {
@@ -78,10 +86,12 @@ impl HeaderProcessor {
         if !missing_parents.is_empty() {
             return Err(RuleError::MissingParents(missing_parents));
         }
+        self.benching.check_parents_exist_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_parents_incest(&self, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let parents = header.direct_parents();
         for parent_a in parents.iter() {
             for parent_b in parents.iter() {
@@ -94,16 +104,19 @@ impl HeaderProcessor {
                 }
             }
         }
-
+        self.benching.check_parents_incest_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_pow_and_calc_block_level(&self, header: &Header) -> BlockProcessResult<BlockLevel> {
+        let time = std::time::Instant::now();
         let state = kaspa_pow::State::new(header);
         let (passed, pow) = state.check_pow(header.nonce);
         if passed || self.skip_proof_of_work {
             let signed_block_level = self.max_block_level as i64 - pow.bits() as i64;
-            Ok(max(signed_block_level, 0) as BlockLevel)
+            let res = max(signed_block_level, 0) as BlockLevel;
+            self.benching.check_pow_and_calc_block_level_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
+            Ok(res)
         } else {
             Err(RuleError::InvalidPoW)
         }

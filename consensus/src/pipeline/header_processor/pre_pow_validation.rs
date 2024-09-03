@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use super::*;
 use crate::errors::{BlockProcessResult, RuleError};
 use crate::model::services::reachability::ReachabilityService;
@@ -12,6 +14,7 @@ impl HeaderProcessor {
     }
 
     fn check_pruning_violation(&self, ctx: &HeaderProcessingContext) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let known_parents = ctx.direct_known_parents();
 
         // We check that the new block is in the future of the pruning point by verifying that at least
@@ -20,10 +23,12 @@ impl HeaderProcessor {
         if !self.reachability_service.is_dag_ancestor_of_any(ctx.pruning_point(), &mut known_parents.iter().copied()) {
             return Err(RuleError::PruningViolation(ctx.pruning_point()));
         }
+        self.benching.check_pruning_violation_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 
     fn check_difficulty_and_daa_score(&self, ctx: &mut HeaderProcessingContext, header: &Header) -> BlockProcessResult<()> {
+        let time = std::time::Instant::now();
         let ghostdag_data = ctx.ghostdag_data();
         let daa_window = self.window_manager.block_daa_window(ghostdag_data)?;
 
@@ -39,6 +44,7 @@ impl HeaderProcessor {
         }
 
         ctx.block_window_for_difficulty = Some(daa_window.window);
+        self.benching.check_difficulty_and_daa_score_bench.fetch_add(time.elapsed().as_millis().try_into().unwrap(), Ordering::SeqCst);
         Ok(())
     }
 }

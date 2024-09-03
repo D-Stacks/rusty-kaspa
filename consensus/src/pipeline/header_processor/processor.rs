@@ -25,7 +25,7 @@ use crate::{
     },
     params::Params,
     pipeline::deps_manager::{BlockProcessingMessage, BlockTask, BlockTaskDependencyManager, TaskId},
-    processes::{ghostdag::ordering::SortableBlock, reachability::inquirer as reachability, relations::RelationsStoreExtensions},
+    processes::{ghostdag::ordering::SortableBlock, reachability::inquirer as reachability, relations::RelationsStoreExtensions, window::WindowManager},
 };
 use crossbeam_channel::{Receiver, Sender};
 use itertools::Itertools;
@@ -37,15 +37,131 @@ use kaspa_consensus_core::{
     BlockHashSet, BlockLevel,
 };
 use kaspa_consensusmanager::SessionLock;
+use kaspa_core::info;
 use kaspa_database::prelude::{StoreResultEmptyTuple, StoreResultExtensions};
 use kaspa_hashes::Hash;
 use kaspa_utils::vec::VecExtensions;
 use parking_lot::RwLock;
 use rayon::ThreadPool;
 use rocksdb::WriteBatch;
-use std::sync::{atomic::Ordering, Arc};
+use std::{os::unix, sync::{atomic::{AtomicU64, Ordering}, Arc}, time::{Duration, Instant, UNIX_EPOCH}};
+use std::time::SystemTime;
 
 use super::super::ProcessingCounters;
+
+
+pub struct HeaderBenching {
+    pub check_blue_score_bench: AtomicU64,
+    pub check_blue_work_bench: AtomicU64,
+    pub check_median_timestamp_bench: AtomicU64,
+    pub check_merge_size_limit_bench: AtomicU64,
+    pub check_bounded_merge_depth_bench: AtomicU64,
+    pub check_pruning_point_bench: AtomicU64,
+    pub check_indirect_parents_bench: AtomicU64,
+    pub check_difficulty_and_daa_score_bench: AtomicU64,
+    pub check_pruning_violation_bench: AtomicU64,
+    pub check_header_version_bench: AtomicU64,
+    pub check_block_timestamp_in_isolation_bench: AtomicU64,
+    pub check_parents_limit_bench: AtomicU64,
+    pub check_parents_not_origin_bench: AtomicU64,
+    pub check_parents_exist_bench: AtomicU64,
+    pub check_parents_incest_bench: AtomicU64,
+    pub check_pow_and_calc_block_level_bench: AtomicU64,
+
+}
+
+impl HeaderBenching {
+    pub fn new() -> Self {
+        Self {
+            check_blue_score_bench: AtomicU64::new(0),
+            check_blue_work_bench: AtomicU64::new(0),
+            check_median_timestamp_bench: AtomicU64::new(0),
+            check_merge_size_limit_bench: AtomicU64::new(0),
+            check_bounded_merge_depth_bench: AtomicU64::new(0),
+            check_pruning_point_bench: AtomicU64::new(0),
+            check_indirect_parents_bench: AtomicU64::new(0),
+            check_difficulty_and_daa_score_bench: AtomicU64::new(0),
+            check_pruning_violation_bench: AtomicU64::new(0),
+            check_header_version_bench: AtomicU64::new(0),
+            check_block_timestamp_in_isolation_bench: AtomicU64::new(0),
+            check_parents_limit_bench: AtomicU64::new(0),
+            check_parents_not_origin_bench: AtomicU64::new(0),
+            check_parents_exist_bench: AtomicU64::new(0),
+            check_parents_incest_bench: AtomicU64::new(0),
+            check_pow_and_calc_block_level_bench: AtomicU64::new(0),
+            }
+    }
+
+    fn log(&self) {
+        let check_blue_work_bench = self.check_blue_work_bench.load(Ordering::SeqCst);
+        let check_blue_score_bench = self.check_blue_score_bench.load(Ordering::SeqCst);
+        let check_median_timestamp_bench = self.check_median_timestamp_bench.load(Ordering::SeqCst);
+        let check_merge_size_limit_bench = self.check_merge_size_limit_bench.load(Ordering::SeqCst);
+        let check_bounded_merge_depth_bench = self.check_bounded_merge_depth_bench.load(Ordering::SeqCst);
+        let check_pruning_point_bench = self.check_pruning_point_bench.load(Ordering::SeqCst);
+        let check_indirect_parents_bench = self.check_indirect_parents_bench.load(Ordering::SeqCst);
+        let check_difficulty_and_daa_score_bench = self.check_difficulty_and_daa_score_bench.load(Ordering::SeqCst);
+        let check_pruning_violation_bench = self.check_pruning_violation_bench.load(Ordering::SeqCst);
+        let check_header_version_bench = self.check_header_version_bench.load(Ordering::SeqCst);
+        let check_block_timestamp_in_isolation_bench = self.check_block_timestamp_in_isolation_bench.load(Ordering::SeqCst);
+        let check_parents_limit_bench = self.check_parents_limit_bench.load(Ordering::SeqCst);
+        let check_parents_not_origin_bench = self.check_parents_not_origin_bench.load(Ordering::SeqCst);
+        let check_parents_exist_bench = self.check_parents_exist_bench.load(Ordering::SeqCst);
+        let check_parents_incest_bench = self.check_parents_incest_bench.load(Ordering::SeqCst);
+        let check_pow_and_calc_block_level_bench = self.check_pow_and_calc_block_level_bench.load(Ordering::SeqCst);
+        let total = check_blue_work_bench + check_blue_score_bench + check_median_timestamp_bench + check_merge_size_limit_bench + check_pruning_point_bench + check_indirect_parents_bench + check_difficulty_and_daa_score_bench + check_pruning_violation_bench + check_header_version_bench + check_block_timestamp_in_isolation_bench + check_parents_limit_bench + check_parents_not_origin_bench + check_parents_exist_bench + check_parents_incest_bench + check_pow_and_calc_block_level_bench;
+        let check_blue_work_percentile = check_blue_work_bench as f64 / total as f64 * 100.0;
+        let check_blue_score_percentile = check_blue_score_bench as f64 / total as f64 * 100.0;
+        let check_median_timestamp_percentile = check_median_timestamp_bench as f64 / total as f64 * 100.0;
+        let check_merge_size_limit_percentile = check_merge_size_limit_bench as f64 / total as f64 * 100.0;
+        let check_pruning_point_percentile = check_pruning_point_bench as f64 / total as f64 * 100.0;
+        let check_indirect_parents_percentile = check_indirect_parents_bench as f64 / total as f64 * 100.0;
+        let check_difficulty_and_daa_score_percentile = check_difficulty_and_daa_score_bench as f64 / total as f64 * 100.0;
+        let check_pruning_violation_percentile = check_pruning_violation_bench as f64 / total as f64 * 100.0;
+        let check_header_version_percentile = check_header_version_bench as f64 / total as f64 * 100.0;
+        let check_block_timestamp_in_isolation_percentile = check_block_timestamp_in_isolation_bench as f64 / total as f64 * 100.0;
+        let check_parents_limit_percentile = check_parents_limit_bench as f64 / total as f64 * 100.0;
+        let check_parents_not_origin_percentile = check_parents_not_origin_bench as f64 / total as f64 * 100.0;
+        let check_parents_exist_percentile = check_parents_exist_bench as f64 / total as f64 * 100.0;
+        let check_parents_incest_percentile = check_parents_incest_bench as f64 / total as f64 * 100.0;
+        let check_pow_and_calc_block_level_percentile = check_pow_and_calc_block_level_bench as f64 / total as f64 * 100.0;
+        info!(
+            "HeaderBenching:\n\
+            check_blue_work_bench: {:?}  ({:.2}%)\n\
+            check_blue_score_bench: {:?} ({:.2}%)\n\
+            check_median_timestamp_bench: {:?} ({:.2}%)\n\
+            check_merge_size_limit_bench: {:?} ({:.2}%)\n\
+            check_pruning_point_bench: {:?} ({:.2}%)\n\
+            check_indirect_parents_bench: {:?} ({:.2}%)\n\
+            check_difficulty_and_daa_score_bench: {:?} ({:.2}%)\n\
+            check_pruning_violation_bench: {:?} ({:.2}%)\n\
+            check_header_version_bench: {:?} ({:.2}%)\n\
+            check_block_timestamp_in_isolation_bench: {:?} ({:.2}%)\n\
+            check_parents_limit_bench: {:?} ({:.2}%)\n\
+            check_parents_not_origin_bench: {:?} ({:.2}%)\n\
+            check_parents_exist_bench: {:?} ({:.2}%)\n\
+            check_parents_incest_bench: {:?} ({:.2}%)\n\
+            check_pow_and_calc_block_level_bench: {:?} ({:.2}%)\n\
+            Total: {:?}",
+            Duration::from_millis(check_blue_work_bench.try_into().unwrap()), check_blue_work_percentile,
+            Duration::from_millis(check_blue_score_bench.try_into().unwrap()), check_blue_score_percentile,
+            Duration::from_millis(check_median_timestamp_bench.try_into().unwrap()), check_median_timestamp_percentile,
+            Duration::from_millis(check_merge_size_limit_bench.try_into().unwrap()), check_merge_size_limit_percentile,
+            Duration::from_millis(check_pruning_point_bench.try_into().unwrap()), check_pruning_point_percentile,
+            Duration::from_millis(check_indirect_parents_bench.try_into().unwrap()), check_indirect_parents_percentile,
+            Duration::from_millis(check_difficulty_and_daa_score_bench.try_into().unwrap()), check_difficulty_and_daa_score_percentile,
+            Duration::from_millis(check_pruning_violation_bench.try_into().unwrap()), check_pruning_violation_percentile,
+            Duration::from_millis(check_header_version_bench.try_into().unwrap()), check_header_version_percentile,
+            Duration::from_millis(check_block_timestamp_in_isolation_bench.try_into().unwrap()), check_block_timestamp_in_isolation_percentile,
+            Duration::from_millis(check_parents_limit_bench.try_into().unwrap()), check_parents_limit_percentile,
+            Duration::from_millis(check_parents_not_origin_bench.try_into().unwrap()), check_parents_not_origin_percentile,
+            Duration::from_millis(check_parents_exist_bench.try_into().unwrap()), check_parents_exist_percentile,
+            Duration::from_millis(check_parents_incest_bench.try_into().unwrap()), check_parents_incest_percentile,
+            Duration::from_millis(check_pow_and_calc_block_level_bench.try_into().unwrap()), check_pow_and_calc_block_level_percentile,
+            Duration::from_millis(total.try_into().unwrap())
+        );
+    }
+}
 
 pub struct HeaderProcessingContext {
     pub hash: Hash,
@@ -146,6 +262,9 @@ pub struct HeaderProcessor {
     pub(super) pruning_point_manager: DbPruningPointManager,
     pub(super) parents_manager: DbParentsManager,
 
+    // Benchmarks
+    pub(super) benching: HeaderBenching,
+
     // Pruning lock
     pruning_lock: SessionLock,
 
@@ -154,6 +273,8 @@ pub struct HeaderProcessor {
 
     // Counters
     counters: Arc<ProcessingCounters>,
+
+    last_log_instance: RwLock<Instant>,
 }
 
 impl HeaderProcessor {
@@ -199,6 +320,8 @@ impl HeaderProcessor {
             task_manager: BlockTaskDependencyManager::new(),
             pruning_lock,
             counters,
+            benching: HeaderBenching::new(),
+
             // TODO (HF): make sure to also pass `new_timestamp_deviation_tolerance` and use according to HF activation score
             timestamp_deviation_tolerance: params.timestamp_deviation_tolerance(0),
             target_time_per_block: params.target_time_per_block,
@@ -206,6 +329,7 @@ impl HeaderProcessor {
             mergeset_size_limit: params.mergeset_size_limit,
             skip_proof_of_work: params.skip_proof_of_work,
             max_block_level: params.max_block_level,
+            last_log_instance: RwLock::new(Instant::now()),
         }
     }
 
@@ -362,6 +486,11 @@ impl HeaderProcessor {
     }
 
     fn commit_header(&self, ctx: HeaderProcessingContext, header: &Header) {
+        if self.last_log_instance.read().elapsed() > Duration::from_secs(10) {
+            self.window_manager.maybe_log_perf();
+            *self.last_log_instance.write() = Instant::now();
+        }
+
         let ghostdag_data = ctx.ghostdag_data.as_ref().unwrap();
         let pp = ctx.pruning_point();
 

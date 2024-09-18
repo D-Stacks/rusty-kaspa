@@ -597,6 +597,7 @@ fn find_most_optimal_solution(
     // 1) the solution with change, and 2) the solution without change.
     // traverse by highest input amounts, increase selection until we breach target_amount treshold.
     for k in (1..=sorted_input_amounts.len()) {
+        current_sum += sorted_input_amounts[k - 1];
         // storage should always be relaxed without change.
         let mut target_amount_without_change = base_target_amount + ((k as u64 + 1) * target_fee); // compute fees
         let mut target_amount_with_change = base_target_amount + change_output_mass * target_fee; // compute fees

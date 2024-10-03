@@ -25,6 +25,8 @@ triggered.workspace = true
 uuid.workspace = true
 log.workspace = true
 wasm-bindgen.workspace = true
+kaspa-core.workspace = true
+rand = { workspace = true, features = ["small_rng"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rlimit.workspace = true
@@ -37,6 +39,9 @@ futures-util.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "macros"] }
 criterion.workspace = true
 rand.workspace = true
+rand_distr.workspace = true
+kaspa-core.workspace = true
+kaspa-consensus-core.workspace = true
 
 [[bench]]
 name = "bench"

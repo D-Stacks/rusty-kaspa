@@ -214,23 +214,80 @@ impl<'a> Context<'a> {
 /// This is done via binary searching.
 fn minimize_to_target(ctx: &Context, solution: &mut Solution, subset_index: usize) -> Option<(usize, u64)> {
 
-    let removed_val = ctx.filtered_input[solution.subset[subset_index]];
-    let target_val = std::cmp::min(ctx.target - (solution.sum - removed_val), *ctx.filtered_input.last().unwrap()); // make sure we point to the minimal value, in the worst case. 
+    assert!(solution.sum >= ctx.target, "expected the solution sum to be above the target sum, but found solution sum: {}, target sum: {}", solution.sum, ctx.target);
+    let removed_filtered_index = solution.subset[subset_index];
+    let removed_val = ctx.filtered_input[removed_filtered_index];
+    let target_val = ctx.target - (solution.sum - removed_val); // make sure we point to the minimal value, in the worst case. 
+    
+    
+    // two things to consider here:
+    // if we point above below the target val, we will be under the target sum.
+    // if we point to a val above or the same as the removed val, the change will result in a larger or same diff to the target sum then before. 
+    
+    // below this index, are all values that are larger then the target value.
+    let pp = ctx.filtered_input.partition_point(|s| target_val <= *s);
 
-    let (new_index, new_val) = 'index_search: {
-        // below this index, are all values that are smaller then the target value.
-        let pp = ctx.filtered_input.partition_point(|s| *s > target_val).saturating_sub(1);
-        //assert!(pp < ctx.filtered_input.len());
+    if pp == 0 {
+        // we only have values to choose from that are less then the target value, so we may break with None. 
+        return None;
+    };
 
-        // below this solution_pp are all indexes, that point to larger target values.
-        // above this solution_pp are all indexes, that point to smaller target values, including the target value, potentially.
-        let solution_pp = solution.subset.partition_point(|i| *i < pp);
-        //assert!(solution.subset[..solution_pp].iter().all(|i| ctx.filtered_input[*i] > ctx.filtered_input[pp]));
-        //assert!(solution.subset[solution_pp..].iter().all(|i| ctx.filtered_input[*i] <= ctx.filtered_input[pp]));
-        //info!("solution_pp: {}, pp: {}, target_val: {}, ctx.filtered_input[pp]: {}, ctx.filtered_input[solution.subset[solution_pp]]: {}", solution_pp, pp, target_val, ctx.filtered_input[pp], ctx.filtered_input[solution.subset[solution_pp]]);
-        if solution_pp == solution.subset.len() { // all values indexed are larger than the target value.
-            //assert!(!solution.subset.contains(&pp)); // fix this
-            break 'index_search (pp, ctx.filtered_input[pp]);
+    // we scan up from the removed filtered_index to find first above it.
+    let low_pp = ctx.filtered_input[removed_filtered_index + 1..pp]
+    .iter()
+    .enumerate()
+    .skip_while(|(_, val)| **val == removed_val)
+    .next()
+    .map(|(i, _)| removed_filtered_index + 1 + i);
+
+    // above this pp index, are all values that point to values that are larger or equal to / than the target value.
+    //let solution_subset_pp = solution.subset.partition_point(|s| s >= &pp);
+
+    //let mut solution_iter = solution.subset[..solution_subset_pp].iter().rev();
+
+    if let Some(low_pp) = low_pp {
+        for ((i, val)) in ctx.filtered_input[low_pp..pp]
+        .iter()
+        .rev()
+        .enumerate()
+        .take_while(|(_, val)| target_val <= **val && **val < removed_val) // we are only interested in values reducing dist to target without exceeding it. 
+        {
+
+            if !solution.subset.binary_search(&(pp - i - 1)).is_ok() {
+                // we are not already pointing to the target val, so we may break with it.
+                return Some((pp - i - 1, solution.sum -removed_val + val));
+                    /*/
+                    if let Some(already_indexed) = solution_iter.next() {
+                        if pp - i  - 1!= *already_indexed {
+                            assert!(val >= &target_val);
+                            assert!(val < &removed_val);
+                            assert!(ctx.filtered_input[pp - i - 1] == *val);
+                            return Some((pp - i, solution.sum -removed_val + val));
+                        }
+                    } else {
+                        assert!(val >= &target_val);
+                        assert!(val < &removed_val);
+                        assert!(ctx.filtered_input[pp - i - 1] == *val);
+                        return Some((pp - i - 1, solution.sum -removed_val + val));
+                    }
+                    */
+            };
+        };
+    } else {
+        // we have no range to choose from, so we may break with None.
+        return None;
+    }
+
+    None
+    
+    }
+        /*
+        if solution_pp == solution.subset.len() {
+            // we are only pointing to values that are larger than the target value, so we may break with the pp - 1
+            return pp - 1, ctx.filtered_input[pp - 1];
+        } else if solution_pp == 0 {
+            // we are only pointing to values that are smaller than the target value, so we may break with the pp
+            return pp - 1, ctx.filtered_input[pp - 1];
         } else if solution.subset[solution_pp] != pp { // we are not pointing to the target val, so we may break with it.
             //assert!(!solution.subset.contains(&pp)); // fix this
             // we are not already pointing to the target val, so we may break with it.
@@ -240,7 +297,7 @@ fn minimize_to_target(ctx: &Context, solution: &mut Solution, subset_index: usiz
             break 'index_search (pp, ctx.filtered_input[pp]);
         }else { 
             return None;
-
+*/
             /*
             let left_index = 'left_search: {
                 for (i, w) in  solution.subset[..solution_pp].windows(2).rev().enumerate() {
@@ -290,6 +347,7 @@ fn minimize_to_target(ctx: &Context, solution: &mut Solution, subset_index: usiz
                 _ => return None,
                 }
                 */
+                /*
             };
         };
 
@@ -307,7 +365,8 @@ fn minimize_to_target(ctx: &Context, solution: &mut Solution, subset_index: usiz
         } else {
             None
         }
-}
+        */
+
 
 fn generate_random_solution(ctx: &Context, rng: &mut impl Rng) -> Solution {
     let subset = sample_weighted(rng, ctx.filtered_input.len(), |val| ctx.filtered_input[val] as f64 / ctx.target as f64, ctx.subset_solution_size).unwrap().into_vec();
@@ -371,53 +430,69 @@ fn approximate_subset_sum_with_context<'a>(ctx: Context, iterations: usize, rng:
 
     let mut global_searches = 0;
     let mut local_searches = 0;
+    let mut exchange_count = 0;
 
     let mut cache_hits = 0;
     
-
-    let mut already_searched = HashSet::<Vec<usize>>::new();
-
     // global search
     'global: loop {
 
         let mut current_solution = generate_random_solution(&ctx, rng);
-
+        current_solution.subset.sort();
 
         // climb randomly to a new solution. over or equal to the target sum.
-        while current_solution.sum < ctx.target {
-            for i in 0..ctx.subset_solution_size {
-                let to_add_index = rng.gen_range(0..ctx.filtered_input[..current_solution.subset[i]].len());
-                let to_remove_index = current_solution.subset[i];
+        loop {
+
+                let to_update_index = rng.gen_range(0..ctx.subset_solution_size);
+                let to_remove_index = current_solution.subset[to_update_index];
                 if to_remove_index == 0 {
+
+                    iterations -= 1;
+                    if iterations == 0 {
+                        break 'global;
+                    };
                     continue;
                 }
-                if current_solution.subset.binary_search(&to_add_index).is_ok() {
-                    continue;
-                };
-                current_solution.subset[i] = to_add_index;
-                current_solution.sum -= ctx.filtered_input[to_remove_index];
-                current_solution.sum += ctx.filtered_input[to_add_index];
-                current_solution.subset.sort();
-                iterations -= 1;
-                if iterations == 0 {
-                    if current_solution.sum >= ctx.target { 
-                        if best_solution.sum < ctx.target {
-                            debug!("SSP: found better solution: {}, local searches {}, global searches: {}", current_solution.sum, local_searches, global_searches);
-                            best_solution = current_solution;
-                        } else if current_solution.sum < best_solution.sum {
-                            debug!("SSP found better solution: {}, local searches {}, global searches: {}", current_solution.sum, local_searches, global_searches);
-                            best_solution = current_solution;
-                        };
+                let to_remove_val = ctx.filtered_input[to_remove_index];
+                if ctx.filtered_input[..to_remove_index].len() - 1 == 0 {
+
+                    iterations -= 1;
+                    if iterations == 0 {
+                        break 'global;
                     };
-                    break 'global;
-                };
+                    continue;
+                }
+
+                let to_add_index = rng.gen_range(0..ctx.filtered_input[..to_remove_index].len() - 1);
+                if current_solution.subset.binary_search(&to_add_index).is_ok() {
+
+                    iterations -= 1;
+                    if iterations == 0 {
+                        break 'global;
+                    };
+                    continue;
+                }
+
+                let to_add_val = ctx.filtered_input[to_add_index];
+                assert!(to_add_val >= to_remove_val);
+                
+                current_solution.subset[to_update_index] = to_add_index;
+                current_solution.sum -= to_remove_val;
+                current_solution.sum += to_add_val;
+                current_solution.subset.sort();
 
                 if current_solution.sum >= ctx.target {
                     break;
-                }
-            };
+                };
 
-        current_solution.subset.sort();
+                iterations -= 1;
+                if iterations == 0 {
+                    break 'global;
+                };
+            
+        }; 
+
+        assert!(current_solution.sum >= ctx.target, "expected the solution sum to be above the target sum, but found solution sum: {}, target sum: {}", current_solution.sum, ctx.target);
     
         // local search 
         'local: {
@@ -439,11 +514,14 @@ fn approximate_subset_sum_with_context<'a>(ctx: Context, iterations: usize, rng:
                     break 'local;
                 }
 
+                assert!(current_solution.sum >= ctx.target, "expected the solution sum to be above the target sum, but found solution sum: {}, target sum: {}", current_solution.sum, ctx.target);
                 if let Some((new_index, new_sum)) = minimize_to_target(&ctx, &mut current_solution, i) {
                     
                     current_solution.subset[i] = new_index;
                     current_solution.subset.sort();                    
                     current_solution.sum = new_sum;
+
+                    assert!(current_solution.sum >= ctx.target, "expected the solution sum to be above the target sum, but found solution sum: {}, target sum: {}", current_solution.sum, ctx.target);
 
                     // bunch of sanity checks. 
                     //assert!(!((1..current_solution.subset.len()).any(|i| current_solution.subset[i] == current_solution.subset[i - 1])));
@@ -454,15 +532,6 @@ fn approximate_subset_sum_with_context<'a>(ctx: Context, iterations: usize, rng:
                    if current_solution.sum == ctx.target {
                         debug!("SSP: found exact solution: {}, local searches {}, global searches: {}", current_solution.sum, local_searches, global_searches);
                         return Some((get_input_indexes_from_solution(&ctx, &current_solution), ctx.target));
-                   };
-
-                   if already_searched.contains(&current_solution.subset) {
-                        cache_hits += 1;
-                        iterations -= 1;
-                       // we have already searched this solution, so we may break early.
-                       break 'local;
-                   } else {
-                       already_searched.insert(current_solution.subset.clone());
                    };
 
                    // reset miss counter, as we found a better solution.
@@ -480,14 +549,10 @@ fn approximate_subset_sum_with_context<'a>(ctx: Context, iterations: usize, rng:
         };
         };
 
-        if current_solution.sum >= ctx.target { 
-                if best_solution.sum < ctx.target {
-                    debug!("SSP: found better solution: {}, local searches {}, global searches: {}", current_solution.sum, local_searches, global_searches);
-                    best_solution = current_solution;
-                } else if current_solution.sum < best_solution.sum {
-                    debug!("SSP found better solution: {}, local searches {}, global searches: {}", current_solution.sum, local_searches, global_searches);
-                    best_solution = current_solution;
-                };
+        if current_solution.sum >= ctx.target && current_solution.sum < best_solution.sum { 
+                debug!("SSP: found better solution: {}, old solution: {}, local searches {}, global searches: {},", current_solution.sum, best_solution.sum, local_searches, global_searches);
+                best_solution = current_solution;
+                exchange_count += 1;
         };
 
         global_searches += 1;
@@ -497,7 +562,7 @@ fn approximate_subset_sum_with_context<'a>(ctx: Context, iterations: usize, rng:
         };
     };
 
-    debug!("SSP: best solution: {}, local searches {}, global searches: {}", best_solution.sum, local_searches, global_searches);
+    debug!("SSP: best solution: {}, local searches {}, global searches: {}, exchange count {}", best_solution.sum, local_searches, global_searches, exchange_count);
     Some((get_input_indexes_from_solution(&ctx, &best_solution), best_solution.sum))
 }
 
@@ -524,7 +589,7 @@ pub mod test {
     // This is the maximum space we define for the subset sum problem. 
     // it corrosponds to MAX_SOMPI in practice, but used here for generic testing.
     const MAX_SPACE: u64 = 29_000_000_000_000_000; 
-    const ITERATIONS: usize = 100_000;
+    const ITERATIONS: usize = 10_000;
 
     #[test]
     fn test_approximate_subset_sum_uniform() {

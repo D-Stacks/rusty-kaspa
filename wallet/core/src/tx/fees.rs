@@ -7,15 +7,16 @@ use std::{
     rc::Rc,
 };
 
+use super::{payment, MassCalculator};
 use crate::{imports::local::storage, result::Result};
 use borsh::{BorshDeserialize, BorshSerialize};
 use itertools::Itertools;
+use kaspa_core::info;
 use kaspa_utils::vec::VecExtensions;
+use rand::seq::index;
 use serde::{Deserialize, Serialize};
 use sorted_insert::{SortedInsertBinary, SortedInsertBinaryByKey, SortedInsertBy};
 use thiserror::Error;
-
-use super::{payment, MassCalculator};
 
 #[derive(Error, Debug, Clone)]
 pub enum InputSelectionError {
@@ -517,6 +518,59 @@ impl Solution {
     }
 }
 
+use std::cmp::Ordering;
+
+// A struct to hold a sum and the corresponding subset of elements
+#[derive(Clone, Default)]
+struct SubsetSum {
+    sum: u64,
+    subset: Vec<u64>,
+}
+
+// This function implements the optimized FPTAS for Subset Sum Problem
+fn optimized_fptas_subset_sum(nums: &[u64], t: u64, epsilon: f64, k: usize) -> (Vec<u64>, u64) {
+    todo!()
+}
+
+/*
+fn select_next_smallest_step_towards_target(arr: &[u64], current_indexes: &[usize], t: u64) -> bool {
+    let mut largest_gap_to_target = 0;
+    let mut index_decrement = 0; // the index, which should be decremented in `current_indexes`
+    let current_indexes_iter = current_indexes.iter().peekable();
+    for (i, arr_index) in current_indexes.enumerate() {
+
+        // we may skip this iteration, if we already index the next arr index.
+        if let Some((_, &next_index)) = current_indexes.peek() {
+            if arr_index + 1 == next_index {
+                continue;
+            }
+        };
+
+        if let some(arr_value) = arr_upper_half.get(arr_index -1 ) {
+            let this_gap_to_target = arr_value - t;
+            if arr_value - t > largest_gap_to_target {
+                largest_gap_to_target = this_gap_to_target;
+                chosen_arr_index = *arr_index;
+                chosen_index_index = i;
+                index_increment += 1;
+            } else {
+                index_increment == 0;
+            };
+        } else {
+            break // we reached end, cannot decrement into arr_upper_half more.
+        };
+    };
+
+    if index_increment == 0 {
+        return true; // if we didn't increment any index, we have reached the end.
+    } else {
+    // update indexes,
+    indexes[chosen_index_index] = chosen_arr_index - index_increment;
+
+    // keep indexes sorted in ascending order.
+
+    }
+}
 // Finds a solution to a variation of the subset sum problem, where the sum of the subset is expected to minimize dist to the target,
 // while being greater or equal to the target.
 // k is the number of elements in the subset, and t is the target treshold.
@@ -526,35 +580,96 @@ impl Solution {
 // some available bounds in our case are: known k, and having a sorted array.
 // on the downside, if storage mass is not relaxed, we need to find the treshold where it becomes relaxed, as the target
 // which in and off itself is probably a subset sum problem 😅 .
-fn find_closest_subset(arr: &[u64], k: usize, t: u64) -> (Vec<u64>, u64) {
-    // below is a depth first search solution to the problem.
-    let mut best_subset = Vec::new();
-    let mut best_sum = u64::MAX;
+fn find_closest_subset(arr_upper_half: &[u64], k: usize, t: u64) -> (Vec<u64>, u64) {
+    // find the closest point to the target.
 
-    // Helper function for depth first search.
-    fn dfs(arr: &[u64], k: usize, t: u64, start: usize, current: &mut Vec<u64>, best_subset: &mut Vec<u64>, best_sum: &mut u64) {
-        if current.len() == k {
-            let current_sum: u64 = current.iter().sum();
-            if current_sum >= t && (current_sum < *best_sum || *best_sum == u64::MAX) {
-                *best_sum = current_sum;
-                *best_subset = current.clone();
+    let get_smallest_step_down = |arr: &[u64], indexes: &[usize], t: u64| -> (usize, usize) {
+        let mut largest_gap_to_target = usize::MAX;
+        let mut index_increment = 0;
+        let mut chosen_index_index = 0;
+        let mut chosen_arr_index = 0;
+        let index_iter = indexes.iter().peekable();
+        for (i, arr_index) in index_iter.enumerate() {
+            if let Some(&next_index) = index_iter.peek() {
+                if arr_index + 1 == next_index {
+                    index_increment += 1;
+                continue;
+                };
+            };
+            if let some(arr_value) = arr_upper_half.get(arr_index -1 ) {
+                if arr_value - t > largest_gap_to_target {
+                    largest_gap_to_target = gap_to_target;
+                    chosen_arr_index = *arr_index;
+                    chosen_index_index = i;
+                } else {
+                    index_increment = 0;
+                }
+            } else {
+                continue // we reached end, cannot decrement more from arr_upper_half.
             }
-            return;
         }
+        // update indexes,
+        indexes[chosen_index_index] = chosen_arr_index - index_increment;
 
-        for i in start..arr.len() {
-            current.push(arr[i]);
-            dfs(arr, k, t, i + 1, current, best_subset, best_sum);
-            current.pop();
+        // keep indexes sorted in ascending order.
+        if index_increment > 0 {
+            indexes.swap(chosen_index_index - index_increment, chosen_index_index);
         }
+    };
+
+    let closest_to_point = match arr.binary_search_by(|t| (t / k).cmp().reverse()) {
+        Ok(index) => {
+            return (vec![arr[index]], 0);
+        }
+        Err(index) => index,
+    };
+    // split to residual and upper half.
+    // residual cannot complete the task amongst its own elements.
+    // upper half all have solutions amongst themselves.
+    // but residual can be mixed with the upper half to find a more optimal solution.
+
+    // lowest_upper_half_result. best solution which doesn't require residuals.
+
+    // take highest_residual,
+    // 1)
+    // a) filter out all uppers who's solution cannot be attained with the highest resiual.
+    // -> either by being above lowest_upper_half_result or by being below target.
+
+    // b) filter out all uppers
+    // take_lowest_residual, filter out all lowest uppers that cannot sovlve
+
+    // now we have bounded the problem.
+
+    let lower_half = &arr[..closest_to_point];
+    let upper_half = &arr[closest_to_point..];
+    let lower_half_len = lower_half.len();
+    let upper_half_len = upper_half.len();
+
+    // do exhaustive search on the upper half, and binary search the larger half.
+    if lower_half_len >= upper_half_len {
+        let mut indexes = (0..k -1).collect();
+        let mut index_change = (0,0);
+        let mut sum = indexes.iter().map(|&index| arr[index]).sum();
+        loop {
+            let index_change = get_smallest_step_down(arr, &indexes, t);
+            indexes[index_change.0] = index_change.1;
+            let new_sum = indexes.iter().map(|&index| arr[index]).sum();
+            if new_sum < sum {
+                let closest_lowest = lower_half.binary_search_by(|new_sum| sum.cmp(probe));
+                sum = new_sum;
+            } else {
+                break;
+            }
+            lower_half.binary_search_by(|probe| sum.cmp(probe));
+        }
+    } else if lower_half_len <= upper_half_len {
+
     }
+    // we binary search the larger half, and exhaust the smaller.
+    // we index k -1 into larger, and search the lower half for closest match.
 
-    let mut current = Vec::new();
-    dfs(arr, k, t, 0, &mut current, &mut best_subset, &mut best_sum);
-
-    (best_subset, best_sum - t)
-}
-
+    }
+*/
 // given a solution finds the lowest input amounts that can cover the payment amount, and fees, without incurring more fees.
 // Generally Choosing the lowest inputs in such a way is the most optimal solution, as it minimizes storage cost waste, and gifted change, depending on the solution.
 fn minimize_to_lowest_inputs(sorted_input_amounts: &[u64], solution: &mut Solution) {
@@ -563,8 +678,12 @@ fn minimize_to_lowest_inputs(sorted_input_amounts: &[u64], solution: &mut Soluti
     // below does not handle the case where solution.is_storage_relaxed is false.
     // more consideration is needed to handle this case, as it adds further analysis to find the optimal inputs.
     // TODO: consider returning indices..
-    let (best_subset, best_sum) =
-        find_closest_subset(sorted_input_amounts, solution.selected_indexes.len(), solution.input_amount - solution.fees());
+    let (best_subset, best_sum) = optimized_fptas_subset_sum(
+        sorted_input_amounts,
+        solution.input_amount - solution.fees(),
+        0.8,
+        solution.selected_indexes.len(),
+    );
 
     solution.selected_indexes =
         best_subset.iter().map(|amount| sorted_input_amounts.iter().position(|&x| x == *amount).unwrap()).collect();
@@ -719,18 +838,39 @@ fn find_most_optimal_solution(
 pub mod test {
 
     use super::*;
-
+    use dpss::dp::find_subset;
+    use kaspa_core::info;
+    use rand::Rng;
     #[test]
     fn test_find_closest_solution() {
-        let target_sum = 100;
-        let sorted_input_amounts = vec![78, 55, 23, 10, 8, 3, 2, 1];
-        let target_size = 3;
-        let (vals, above_target_amount) =
-            find_closest_subset(&sorted_input_amounts, target_size, target_sum);
-        let indexes = vals.iter().map(|val| sorted_input_amounts.iter().position(|&x| x == *val).unwrap()).collect::<Vec<usize>>();
-        assert_eq!(vals.iter().sum::<u64>(), target_sum + above_target_amount);
-        assert_eq!(indexes, vec![0, 2, 7]);
-        assert_eq!(above_target_amount, 2);
-        println!("num_of_inputs: {:?}, indexes:{:?}, above_target_amount {:?}", indexes.len(), indexes, above_target_amount);
+        // intialize logger
+        kaspa_core::log::try_init_logger("INFO");
+
+        info!("test_find_closest_solution");
+        let target_sum = 100_000_0 * 5 / 2;
+        let mut rng = rand::thread_rng();
+        let mut sorted_input_amounts = [0i32; 10_000];
+        for i in 0..sorted_input_amounts.len() {
+            sorted_input_amounts[i] = rng.gen_range::<i32, _>(1..100_000);
+        }
+        sorted_input_amounts.sort();
+        sorted_input_amounts.reverse();
+        info!("sorted_input_amounts: {:?}", sorted_input_amounts.len());
+        let target_size = 5;
+        let time = std::time::Instant::now();
+        let elipson = if sorted_input_amounts.len() < 10_000 { 0.0 } else { 1.0 / (sorted_input_amounts.len() as f64).ln() };
+        info!("elipson: {:?}", elipson);
+        let res = find_subset(sorted_input_amounts.to_vec(), target_sum, target_size);
+        info!("time: {:?}", time.elapsed());
+        info!("res: {:?}", res);
+        /*
+            let above_target_sum = sum - target_sum;
+            let indexes = vals.iter().map(|val| sorted_input_amounts.iter().position(|&x| x == *val).unwrap()).collect::<Vec<usize>>();
+            assert_eq!(vals.iter().sum::<u64>(), target_sum + above_target_sum);
+            assert_eq!(indexes, vec![0, 2, 7]);
+            assert_eq!(above_target_sum, 2);
+            println!("num_of_inputs: {:?}, indexes:{:?}, above_target_amount {:?}", indexes.len(), indexes, above_target_sum);
+        }
+        */
     }
 }

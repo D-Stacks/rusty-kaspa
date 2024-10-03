@@ -9,6 +9,7 @@ pub mod mem_size;
 pub mod networking;
 pub mod option;
 pub mod refs;
+pub mod ssp_solver;
 
 pub mod as_slice;
 

@@ -516,6 +516,10 @@ impl Solution {
     pub fn fees(&self) -> u64 {
         self.compute_fees + self.storage_mass
     }
+
+    pub fn payment_amount(&self) -> u64 {
+        self.input_amount - self.fees() - self.change_amount
+    }
 }
 
 use std::cmp::Ordering;
@@ -673,22 +677,12 @@ fn find_closest_subset(arr_upper_half: &[u64], k: usize, t: u64) -> (Vec<u64>, u
 // given a solution finds the lowest input amounts that can cover the payment amount, and fees, without incurring more fees.
 // Generally Choosing the lowest inputs in such a way is the most optimal solution, as it minimizes storage cost waste, and gifted change, depending on the solution.
 fn minimize_to_lowest_inputs(sorted_input_amounts: &[u64], solution: &mut Solution) {
-    let payment_amount = solution.input_amount - solution.fees() - solution.change_amount; // this should reconstruct payment amount
-
-    // below does not handle the case where solution.is_storage_relaxed is false.
-    // more consideration is needed to handle this case, as it adds further analysis to find the optimal inputs.
-    // TODO: consider returning indices..
-    let (best_subset, best_sum) = optimized_fptas_subset_sum(
-        sorted_input_amounts,
-        solution.input_amount - solution.fees(),
-        0.8,
-        solution.selected_indexes.len(),
-    );
-
-    solution.selected_indexes =
-        best_subset.iter().map(|amount| sorted_input_amounts.iter().position(|&x| x == *amount).unwrap()).collect();
-    solution.input_amount = best_sum;
-    solution.change_amount = solution.input_amount - payment_amount - solution.fees();
+    let res = kaspa_utils::ssp_solver::approximate_subset_sum(sorted_input_amounts, solution.payment_amount(), 50).unwrap();
+    solution.selected_indexes.clear();
+    for index in res.subset {
+        solution.selected_indexes.push(index);
+    }
+    solution.input_amount = res.sum;
 }
 
 /// finds the most optimal selection of inputs to cover the payment amount, and fees with least amount of cost.
@@ -860,7 +854,7 @@ pub mod test {
         let time = std::time::Instant::now();
         let elipson = if sorted_input_amounts.len() < 10_000 { 0.0 } else { 1.0 / (sorted_input_amounts.len() as f64).ln() };
         info!("elipson: {:?}", elipson);
-        let res = find_subset(sorted_input_amounts.to_vec(), target_sum, target_size);
+        let res = minimize_to_lowest_inputs(sorted_input_amounts.to_vec(), target_sum, target_size);
         info!("time: {:?}", time.elapsed());
         info!("res: {:?}", res);
         /*

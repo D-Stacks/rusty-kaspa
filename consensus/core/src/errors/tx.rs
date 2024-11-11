@@ -1,6 +1,6 @@
 use crate::constants::MAX_SOMPI;
 use crate::subnets::SubnetworkId;
-use crate::tx::TransactionOutpoint;
+use crate::tx::{TimeLock, TimeLockArg, TransactionOutpoint};
 use kaspa_txscript_errors::TxScriptError;
 use thiserror::Error;
 
@@ -100,6 +100,9 @@ pub enum TxRuleError {
     /// fee/mass RBF validation rule
     #[error("fee rate per contextual mass gram is not greater than the fee rate of the replaced transaction")]
     FeerateTooLow,
+
+    #[error("invalid unlock op with time lock arg {0} on time lock {1}")]
+    InvalidUnlockOp(TimeLockArg, TimeLock),
 }
 
 pub type TxResult<T> = std::result::Result<T, TxRuleError>;

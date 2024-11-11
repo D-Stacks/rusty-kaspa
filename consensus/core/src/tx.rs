@@ -29,6 +29,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     hashing,
     subnets::{self, SubnetworkId},
+    constants::LOCK_TIME_THRESHOLD,
 };
 
 /// COINBASE_TRANSACTION_INDEX is the index of the coinbase transaction in every block
@@ -211,6 +212,93 @@ impl Transaction {
     }
 }
 
+
+
+pub enum TimeLockResult{
+    Finalized,
+    NotFinalized,
+    Invalid,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeLockArg{
+    None,
+    DAAScore(u64),
+    PastMedianTime(u64),
+}
+
+impl Display for TimeLockArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TimeLockArg::None => write!(f, "TimeLockArg::None"),
+            TimeLockArg::DAAScore(daa_unlock_time) => write!(f, "TimeLockArg::DAAScore({})", daa_unlock_time),
+            TimeLockArg::PastMedianTime(past_median_unlock_time) => write!(f, "TimeLockArg::PastMedianTime({})", past_median_unlock_time),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeLock{
+    None,
+    DAAScore(u64),
+    PastMedianTime(u64),
+}
+
+
+impl TimeLock {
+
+    pub fn is_finalized(&self, time_lock_arg: &TimeLockArg) -> TimeLockResult {
+        match self {
+            TimeLock::None => TimeLockResult::Finalized,
+            TimeLock::DAAScore(daa_lock_time) => match time_lock_arg {
+                TimeLockArg::DAAScore(daa_unlock_time) => {
+                    if *daa_unlock_time >= LOCK_TIME_THRESHOLD {
+                        TimeLockResult::Invalid
+                    } else if daa_unlock_time <= daa_lock_time  {
+                        TimeLockResult::Finalized
+                    } else {
+                        TimeLockResult::NotFinalized
+                    }
+                },
+                _invalid => TimeLockResult::Invalid,
+            },
+            TimeLock::PastMedianTime(past_median_lock_time) => match time_lock_arg {
+                TimeLockArg::PastMedianTime(past_median_unlock_time) => {
+                    if *past_median_unlock_time < LOCK_TIME_THRESHOLD {
+                        TimeLockResult::Invalid
+                    } else if past_median_unlock_time <= past_median_lock_time  {
+                        TimeLockResult::Finalized
+                    } else {
+                        TimeLockResult::NotFinalized
+                    }
+                },
+                _invalid => TimeLockResult::Invalid,
+            },
+            }
+        }
+    }
+
+impl From<u64> for TimeLock {
+    fn from(val: u64) -> Self {
+        match val {
+            0 => TimeLock::None,
+            val if val < LOCK_TIME_THRESHOLD => TimeLock::DAAScore(val),
+            val => TimeLock::PastMedianTime(val),
+        }
+    }
+}
+
+impl Display for TimeLock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TimeLock::None => write!(f, "TimeLock::None"),
+            TimeLock::DAAScore(daa_lock_time) => write!(f, "TimeLock::DAAScore({})", daa_lock_time),
+            TimeLock::PastMedianTime(past_median_lock_time) => write!(f, "TimeLock::PastMedianTime({})", past_median_lock_time),
+        }
+    }
+}
+
+
 impl Transaction {
     /// Determines whether or not a transaction is a coinbase transaction. A coinbase
     /// transaction is a special transaction created by miners that distributes fees and block subsidy
@@ -243,6 +331,10 @@ impl Transaction {
     pub fn with_mass(self, mass: u64) -> Self {
         self.set_mass(mass);
         self
+    }
+
+    pub fn get_time_lock(&self) -> TimeLock {
+        self.lock_time.into()
     }
 }
 
@@ -689,6 +781,74 @@ mod tests {
         let bin = borsh::to_vec(&spk).unwrap();
         let spk2: ScriptPublicKey = BorshDeserialize::try_from_slice(&bin).unwrap();
         assert_eq!(spk, spk2);
+    }
+
+    #[test]
+    fn test_time_lock_none() {
+        let time_lock = TimeLock::from(0);
+        assert_eq!(time_lock, TimeLock::None);
+        
+        let mut time_lock_arg = TimeLockArg::None;
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized)); 
+
+        time_lock_arg = TimeLockArg::DAAScore(0);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+
+        time_lock_arg = TimeLockArg::PastMedianTime(LOCK_TIME_THRESHOLD);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+    }
+
+    #[test]
+    fn test_time_lock_daa_score() {
+
+        let time_lock = TimeLock::from(42);
+        assert_eq!(time_lock, TimeLock::DAAScore(42));
+
+        let mut time_lock_arg = TimeLockArg::None;
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Invalid));
+        
+        time_lock_arg = TimeLockArg::DAAScore(41);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+
+        time_lock_arg = TimeLockArg::DAAScore(42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+
+        time_lock_arg = TimeLockArg::DAAScore(43);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::NotFinalized));
+
+
+        time_lock_arg = TimeLockArg::PastMedianTime(42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Invalid));
+
+        time_lock_arg = TimeLockArg::PastMedianTime(LOCK_TIME_THRESHOLD + 42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg.clone()), TimeLockResult::Invalid));
+
+    }
+
+    #[test]
+    fn test_time_lock_past_median_time() {
+        
+        let time_lock = TimeLock::from(LOCK_TIME_THRESHOLD + 42);
+        assert_eq!(time_lock, TimeLock::PastMedianTime(LOCK_TIME_THRESHOLD + 42));
+
+        let mut time_lock_arg = TimeLockArg::None;
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Invalid));
+
+        time_lock_arg = TimeLockArg::PastMedianTime(LOCK_TIME_THRESHOLD + 41);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+
+        time_lock_arg = TimeLockArg::PastMedianTime(LOCK_TIME_THRESHOLD + 42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Finalized));
+
+        time_lock_arg = TimeLockArg::PastMedianTime(LOCK_TIME_THRESHOLD + 43);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::NotFinalized));
+
+        time_lock_arg = TimeLockArg::DAAScore(42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Invalid));
+
+        time_lock_arg = TimeLockArg::DAAScore(LOCK_TIME_THRESHOLD + 42);
+        assert!(matches!(time_lock.is_finalized(&time_lock_arg), TimeLockResult::Invalid));
+
     }
 
     // use wasm_bindgen_test::wasm_bindgen_test;

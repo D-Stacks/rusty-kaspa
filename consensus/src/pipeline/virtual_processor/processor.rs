@@ -310,9 +310,6 @@ impl VirtualStateProcessor {
             )
             .expect("all possible rule errors are unexpected here");
 
-        // Update the pruning processor about the virtual state change
-        let sink_ghostdag_data = self.ghostdag_store.get_compact_data(new_sink).unwrap();
-
         let compact_sink_ghostdag_data = if prev_sink != new_sink {
             // we need to check with full data here, since we may need to update the window caches
             let sink_ghostdag_data = self.ghostdag_store.get_data(new_sink).unwrap();
@@ -804,11 +801,14 @@ impl VirtualStateProcessor {
     ) -> TxResult<()> {
         self.transaction_validator.validate_tx_in_isolation(&mutable_tx.tx)?;
 
-        self.transaction_validator.utxo_free_tx_validation(&mutable_tx.tx, match mutable_tx.tx.get_time_lock() {
-            TimeLock::None => TimeLockArg::None,
-            TimeLock::DAAScore(_) => TimeLockArg::DAAScore(virtual_daa_score),
-            TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime(virtual_past_median_time),
-        })?;
+        self.transaction_validator.utxo_free_tx_validation(
+            &mutable_tx.tx,
+            match mutable_tx.tx.get_time_lock() {
+                TimeLock::None => TimeLockArg::None,
+                TimeLock::DAAScore(_) => TimeLockArg::DAAScore(virtual_daa_score),
+                TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime(virtual_past_median_time),
+            },
+        )?;
         self.validate_mempool_transaction_in_utxo_context(mutable_tx, virtual_utxo_view, virtual_daa_score, args)?;
         Ok(())
     }
@@ -897,11 +897,14 @@ impl VirtualStateProcessor {
         // No need to validate the transaction in isolation since we rely on the mining manager to submit transactions
         // which were previously validated through `validate_mempool_transaction_and_populate`, hence we only perform
         // in-context validations
-        self.transaction_validator.utxo_free_tx_validation(tx, match tx.get_time_lock() {
-            TimeLock::None => TimeLockArg::None,
-            TimeLock::DAAScore(_) => TimeLockArg::DAAScore(virtual_state.daa_score),
-            TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime(virtual_state.past_median_time),
-        })?;
+        self.transaction_validator.utxo_free_tx_validation(
+            tx,
+            match tx.get_time_lock() {
+                TimeLock::None => TimeLockArg::None,
+                TimeLock::DAAScore(_) => TimeLockArg::DAAScore(virtual_state.daa_score),
+                TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime(virtual_state.past_median_time),
+            },
+        )?;
         let ValidatedTransaction { calculated_fee, .. } =
             self.validate_transaction_in_utxo_context(tx, utxo_view, virtual_state.daa_score, TxValidationFlags::Full)?;
         Ok(calculated_fee)

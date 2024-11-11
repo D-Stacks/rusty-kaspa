@@ -13,12 +13,11 @@ impl TransactionValidator {
     }
 
     fn check_tx_is_finalized(&self, tx: &Transaction, time_lock_arg: TimeLockArg) -> TxResult<()> {
-
         let time_lock = tx.get_time_lock();
         match time_lock.is_finalized(&time_lock_arg) {
             TimeLockResult::Finalized => return Ok(()),
             TimeLockResult::NotFinalized => (),
-            TimeLockResult::Invalid => return Err(TxRuleError::InvalidUnlockOp(time_lock_arg, time_lock)), 
+            TimeLockResult::Invalid => return Err(TxRuleError::InvalidUnlockOp(time_lock_arg, time_lock)),
         };
 
         // At this point, the transaction's lock time hasn't occurred yet, but

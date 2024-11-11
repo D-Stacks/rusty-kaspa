@@ -4,7 +4,10 @@ use crate::{
     model::stores::{ghostdag::GhostdagStoreReader, statuses::StatusesStoreReader},
     processes::window::WindowManager,
 };
-use kaspa_consensus_core::{block::Block, tx::{TimeLock, TimeLockArg}};
+use kaspa_consensus_core::{
+    block::Block,
+    tx::{TimeLock, TimeLockArg},
+};
 use kaspa_database::prelude::StoreResultExtensions;
 use kaspa_hashes::Hash;
 use kaspa_utils::option::OptionExtensions;
@@ -27,15 +30,18 @@ impl BlockBodyProcessor {
             });
 
         for tx in block.transactions.iter() {
-            if let Err(e) = self.transaction_validator.utxo_free_tx_validation(tx, match tx.get_time_lock() {
-                TimeLock::None => TimeLockArg::None,
-                TimeLock::DAAScore(_) => TimeLockArg::DAAScore(block.header.daa_score),
-                TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime((*pmt_res).clone()?),
-            }) {
+            if let Err(e) = self.transaction_validator.utxo_free_tx_validation(
+                tx,
+                match tx.get_time_lock() {
+                    TimeLock::None => TimeLockArg::None,
+                    TimeLock::DAAScore(_) => TimeLockArg::DAAScore(block.header.daa_score),
+                    TimeLock::PastMedianTime(_) => TimeLockArg::PastMedianTime((*pmt_res).clone()?),
+                },
+            ) {
                 return Err(RuleError::TxInContextFailed(tx.id(), e.clone()));
             }
         }
-        
+
         Ok(())
     }
 

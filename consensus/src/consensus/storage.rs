@@ -17,6 +17,7 @@ use crate::{
         selected_chain::DbSelectedChainStore,
         statuses::DbStatusesStore,
         tips::DbTipsStore,
+        transactions::DbTransactionsStore,
         utxo_diffs::DbUtxoDiffsStore,
         utxo_multisets::DbUtxoMultisetsStore,
         virtual_state::{LkgVirtualState, VirtualStores},
@@ -53,6 +54,7 @@ pub struct ConsensusStorage {
     pub ghostdag_store: Arc<DbGhostdagStore>,
     pub headers_store: Arc<DbHeadersStore>,
     pub block_transactions_store: Arc<DbBlockTransactionsStore>,
+    pub transactions_store: Arc<DbTransactionsStore>,
     pub past_pruning_points_store: Arc<DbPastPruningPointsStore>,
     pub daa_excluded_store: Arc<DbDaaStore>,
     pub depth_store: Arc<DbDepthStore>,
@@ -210,6 +212,7 @@ impl ConsensusStorage {
 
         // Txs
         let block_transactions_store = Arc::new(DbBlockTransactionsStore::new(db.clone(), transactions_builder.build()));
+        let transactions_store = Arc::new(DbTransactionsStore::new(db.clone(), transactions_builder.build()));
         let utxo_diffs_store = Arc::new(DbUtxoDiffsStore::new(db.clone(), utxo_diffs_builder.build()));
         let utxo_multisets_store = Arc::new(DbUtxoMultisetsStore::new(db.clone(), block_data_builder.build()));
         let acceptance_data_store = Arc::new(DbAcceptanceDataStore::new(db.clone(), acceptance_data_builder.build()));
@@ -243,6 +246,7 @@ impl ConsensusStorage {
             body_tips_store,
             headers_store,
             block_transactions_store,
+            transactions_store,
             pruning_utxoset_stores,
             virtual_stores,
             selected_chain_store,

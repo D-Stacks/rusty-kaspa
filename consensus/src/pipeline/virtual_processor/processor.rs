@@ -28,6 +28,7 @@ use crate::{
             selected_chain::{DbSelectedChainStore, SelectedChainStore},
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStoreReader},
+            transactions::{DbTransactionsStore, TransactionsStoreReader},
             utxo_diffs::{DbUtxoDiffsStore, UtxoDiffsStoreReader},
             utxo_multisets::{DbUtxoMultisetsStore, UtxoMultisetsStoreReader},
             virtual_state::{LkgVirtualState, VirtualState, VirtualStateStoreReader, VirtualStores},
@@ -120,6 +121,7 @@ pub struct VirtualStateProcessor {
     pub(super) headers_store: Arc<DbHeadersStore>,
     pub(super) daa_excluded_store: Arc<DbDaaStore>,
     pub(super) block_transactions_store: Arc<DbBlockTransactionsStore>,
+    pub(super) transactions_store: Arc<DbTransactionsStore>,
     pub(super) pruning_point_store: Arc<RwLock<DbPruningStore>>,
     pub(super) past_pruning_points_store: Arc<DbPastPruningPointsStore>,
     pub(super) body_tips_store: Arc<RwLock<DbTipsStore>>,
@@ -194,6 +196,7 @@ impl VirtualStateProcessor {
             ghostdag_store: storage.ghostdag_store.clone(),
             daa_excluded_store: storage.daa_excluded_store.clone(),
             block_transactions_store: storage.block_transactions_store.clone(),
+            transactions_store: storage.transactions_store.clone(),
             pruning_point_store: storage.pruning_point_store.clone(),
             past_pruning_points_store: storage.past_pruning_points_store.clone(),
             body_tips_store: storage.body_tips_store.clone(),
@@ -1094,9 +1097,8 @@ impl VirtualStateProcessor {
         }
 
         let virtual_read = self.virtual_stores.upgradable_read();
-
         // Validate transactions of the pruning point itself
-        let new_pruning_point_transactions = self.block_transactions_store.get(new_pruning_point).unwrap();
+        let new_pruning_point_transactions = Arc::new(self.get_block_transactions(new_pruning_point));
         let validated_transactions = self.validate_transactions_in_parallel(
             &new_pruning_point_transactions,
             &virtual_read.utxo_set,
@@ -1133,6 +1135,11 @@ impl VirtualStateProcessor {
         )?;
 
         Ok(())
+    }
+
+    pub fn get_block_transactions(&self, hash: Hash) -> Vec<Arc<Transaction>> {
+        let tx_ids = self.block_transactions_store.get(hash).unwrap();
+        self.thread_pool.install(|| tx_ids.par_iter().map(|tx_id| self.transactions_store.get(*tx_id).unwrap()).collect())
     }
 
     pub fn are_pruning_points_violating_finality(&self, pp_list: PruningPointsList) -> bool {

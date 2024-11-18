@@ -10,6 +10,7 @@ use crate::{
             reachability::DbReachabilityStore,
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStore},
+            transactions::DbTransactionsStore,
             DB,
         },
     },
@@ -34,6 +35,7 @@ use kaspa_consensus_notify::{
 use kaspa_consensusmanager::SessionLock;
 use kaspa_hashes::Hash;
 use kaspa_notify::notifier::Notify;
+use kaspa_utils::arc::ArcExtensions;
 use parking_lot::RwLock;
 use rayon::ThreadPool;
 use rocksdb::WriteBatch;
@@ -59,6 +61,7 @@ pub struct BlockBodyProcessor {
     pub(super) ghostdag_store: Arc<DbGhostdagStore>,
     pub(super) headers_store: Arc<DbHeadersStore>,
     pub(super) block_transactions_store: Arc<DbBlockTransactionsStore>,
+    pub(super) transactions_store: Arc<DbTransactionsStore>,
     pub(super) body_tips_store: Arc<RwLock<DbTipsStore>>,
 
     // Managers and services
@@ -96,6 +99,7 @@ impl BlockBodyProcessor {
         ghostdag_store: Arc<DbGhostdagStore>,
         headers_store: Arc<DbHeadersStore>,
         block_transactions_store: Arc<DbBlockTransactionsStore>,
+        transactions_store: Arc<DbTransactionsStore>,
         body_tips_store: Arc<RwLock<DbTipsStore>>,
 
         reachability_service: MTReachabilityService<DbReachabilityStore>,
@@ -120,6 +124,7 @@ impl BlockBodyProcessor {
             ghostdag_store,
             headers_store,
             block_transactions_store,
+            transactions_store,
             body_tips_store,
             coinbase_manager,
             mass_calculator,
@@ -233,9 +238,19 @@ impl BlockBodyProcessor {
     fn commit_body(self: &Arc<BlockBodyProcessor>, hash: Hash, parents: &[Hash], transactions: Arc<Vec<Transaction>>) {
         let mut batch = WriteBatch::default();
 
-        // This is an append only store so it requires no lock.
-        self.block_transactions_store.insert_batch(&mut batch, hash, transactions).unwrap();
+        let transaction_ids = Arc::new(
+            transactions
+                .unwrap_or_clone()
+                .into_iter()
+                .map(|tx| {
+                    let tx_id = tx.id();
+                    self.transactions_store.insert_batch(&mut batch, tx_id, Arc::new(tx)).unwrap();
+                    tx_id
+                })
+                .collect(),
+        );
 
+        self.block_transactions_store.insert_batch(&mut batch, hash, transaction_ids).unwrap();
         let mut body_tips_write_guard = self.body_tips_store.write();
         body_tips_write_guard.add_tip_batch(&mut batch, hash, parents).unwrap();
         let statuses_write_guard =

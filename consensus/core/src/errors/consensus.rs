@@ -1,12 +1,17 @@
 use kaspa_hashes::Hash;
 use thiserror::Error;
 
+use crate::tx::TransactionId;
+
 use super::{difficulty::DifficultyError, sync::SyncManagerError, traversal::TraversalError};
 
 #[derive(Error, Debug, Clone)]
 pub enum ConsensusError {
     #[error("cannot find full block {0}")]
     BlockNotFound(Hash),
+
+    #[error("cannot find full transaction {0}")]
+    TransactionNotFound(TransactionId),
 
     #[error("cannot find header {0}")]
     HeaderNotFound(Hash),

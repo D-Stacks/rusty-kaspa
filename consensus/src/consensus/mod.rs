@@ -24,6 +24,7 @@ use crate::{
             relations::RelationsStoreReader,
             statuses::StatusesStoreReader,
             tips::TipsStoreReader,
+            transactions::TransactionsStoreReader,
             utxo_set::{UtxoSetStore, UtxoSetStoreReader},
             DB,
         },
@@ -81,6 +82,7 @@ use kaspa_database::prelude::StoreResultExtensions;
 use kaspa_hashes::Hash;
 use kaspa_muhash::MuHash;
 use kaspa_txscript::caches::TxScriptCacheCounters;
+use kaspa_utils::arc::ArcExtensions;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::{
@@ -246,6 +248,7 @@ impl Consensus {
             storage.ghostdag_store.clone(),
             storage.headers_store.clone(),
             storage.block_transactions_store.clone(),
+            storage.transactions_store.clone(),
             storage.body_tips_store.clone(),
             services.reachability_service.clone(),
             services.coinbase_manager.clone(),
@@ -887,10 +890,21 @@ impl ConsensusApi for Consensus {
             return Err(ConsensusError::BlockNotFound(hash));
         }
 
-        Ok(Block {
-            header: self.headers_store.get_header(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))?,
-            transactions: self.block_transactions_store.get(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))?,
-        })
+        let header = self.headers_store.get_header(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))?;
+        let transaction_ids = self.block_transactions_store.get(hash).unwrap_option().ok_or(ConsensusError::BlockNotFound(hash))?;
+
+        let transactions = transaction_ids
+            .iter()
+            .map(|tx_id| {
+                self.transactions_store
+                    .get(*tx_id)
+                    .unwrap_option()
+                    .ok_or(ConsensusError::TransactionNotFound(*tx_id))
+                    .map(|tx| tx.unwrap_or_clone())
+            })
+            .collect::<ConsensusResult<Vec<_>>>()?;
+
+        Ok(Block { header, transactions: Arc::new(transactions) })
     }
 
     fn get_block_even_if_header_only(&self, hash: Hash) -> ConsensusResult<Block> {
@@ -902,7 +916,15 @@ impl ConsensusApi for Consensus {
             transactions: if status.is_header_only() {
                 Default::default()
             } else {
-                self.block_transactions_store.get(hash).unwrap_option().unwrap_or_default()
+                Arc::new(
+                    self.block_transactions_store
+                        .get(hash)
+                        .unwrap_option()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|tx_id| self.transactions_store.get(*tx_id).unwrap().unwrap_or_clone())
+                        .collect(),
+                )
             },
         })
     }

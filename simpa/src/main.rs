@@ -399,7 +399,7 @@ fn submit_chunk(
     for hash in chunk {
         let block = Block::from_arcs(
             src_consensus.headers_store.get_header(hash).unwrap(),
-            if header_only { Default::default() } else { src_consensus.block_transactions_store.get(hash).unwrap() },
+            if header_only { Default::default() } else { src_consensus.get_block(hash).unwrap().transactions },
         );
         let f = dst_consensus.validate_and_insert_block(block).virtual_state_task;
         futures.push(f);

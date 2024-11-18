@@ -1,5 +1,5 @@
-use kaspa_consensus_core::tx::{TransactionInput, TransactionOutput};
-use kaspa_consensus_core::{tx::Transaction, BlockHasher};
+use kaspa_consensus_core::tx::TransactionId;
+use kaspa_consensus_core::BlockHasher;
 use kaspa_database::prelude::CachePolicy;
 use kaspa_database::prelude::StoreError;
 use kaspa_database::prelude::DB;
@@ -12,32 +12,21 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub trait BlockTransactionsStoreReader {
-    fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get(&self, hash: Hash) -> Result<Arc<Vec<TransactionId>>, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
     // This is append only
-    fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError>;
+    fn insert(&self, hash: Hash, transactions: Arc<Vec<TransactionId>>) -> Result<(), StoreError>;
     fn delete(&self, hash: Hash) -> Result<(), StoreError>;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct BlockBody(Arc<Vec<Transaction>>);
+struct BlockBody(Arc<Vec<TransactionId>>);
 
 impl MemSizeEstimator for BlockBody {
     fn estimate_mem_bytes(&self) -> usize {
-        const NORMAL_SIG_SIZE: usize = 66;
-        let (inputs, outputs) = self.0.iter().fold((0, 0), |(ins, outs), tx| (ins + tx.inputs.len(), outs + tx.outputs.len()));
-        // TODO: consider tracking transactions by bytes accurately (preferably by saving the size in a field)
-        // We avoid zooming in another level and counting exact bytes for sigs and scripts for performance reasons.
-        // Outliers with longer signatures are rare enough and their size is eventually bounded by mempool standards
-        // or in the worst case by max block mass.
-        // A similar argument holds for spk within outputs, but in this case the constant is already counted through the SmallVec used within.
-        inputs * (size_of::<TransactionInput>() + NORMAL_SIG_SIZE)
-            + outputs * size_of::<TransactionOutput>()
-            + self.0.len() * size_of::<Transaction>()
-            + size_of::<Vec<Transaction>>()
-            + size_of::<Self>()
+        self.0.len() * std::mem::size_of::<TransactionId>() + std::mem::size_of::<Arc<Vec<TransactionId>>>()
     }
 }
 
@@ -57,11 +46,11 @@ impl DbBlockTransactionsStore {
         Self::new(Arc::clone(&self.db), cache_policy)
     }
 
-    pub fn has(&self, hash: Hash) -> Result<bool, StoreError> {
-        self.access.has(hash)
+    pub fn has(&self, tx_id: TransactionId) -> Result<bool, StoreError> {
+        self.access.has(tx_id)
     }
 
-    pub fn insert_batch(&self, batch: &mut WriteBatch, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
+    pub fn insert_batch(&self, batch: &mut WriteBatch, hash: Hash, transactions: Arc<Vec<TransactionId>>) -> Result<(), StoreError> {
         if self.access.has(hash)? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
@@ -75,17 +64,17 @@ impl DbBlockTransactionsStore {
 }
 
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
-    fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
+    fn get(&self, hash: Hash) -> Result<Arc<Vec<TransactionId>>, StoreError> {
         Ok(self.access.read(hash)?.0)
     }
 }
 
 impl BlockTransactionsStore for DbBlockTransactionsStore {
-    fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
+    fn insert(&self, hash: Hash, transaction_ids: Arc<Vec<TransactionId>>) -> Result<(), StoreError> {
         if self.access.has(hash)? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
-        self.access.write(DirectDbWriter::new(&self.db), hash, BlockBody(transactions))?;
+        self.access.write(DirectDbWriter::new(&self.db), hash, BlockBody(transaction_ids))?;
         Ok(())
     }
 

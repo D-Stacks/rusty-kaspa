@@ -15,6 +15,7 @@ pub mod relations;
 pub mod selected_chain;
 pub mod statuses;
 pub mod tips;
+pub mod transactions;
 pub mod utxo_diffs;
 pub mod utxo_multisets;
 pub mod utxo_set;

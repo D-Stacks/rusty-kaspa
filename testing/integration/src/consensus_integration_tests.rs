@@ -16,6 +16,7 @@ use kaspa_consensus::model::stores::headers::HeaderStoreReader;
 use kaspa_consensus::model::stores::reachability::DbReachabilityStore;
 use kaspa_consensus::model::stores::relations::DbRelationsStore;
 use kaspa_consensus::model::stores::selected_chain::SelectedChainStoreReader;
+use kaspa_consensus::model::stores::transactions::{DbTransactionsStore, TransactionsStore, TransactionsStoreReader};
 use kaspa_consensus::params::{
     ForkActivation, Params, DEVNET_PARAMS, MAINNET_PARAMS, MAX_DIFFICULTY_TARGET, MAX_DIFFICULTY_TARGET_AS_F64,
 };
@@ -42,6 +43,7 @@ use kaspa_core::task::tick::TickService;
 use kaspa_core::time::unix_now;
 use kaspa_database::utils::get_kaspa_tempdir;
 use kaspa_hashes::Hash;
+use kaspa_utils::arc::ArcExtensions;
 
 use crate::common;
 use flate2::read::GzDecoder;
@@ -951,7 +953,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     // External storage for storing block bodies. This allows separating header and body processing phases
     let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
-    let external_block_store = DbBlockTransactionsStore::new(external_storage, CachePolicy::Count(config.perf.block_data_cache_size));
+    let external_block_store = DbBlockTransactionsStore::new(external_storage.clone(), CachePolicy::Count(config.perf.block_data_cache_size));
+    let external_transaction_store = DbTransactionsStore::new(external_storage, CachePolicy::Count(config.perf.block_data_cache_size));
     let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
     let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
@@ -1005,10 +1008,10 @@ async fn json_test(file_path: &str, concurrency: bool) {
         let chunks = lines.chunks(1000);
         let mut iter = chunks.into_iter();
         let chunk = iter.next().unwrap();
-        let mut prev_joins = submit_header_chunk(&tc, &external_block_store, chunk);
+        let mut prev_joins = submit_header_chunk(&tc, &external_block_store, &external_transaction_store, chunk);
 
         for chunk in iter {
-            let current_joins = submit_header_chunk(&tc, &external_block_store, chunk);
+            let current_joins = submit_header_chunk(&tc, &external_block_store, &external_transaction_store, chunk);
             let statuses = try_join_all(prev_joins).await.unwrap();
             assert!(statuses.iter().all(|s| s.is_header_only()));
             prev_joins = current_joins;
@@ -1022,8 +1025,11 @@ async fn json_test(file_path: &str, concurrency: bool) {
             let hash = block.header.hash;
             // Test our hashing implementation vs the hash accepted from the json source
             assert_eq!(hashing::header::hash(&block.header), hash, "header hashing for block {hash} failed");
-
-            external_block_store.insert(hash, block.transactions).unwrap();
+            external_block_store.insert(hash, Arc::new(block.transactions.iter().map(|tx| {
+                            let tx_id = tx.id();
+                            external_transaction_store.insert(tx_id, Arc::new(tx.clone())).unwrap();
+                            tx.id()
+                        }).collect::<Vec<_>>())).unwrap();
             let block = Block::from_header_arc(block.header);
             let status =
                 tc.validate_and_insert_block(block).virtual_state_task.await.unwrap_or_else(|e| panic!("block {hash} failed: {e}"));
@@ -1051,10 +1057,10 @@ async fn json_test(file_path: &str, concurrency: bool) {
         let chunks = missing_bodies.into_iter().chunks(1000);
         let mut iter = chunks.into_iter();
         let chunk = iter.next().unwrap();
-        let mut prev_joins = submit_body_chunk(&tc, &external_block_store, chunk);
+        let mut prev_joins = submit_body_chunk(&tc, &external_block_store, &external_transaction_store, chunk);
 
         for chunk in iter {
-            let current_joins = submit_body_chunk(&tc, &external_block_store, chunk);
+            let current_joins = submit_body_chunk(&tc, &external_block_store, &external_transaction_store, chunk);
             let statuses = try_join_all(prev_joins).await.unwrap();
             assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
             prev_joins = current_joins;
@@ -1064,7 +1070,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
         assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
     } else {
         for hash in missing_bodies {
-            let block = Block::from_arcs(tc.get_header(hash).unwrap(), external_block_store.get(hash).unwrap());
+            let block = Block::from_arcs(tc.get_header(hash).unwrap(), Arc::new(external_block_store.get(hash).unwrap().iter().map(|tx_id| external_transaction_store.get(*tx_id).unwrap().unwrap_or_clone()).collect()));
             let status =
                 tc.validate_and_insert_block(block).virtual_state_task.await.unwrap_or_else(|e| panic!("block {hash} failed: {e}"));
             assert!(status.is_utxo_valid_or_pending());
@@ -1090,12 +1096,17 @@ async fn json_test(file_path: &str, concurrency: bool) {
 fn submit_header_chunk(
     tc: &TestConsensus,
     external_block_store: &DbBlockTransactionsStore,
+    external_transaction_store: &DbTransactionsStore,
     chunk: impl Iterator<Item = String>,
 ) -> Vec<impl Future<Output = BlockProcessResult<BlockStatus>>> {
     let mut futures = Vec::new();
     for line in chunk {
         let block = json_line_to_block(line);
-        external_block_store.insert(block.hash(), block.transactions).unwrap();
+        external_block_store.insert(block.hash(), Arc::new(block.transactions.iter().map(|tx| {
+                            let tx_id = tx.id();
+                            external_transaction_store.insert(tx_id, Arc::new(tx.clone())).unwrap();
+                            tx.id()
+                        }).collect::<Vec<_>>())).unwrap();  
         let block = Block::from_header_arc(block.header);
         let f = tc.validate_and_insert_block(block).virtual_state_task;
         futures.push(f);
@@ -1106,11 +1117,12 @@ fn submit_header_chunk(
 fn submit_body_chunk(
     tc: &TestConsensus,
     external_block_store: &DbBlockTransactionsStore,
+    external_transaction_store: &DbTransactionsStore,
     chunk: impl Iterator<Item = Hash>,
 ) -> Vec<impl Future<Output = BlockProcessResult<BlockStatus>>> {
     let mut futures = Vec::new();
     for hash in chunk {
-        let block = Block::from_arcs(tc.get_header(hash).unwrap(), external_block_store.get(hash).unwrap());
+        let block = Block::from_arcs(tc.get_header(hash).unwrap(), Arc::new(external_block_store.get(hash).unwrap().iter().map(|tx_id| external_transaction_store.get(*tx_id).unwrap().unwrap_or_clone()).collect()));
         let f = tc.validate_and_insert_block(block).virtual_state_task;
         futures.push(f);
     }

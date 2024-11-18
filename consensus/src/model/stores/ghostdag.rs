@@ -14,7 +14,6 @@ use kaspa_utils::mem_size::MemSizeEstimator;
 use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 use std::iter::once;
-use std::mem::size_of;
 use std::{cell::RefCell, sync::Arc};
 
 /// Re-export for convenience
@@ -263,6 +262,27 @@ impl DbGhostdagStore {
         let lvl_bytes = level.to_le_bytes();
         let prefix = DatabaseStorePrefixes::Ghostdag.into_iter().chain(lvl_bytes).collect_vec();
         let compact_prefix = DatabaseStorePrefixes::GhostdagCompact.into_iter().chain(lvl_bytes).collect_vec();
+        Self {
+            db: Arc::clone(&db),
+            level,
+            access: CachedDbAccess::new(db.clone(), cache_policy, prefix),
+            compact_access: CachedDbAccess::new(db, compact_cache_policy, compact_prefix),
+        }
+    }
+
+    pub fn new_temp(
+        db: Arc<DB>,
+        level: BlockLevel,
+        cache_policy: CachePolicy,
+        compact_cache_policy: CachePolicy,
+        temp_index: u8,
+    ) -> Self {
+        assert_ne!(SEPARATOR, level, "level {} is reserved for the separator", level);
+        let lvl_bytes = level.to_le_bytes();
+        let temp_index_bytes = temp_index.to_le_bytes();
+        let prefix = DatabaseStorePrefixes::TempGhostdag.into_iter().chain(lvl_bytes).chain(temp_index_bytes).collect_vec();
+        let compact_prefix =
+            DatabaseStorePrefixes::TempGhostdagCompact.into_iter().chain(lvl_bytes).chain(temp_index_bytes).collect_vec();
         Self {
             db: Arc::clone(&db),
             level,

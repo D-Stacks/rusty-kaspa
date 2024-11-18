@@ -520,7 +520,7 @@ mod address_store_with_cache {
         use kaspa_database::create_temp_db;
         use kaspa_database::prelude::ConnBuilder;
         use kaspa_utils::networking::IpAddress;
-        use kolmogorov_smirnov::test::test as two_way_ks_test;
+        use rv::{dist::Uniform, misc::ks_test as one_way_ks_test, traits::Cdf};
         use std::net::{IpAddr, Ipv6Addr};
 
         #[test]
@@ -590,10 +590,11 @@ mod address_store_with_cache {
             assert!(num_of_buckets >= 12);
 
             // Run multiple Kolmogorov–Smirnov tests to offset random noise of the random weighted iterator
-            let num_of_trials = 512;
+            let num_of_trials = 2048; // Number of trials to run the test, chosen to reduce random noise.
             let mut cul_p = 0.;
             // The target uniform distribution
-            let target_u_dist = Vec::from_iter(0..num_of_buckets);
+            let target_uniform_dist = Uniform::new(1.0, num_of_buckets as f64).unwrap();
+            let uniform_cdf = |x: f64| target_uniform_dist.cdf(&x);
             for _ in 0..num_of_trials {
                 // The weight sampled expected uniform distibution
                 let prioritized_address_distribution = am
@@ -602,17 +603,12 @@ mod address_store_with_cache {
                     .take(num_of_buckets)
                     .map(|addr| addr.prefix_bucket().as_u64() as usize)
                     .collect_vec();
-                cul_p += two_way_ks_test(
-                    prioritized_address_distribution.as_slice(),
-                    target_u_dist.as_slice(),
-                    0.5, // confidence is unimportant here, as we are just culminating reject_probabilities for now.
-                )
-                .reject_probability
-                    / 2.0; // Divide by 2 as we want to test one way.
+                cul_p += one_way_ks_test(prioritized_address_distribution.as_slice(), uniform_cdf).1;
             }
 
             // Normalize and adjust p to test for uniformity, over average of all trials.
-            let adjusted_p = cul_p / num_of_trials as f64;
+            // we do this to reduce the effect of random noise failing this test.
+            let adjusted_p = ((cul_p / num_of_trials as f64) - 0.5).abs();
             // Define the significance threshold.
             let significance = 0.10;
 
@@ -622,7 +618,7 @@ mod address_store_with_cache {
                 adjusted_p,
                 significance
             );
-            assert!(adjusted_p <= significance)
+            assert!(adjusted_p <= significance);
         }
     }
 }

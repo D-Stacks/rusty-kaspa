@@ -7,6 +7,9 @@ pub enum StoreError {
     #[error("key {0} not found in store")]
     KeyNotFound(DbKey),
 
+    #[error("bucket {0} not found in store")]
+    BucketNotFound(String),
+
     #[error("key {0} already exists in store")]
     KeyAlreadyExists(String),
 

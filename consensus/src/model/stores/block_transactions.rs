@@ -1,5 +1,7 @@
+use kaspa_consensus_core::tx::Transaction;
+use kaspa_consensus_core::tx::TransactionIndexType;
 use kaspa_consensus_core::tx::{TransactionInput, TransactionOutput};
-use kaspa_consensus_core::{tx::Transaction, BlockHasher};
+use kaspa_database::prelude::Cache;
 use kaspa_database::prelude::CachePolicy;
 use kaspa_database::prelude::StoreError;
 use kaspa_database::prelude::DB;
@@ -9,10 +11,49 @@ use kaspa_hashes::Hash;
 use kaspa_utils::mem_size::MemSizeEstimator;
 use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, Bytes};
+use std::fmt::Display;
 use std::sync::Arc;
 
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+struct BlockTransactionFullAccessKey(#[serde_as(as = "Bytes")] [u8; 36]);
+
+impl Display for BlockTransactionFullAccessKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl BlockTransactionFullAccessKey {
+    pub fn new(block_hash: &Hash, index: TransactionIndexType) -> Self {
+        let block_hash_bytes = block_hash.as_bytes();
+        let index_bytes = index.to_be_bytes();
+        let mut key = std::mem::MaybeUninit::uninit();
+        let dest = key.as_mut_ptr() as *mut u8;
+        Self(
+            // unsafe, but avoids initializing array with zeros
+            unsafe {
+                std::ptr::copy_nonoverlapping(block_hash_bytes.as_ptr(), dest, block_hash_bytes.len());
+                std::ptr::copy_nonoverlapping(index_bytes.as_ptr(), dest.add(block_hash_bytes.len()), index_bytes.len());
+                key.assume_init()
+            },
+        )
+    }
+}
+
+impl AsRef<[u8]> for BlockTransactionFullAccessKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct BlockBody(Arc<Vec<Transaction>>);
+
 pub trait BlockTransactionsStoreReader {
-    fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get(&self, block_hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
+    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Transaction, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
@@ -20,9 +61,6 @@ pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
     fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError>;
     fn delete(&self, hash: Hash) -> Result<(), StoreError>;
 }
-
-#[derive(Clone, Serialize, Deserialize)]
-struct BlockBody(Arc<Vec<Transaction>>);
 
 impl MemSizeEstimator for BlockBody {
     fn estimate_mem_bytes(&self) -> usize {
@@ -45,12 +83,17 @@ impl MemSizeEstimator for BlockBody {
 #[derive(Clone)]
 pub struct DbBlockTransactionsStore {
     db: Arc<DB>,
-    access: CachedDbAccess<Hash, BlockBody, BlockHasher>,
+    access: CachedDbAccess<BlockTransactionFullAccessKey, Transaction>,
+    cache: Cache<Hash, BlockBody>,
 }
 
 impl DbBlockTransactionsStore {
     pub fn new(db: Arc<DB>, cache_policy: CachePolicy) -> Self {
-        Self { db: Arc::clone(&db), access: CachedDbAccess::new(db, cache_policy, DatabaseStorePrefixes::BlockTransactions.into()) }
+        Self {
+            db: Arc::clone(&db),
+            access: CachedDbAccess::new(Arc::clone(&db), CachePolicy::Empty, DatabaseStorePrefixes::BlockTransactions.into()),
+            cache: Cache::new(cache_policy),
+        }
     }
 
     pub fn clone_with_new_cache(&self, cache_policy: CachePolicy) -> Self {
@@ -58,38 +101,70 @@ impl DbBlockTransactionsStore {
     }
 
     pub fn has(&self, hash: Hash) -> Result<bool, StoreError> {
-        self.access.has(hash)
+        Ok(self.cache.contains_key(&hash) || self.access.has_bucket(hash.as_bytes().as_ref())?)
     }
 
     pub fn insert_batch(&self, batch: &mut WriteBatch, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
-        if self.access.has(hash)? {
+        if self.cache.contains_key(&hash) || self.access.has_bucket(hash.as_bytes().as_ref())? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
-        self.access.write(BatchDbWriter::new(batch), hash, BlockBody(transactions))?;
+        let writer = BatchDbWriter::new(batch);
+        self.cache.insert(hash, BlockBody(transactions.clone()));
+        self.access.write_many_without_cache(
+            writer,
+            &mut transactions
+                .iter()
+                .enumerate()
+                .map(|(index, tx)| (BlockTransactionFullAccessKey::new(&hash, index as TransactionIndexType), tx.clone())),
+        )?;
         Ok(())
     }
 
     pub fn delete_batch(&self, batch: &mut WriteBatch, hash: Hash) -> Result<(), StoreError> {
-        self.access.delete(BatchDbWriter::new(batch), hash)
+        self.cache.remove(&hash);
+        self.access.delete_bucket(BatchDbWriter::new(batch), hash.as_bytes().as_ref())
     }
 }
 
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
-        Ok(self.access.read(hash)?.0)
+        self.cache
+            .get(&hash)
+            .map(|block_transactions| block_transactions.0.clone())
+            .ok_or_else(|| StoreError::BucketNotFound(hash.to_string()));
+        if self.cache.contains_key(&hash) {
+            Ok(self.cache.get(&hash).unwrap().0.clone())
+        } else {
+            Ok(Arc::new(self.access.read_bucket(hash.as_bytes().as_ref())?))
+        }
+    }
+
+    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Transaction, StoreError> {
+        if let Some(block_transactions) = self.cache.get(&block_hash) {
+            return Ok(block_transactions.0[index as usize].clone());
+        } else {
+            self.access.read(BlockTransactionFullAccessKey::new(&block_hash, index))
+        }
     }
 }
 
 impl BlockTransactionsStore for DbBlockTransactionsStore {
     fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
-        if self.access.has(hash)? {
+        if self.access.has_bucket(hash.as_bytes().as_ref())? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
-        self.access.write(DirectDbWriter::new(&self.db), hash, BlockBody(transactions))?;
-        Ok(())
+        self.cache.insert(hash, BlockBody(transactions.clone()));
+        self.access.write_many_without_cache(
+            DirectDbWriter::new(&self.db),
+            &mut transactions
+                .iter()
+                .enumerate()
+                .map(|(index, tx)| (BlockTransactionFullAccessKey::new(&hash, index as TransactionIndexType), tx.clone())),
+        )
     }
 
     fn delete(&self, hash: Hash) -> Result<(), StoreError> {
-        self.access.delete(DirectDbWriter::new(&self.db), hash)
+        self.cache.remove(&hash);
+        self.access.delete_bucket(DirectDbWriter::new(&self.db), hash.as_bytes().as_ref())
     }
 }

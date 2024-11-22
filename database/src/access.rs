@@ -46,6 +46,14 @@ where
         Ok(self.cache.contains_key(&key) || self.db.get_pinned(DbKey::new(&self.prefix, key))?.is_some())
     }
 
+    pub fn has_bucket(&self, bucket: &[u8]) -> Result<bool, StoreError> {
+        let db_key = DbKey::prefix_only(&self.prefix).with_bucket(bucket);
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_iterate_range(rocksdb::PrefixRange(db_key.as_ref()));
+
+        Ok(self.db.iterator_opt(IteratorMode::Start, read_opts).next().is_some())
+    }
+
     pub fn read(&self, key: TKey) -> Result<TData, StoreError>
     where
         TKey: Clone + AsRef<[u8]> + ToString,
@@ -163,6 +171,37 @@ where
         let (from, to) = rocksdb::PrefixRange(db_key.as_ref()).into_bounds();
         writer.delete_range(from.unwrap(), to.unwrap())?;
         Ok(())
+    }
+
+    /// Deletes a prefix bucket from the db.
+    /// Note: This does not clear from the cache.
+    pub fn delete_bucket(&self, mut writer: impl DbWriter, bucket: &[u8]) -> Result<(), StoreError>
+where {
+        let db_key = DbKey::new_with_bucket(&self.prefix, &bucket, []);
+        let (from, to) = rocksdb::PrefixRange(db_key.as_ref()).into_bounds();
+        writer.delete_range(from.unwrap(), to.unwrap())?;
+        Ok(())
+    }
+
+    pub fn read_bucket(&self, bucket: &[u8]) -> Result<Vec<TData>, StoreError>
+    where
+        TData: DeserializeOwned,
+    {
+        let db_key = DbKey::prefix_only(&self.prefix).with_bucket(bucket);
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_iterate_range(rocksdb::PrefixRange(db_key.as_ref()));
+
+        self.db
+            .iterator_opt(IteratorMode::Start, read_opts)
+            .into_iter()
+            .map(|item| match item {
+                Ok((_, value_bytes)) => match bincode::deserialize::<TData>(value_bytes.as_ref()) {
+                    Ok(value) => Ok(value),
+                    Err(err) => Err(err.into()),
+                },
+                Err(err) => Err(err.into()),
+            })
+            .collect()
     }
 
     /// A dynamic iterator that can iterate through a specific prefix / bucket, or from a certain start point.

@@ -40,6 +40,15 @@ impl DbKey {
         self.prefix_len += bucket.as_ref().len();
     }
 
+    pub fn with_bucket<TBucket>(mut self, bucket: TBucket) -> Self
+    where
+        TBucket: Copy + AsRef<[u8]>,
+    {
+        self.path.extend(bucket.as_ref().iter().copied());
+        self.prefix_len += bucket.as_ref().len();
+        self
+    }
+
     pub fn add_key<TKey>(&mut self, key: TKey)
     where
         TKey: Clone + AsRef<[u8]>,

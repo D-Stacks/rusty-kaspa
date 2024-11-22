@@ -39,6 +39,7 @@ rayon.workspace = true
 rocksdb.workspace = true
 secp256k1.workspace = true
 serde.workspace = true
+serde_with.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

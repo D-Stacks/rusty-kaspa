@@ -13,7 +13,7 @@ use kaspa_consensus_core::{
     config::Config,
     constants::MAX_SOMPI,
     network::NetworkType,
-    tx::{Transaction, COINBASE_TRANSACTION_INDEX},
+    tx::Transaction,
 };
 use kaspa_consensus_notify::{
     notifier::ConsensusNotifier,

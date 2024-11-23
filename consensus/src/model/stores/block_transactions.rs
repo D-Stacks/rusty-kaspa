@@ -133,12 +133,8 @@ impl DbBlockTransactionsStore {
 
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
     fn get(&self, hash: Hash) -> Result<Arc<Vec<Arc<Transaction>>>, StoreError> {
-        self.cache
-            .get(&hash)
-            .map(|block_transactions| block_transactions.0.clone())
-            .ok_or_else(|| StoreError::BucketNotFound(hash.to_string()));
-        if self.cache.contains_key(&hash) {
-            Ok(self.cache.get(&hash).unwrap().0.clone())
+        if let Some(transaction_body) = self.cache.get(&hash) {
+            Ok(transaction_body.0.clone())
         } else {
             Ok(Arc::new(self.access.read_bucket(hash.as_bytes().as_ref())?))
         }
@@ -155,9 +151,9 @@ impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
 
 impl BlockTransactionsStore for DbBlockTransactionsStore {
     fn insert(&self, hash: Hash, transactions: Arc<Vec<Arc<Transaction>>>) -> Result<(), StoreError> {
-        if self.access.has_bucket(hash.as_bytes().as_ref())? {
+        if self.cache.contains_key(&hash) || self.access.has_bucket(hash.as_bytes().as_ref())? {
             return Err(StoreError::HashAlreadyExists(hash));
-        }
+        };
         self.cache.insert(hash, BlockBody(transactions.clone()));
         self.access.write_many(
             DirectDbWriter::new(&self.db),

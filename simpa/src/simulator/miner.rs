@@ -4,7 +4,7 @@ use kaspa_consensus::consensus::Consensus;
 use kaspa_consensus::model::stores::virtual_state::VirtualStateStoreReader;
 use kaspa_consensus::params::Params;
 use kaspa_consensus_core::api::ConsensusApi;
-use kaspa_consensus_core::block::{self, Block, TemplateBuildMode, TemplateTransactionSelector};
+use kaspa_consensus_core::block::{Block, TemplateBuildMode, TemplateTransactionSelector};
 use kaspa_consensus_core::coinbase::MinerData;
 use kaspa_consensus_core::mass::{Kip9Version, MassCalculator};
 use kaspa_consensus_core::sign::sign;
@@ -14,7 +14,6 @@ use kaspa_consensus_core::tx::{
 };
 use kaspa_consensus_core::utxo::utxo_view::UtxoView;
 use kaspa_core::trace;
-use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::sim::{Environment, Process, Resumption, Suspension};
 use rand::rngs::ThreadRng;
 use rand::Rng;

@@ -18,7 +18,7 @@ mod tests {
     use kaspa_addresses::{Address, Prefix, Version};
     use kaspa_consensus_core::{
         api::ConsensusApi,
-        block::TemplateBuildMode,
+        block::{Block, TemplateBuildMode},
         coinbase::MinerData,
         constants::{MAX_TX_IN_SEQUENCE_NUM, SOMPI_PER_KASPA, TX_VERSION},
         errors::tx::TxRuleError,
@@ -1186,9 +1186,8 @@ mod tests {
         consensus: &dyn ConsensusApi,
         address_prefix: Prefix,
         mining_manager: &MiningManager,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
     ) {
-        let transactions = transactions.into_iter().map(Arc::new).collect::<Vec<_>>();
         for _ in 0..4 {
             // Run a few times to get more randomness
             compare_modified_template_to_built(
@@ -1278,16 +1277,16 @@ mod tests {
         assert!(result.is_ok(), "modify block template failed for miner data 1");
         let mut modified_template = result.unwrap();
         // Make sure timestamps are equal before comparing the hash
-        if modified_template.block.header.timestamp != expected_template.block.header.timestamp {
-            modified_template.block.header.timestamp = expected_template.block.header.timestamp;
-            modified_template.block.header.finalize();
+        if modified_template.header.timestamp != expected_template.header.timestamp {
+            modified_template.header.timestamp = expected_template.header.timestamp;
+            modified_template.header.finalize();
         }
 
         // Compare hashes
-        let expected_block = expected_template.clone().block.to_immutable();
-        let modified_block = modified_template.clone().block.to_immutable();
+        let expected_block = Block::from(expected_template.clone());
+        let modified_block = Block::from(modified_template.clone());
         assert_ne!(
-            expected_template.block.header.hash, modified_template.block.header.hash,
+            expected_template.header.hash, modified_template.header.hash,
             "built and modified block templates should have different hashes"
         );
         assert_ne!(expected_block.hash(), modified_block.hash(), "built and modified blocks should have different hashes");
@@ -1297,15 +1296,15 @@ mod tests {
         assert!(result.is_ok(), "modify block template failed for miner data 2");
         let mut modified_template_2 = result.unwrap();
         // Make sure timestamps are equal before comparing the hash
-        if modified_template_2.block.header.timestamp != expected_template.block.header.timestamp {
-            modified_template_2.block.header.timestamp = expected_template.block.header.timestamp;
-            modified_template_2.block.header.finalize();
+        if modified_template_2.header.timestamp != expected_template.header.timestamp {
+            modified_template_2.header.timestamp = expected_template.header.timestamp;
+            modified_template_2.header.finalize();
         }
 
         // Compare hashes
-        let modified_block = modified_template_2.clone().block.to_immutable();
+        let modified_block = Block::from(modified_template.clone());
         assert_eq!(
-            expected_template.block.header.hash, modified_template_2.block.header.hash,
+            expected_template.header.hash, modified_template_2.header.hash,
             "built and modified block templates should have same hashes"
         );
         assert_eq!(

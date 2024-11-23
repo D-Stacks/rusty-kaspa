@@ -50,7 +50,7 @@ use crate::{
 use kaspa_consensus_core::{
     acceptance_data::AcceptanceData,
     api::args::{TransactionValidationArgs, TransactionValidationBatchArgs},
-    block::{Block, BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector},
+    block::{BlockTemplate, TemplateBuildMode, TemplateTransactionSelector},
     blockstatus::BlockStatus::{StatusDisqualifiedFromChain, StatusUTXOValid},
     coinbase::MinerData,
     config::{genesis::GenesisBlock, params::ForkActivation},
@@ -83,7 +83,7 @@ use super::errors::{PruningImportError, PruningImportResult};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use itertools::Itertools;
 use kaspa_consensus_core::tx::ValidatedTransaction;
-use kaspa_utils::{arc::ArcExtensions, binary_heap::BinaryHeapExtensions};
+use kaspa_utils::binary_heap::BinaryHeapExtensions;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rand::{seq::SliceRandom, Rng};
 use rayon::{

@@ -22,7 +22,7 @@ use kaspa_core::time::unix_now;
 use kaspa_hashes::{Hash, ZERO_HASH};
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::Iter, sync::Arc};
 
 pub(crate) struct ConsensusMock {
     transactions: RwLock<HashMap<TransactionId, Arc<Transaction>>>,
@@ -86,7 +86,7 @@ impl ConsensusApi for ConsensusMock {
         let coinbase = coinbase_manager.expected_coinbase_transaction(miner_data.clone());
         txs.insert(0, Arc::new(coinbase.tx));
         let now = unix_now();
-        let hash_merkle_root = self.calc_transaction_hash_merkle_root(&txs, 0);
+        let hash_merkle_root = self.calc_transaction_hash_merkle_root(txs.as_ref(), 0);
         let header = Header::new_finalized(
             BLOCK_VERSION,
             vec![],
@@ -101,9 +101,8 @@ impl ConsensusApi for ConsensusMock {
             0,
             ZERO_HASH,
         );
-        let mutable_block = Block::new(header, txs);
 
-        Ok(BlockTemplate::new(mutable_block, miner_data, coinbase.has_red_reward, now, 0, ZERO_HASH, vec![]))
+        Ok(BlockTemplate::new(header, txs, miner_data, coinbase.has_red_reward, now, 0, ZERO_HASH, vec![]))
     }
 
     fn validate_mempool_transaction(&self, mutable_tx: &mut MutableTransaction, _: &TransactionValidationArgs) -> TxResult<()> {

@@ -1,12 +1,12 @@
 use crate::{
-    coinbase::MinerData,
+    coinbase::{self, MinerData},
     header::Header,
     tx::{Transaction, TransactionId},
     BlueWorkType,
 };
 use kaspa_hashes::Hash;
-use kaspa_utils::{arc::ArcExtensions, mem_size::MemSizeEstimator};
-use std::sync::Arc;
+use kaspa_utils::{arc::ArcExtensions, mem_size::MemSizeEstimator, vec};
+use std::{iter::Once, sync::Arc};
 
 /// A mutable block structure where header and transactions within can still be mutated.
 #[derive(Debug, Clone)]
@@ -126,7 +126,10 @@ pub enum TemplateBuildMode {
 /// A block template for miners.
 #[derive(Debug, Clone)]
 pub struct BlockTemplate {
-    pub block: Block,
+    pub header: Header,
+    pub coinbase_transaction: Transaction,
+    // this does not include the coinbase transaction
+    pub none_coinbase_transactions: Vec<Arc<Transaction>>,
     pub miner_data: MinerData,
     pub coinbase_has_red_reward: bool,
     pub selected_parent_timestamp: u64,
@@ -138,7 +141,8 @@ pub struct BlockTemplate {
 
 impl BlockTemplate {
     pub fn new(
-        block: Block,
+        header: Header,
+        mut transactions: Vec<Arc<Transaction>>,
         miner_data: MinerData,
         coinbase_has_red_reward: bool,
         selected_parent_timestamp: u64,
@@ -146,19 +150,39 @@ impl BlockTemplate {
         selected_parent_hash: Hash,
         calculated_fees: Vec<u64>,
     ) -> Self {
+        let coinbase_transaction = transactions.remove(0).unwrap_or_clone();
         Self {
-            block,
             miner_data,
             coinbase_has_red_reward,
             selected_parent_timestamp,
             selected_parent_daa_score,
             selected_parent_hash,
             calculated_fees,
+            header,
+            coinbase_transaction,
+            none_coinbase_transactions: transactions,
         }
     }
 
     pub fn to_virtual_state_approx_id(&self) -> VirtualStateApproxId {
-        VirtualStateApproxId::new(self.block.header.daa_score, self.block.header.blue_work, self.selected_parent_hash)
+        VirtualStateApproxId::new(self.header.daa_score, self.header.blue_work, self.selected_parent_hash)
+    }
+
+    pub fn transactions(&self) -> Vec<Arc<Transaction>> {
+        let mut txs = Vec::with_capacity(self.none_coinbase_transactions.len() + 1);
+        txs.push(Arc::new(self.coinbase_transaction.clone()));
+        txs.extend(self.none_coinbase_transactions.iter().cloned());
+        txs
+    }
+}
+
+impl From<BlockTemplate> for Block {
+    #[inline]
+    fn from(block_template: BlockTemplate) -> Self {
+        let mut txs = Vec::with_capacity(block_template.none_coinbase_transactions.len() + 1);
+        txs.push(Arc::new(block_template.coinbase_transaction));
+        txs.extend(block_template.none_coinbase_transactions.iter().cloned());
+        Block::new(block_template.header, txs)
     }
 }
 

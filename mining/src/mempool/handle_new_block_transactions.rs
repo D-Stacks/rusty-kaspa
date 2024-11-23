@@ -11,13 +11,16 @@ use kaspa_consensus_core::{
     tx::{Transaction, TransactionId},
 };
 use kaspa_core::time::Stopwatch;
-use std::{collections::HashSet, sync::atomic::Ordering};
+use std::{
+    collections::HashSet,
+    sync::{atomic::Ordering, Arc},
+};
 
 impl Mempool {
     pub(crate) fn handle_new_block_transactions(
         &mut self,
         block_daa_score: u64,
-        block_transactions: &[Transaction],
+        block_transactions: Arc<Vec<Arc<Transaction>>>,
     ) -> RuleResult<Vec<MempoolTransaction>> {
         let _sw = Stopwatch::<400>::with_threshold("handle_new_block_transactions op");
         let mut unorphaned_transactions = vec![];

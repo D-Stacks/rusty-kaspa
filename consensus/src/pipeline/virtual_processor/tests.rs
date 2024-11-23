@@ -76,7 +76,7 @@ impl TestContext {
 
     pub fn assert_row_parents(&mut self) -> &mut Self {
         for t in self.current_templates.iter() {
-            assert_eq!(self.current_tips, BlockHashSet::from_iter(t.block.header.direct_parents().iter().copied()));
+            assert_eq!(self.current_tips, BlockHashSet::from_iter(t.header.direct_parents().iter().copied()));
         }
         self
     }
@@ -84,8 +84,8 @@ impl TestContext {
     pub async fn validate_and_insert_row(&mut self) -> &mut Self {
         self.current_tips.clear();
         while let Some(t) = self.current_templates.pop_front() {
-            self.current_tips.insert(t.block.header.hash);
-            self.validate_and_insert_block(t.block).await;
+            self.current_tips.insert(t.header.hash);
+            self.validate_and_insert_block(Block::from(t)).await;
         }
         self
     }
@@ -110,11 +110,9 @@ impl TestContext {
                 TemplateBuildMode::Standard,
             )
             .unwrap();
-        let mut mutable_block = MutableBlock::from(t.block);
-        mutable_block.header.timestamp = timestamp;
-        mutable_block.header.nonce = nonce;
-        mutable_block.header.finalize();
-        t.block = mutable_block.into();
+        t.header.timestamp = timestamp;
+        t.header.nonce = nonce;
+        t.header.finalize();
         t
     }
 

@@ -35,6 +35,7 @@ use crate::{
 pub const COINBASE_TRANSACTION_INDEX: usize = 0;
 /// A 32-byte Kaspa transaction identifier.
 pub type TransactionId = kaspa_hashes::Hash;
+pub type TransactionHash = kaspa_hashes::Hash;
 
 /// Holds details about an individual transaction output in a utxo
 /// set such as whether or not it was contained in a coinbase tx, the daa

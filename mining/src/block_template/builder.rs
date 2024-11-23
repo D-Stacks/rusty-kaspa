@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::{iter::Once, sync::Arc};
 
 use super::errors::BuilderResult;
+use arc_swap::ArcSwap;
 use kaspa_consensus_core::{
     api::ConsensusApi,
     block::{BlockTemplate, TemplateBuildMode, TemplateTransactionSelector},
@@ -101,27 +102,28 @@ impl BlockTemplateBuilder {
         let mut block_template = block_template_to_modify.clone();
 
         // The first transaction is always the coinbase transaction
-        let coinbase_tx = &mut (*(block_template.block.transactions.clone()[COINBASE_TRANSACTION_INDEX].clone())).clone();
+        let coinbase_tx = &mut block_template.coinbase_transaction;
         let new_payload = consensus.modify_coinbase_payload(coinbase_tx.payload.clone(), new_miner_data)?;
         coinbase_tx.payload = new_payload;
         if block_template.coinbase_has_red_reward {
             // The last output is always the coinbase red blocks reward
             coinbase_tx.outputs.last_mut().unwrap().script_public_key = new_miner_data.script_public_key.clone();
         }
+
         // Update the hash merkle root according to the modified transactions
-        let old_timestamp = block_template.block.header.timestamp;
-        let mut new_header = block_template.block.header.unwrap_or_clone();
-        new_header.hash_merkle_root = consensus
-            .calc_transaction_hash_merkle_root(&block_template.block.transactions, new_header.daa_score);
+        let old_timestamp = block_template.header.timestamp;
+
+        block_template.header.hash_merkle_root =
+            consensus.calc_transaction_hash_merkle_root(&block_template.transactions(), block_template.header.daa_score);
+
         let new_timestamp = unix_now();
         if new_timestamp > old_timestamp {
             // Only if new time stamp is later than current, update the header. Otherwise,
             // we keep the previous time as built by internal consensus median time logic
-            new_header.timestamp = new_timestamp;
+            block_template.header.timestamp = new_timestamp;
         }
-        new_header.finalize();
-        block_template.block.header = Arc::new(new_header);
         block_template.miner_data = new_miner_data.clone();
+        block_template.header.finalize();
         Ok(block_template)
     }
 }

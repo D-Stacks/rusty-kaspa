@@ -61,7 +61,7 @@ try_from!(item: &protowire::RpcBlock, kaspa_rpc_core::RpcRawBlock, {
             .as_ref()
             .ok_or_else(|| RpcError::MissingRpcFieldError("RpcBlock".to_string(), "header".to_string()))?
             .try_into()?,
-        transactions: item.transactions.iter().map(kaspa_rpc_core::RpcTransaction::try_from).collect::<Result<Vec<_>, _>>()?,
+        transactions: item.transactions.iter().map(|tx| kaspa_rpc_core::RpcTransaction::try_from(tx)).collect::<Result<Vec<_>, _>>()?,
     }
 });
 

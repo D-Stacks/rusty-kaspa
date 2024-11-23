@@ -38,16 +38,13 @@ use kaspa_p2p_lib::{
 use kaspa_utils::iter::IterExtensions;
 use kaspa_utils::networking::PeerId;
 use parking_lot::{Mutex, RwLock};
-use std::collections::HashMap;
 use std::time::Instant;
 use std::{collections::hash_map::Entry, fmt::Display};
+use std::{collections::HashMap, sync::Arc};
 use std::{
     iter::once,
     ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 use tokio::sync::{

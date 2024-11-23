@@ -2848,6 +2848,7 @@ dependencies = [
 name = "kaspa-mining"
 version = "0.15.3"
 dependencies = [
+ "arc-swap",
  "criterion",
  "futures-util",
  "itertools 0.13.0",

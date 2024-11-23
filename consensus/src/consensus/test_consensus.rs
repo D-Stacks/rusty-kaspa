@@ -167,7 +167,7 @@ impl TestConsensus {
         txs: Vec<Arc<Transaction>>,
     ) -> MutableBlock {
         let template = self.block_builder.build_block_template_with_parents(parents, miner_data, txs).unwrap();
-        MutableBlock::new((*template.block.header).clone(), template.block.transactions.iter().map(|tx| (**tx).clone()).collect())
+        MutableBlock::new(template.header.clone(), template.transactions().iter().map(|tx| (**tx).clone()).collect())
     }
 
     pub fn build_block_with_parents_and_transactions(

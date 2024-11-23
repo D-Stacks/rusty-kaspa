@@ -121,21 +121,21 @@ impl MiningManager {
                         1 => {
                             debug!(
                                 "Built a new block template with {} transactions in {:#?}",
-                                block_template.block.transactions.len(),
+                                block_template.none_coinbase_transactions.len() + 1,
                                 _swo.elapsed()
                             );
                         }
                         2 => {
                             debug!(
                                 "Built a new block template with {} transactions at second attempt in {:#?}",
-                                block_template.block.transactions.len(),
+                                block_template.none_coinbase_transactions.len() + 1,
                                 _swo.elapsed()
                             );
                         }
                         n => {
                             debug!(
                                 "Built a new block template with {} transactions in {} attempts totaling {:#?}",
-                                block_template.block.transactions.len(),
+                                block_template.none_coinbase_transactions.len() + 1,
                                 n,
                                 _swo.elapsed()
                             );
@@ -241,10 +241,12 @@ impl MiningManager {
             ));
             let miner_data: MinerData = MinerData::new(script_public_key, vec![]);
 
-            let BlockTemplate { block: kaspa_consensus_core::block::Block { transactions, .. }, calculated_fees, .. } =
-                self.get_block_template(consensus, &miner_data)?;
+            let (none_coinbase_transactions, calculated_fees) = {
+                let block_template = self.get_block_template(consensus, &miner_data)?;
+                (block_template.none_coinbase_transactions, block_template.calculated_fees)
+            };
 
-            let Some(Stats { max, median, min }) = feerate_stats(transactions, calculated_fees) else {
+            let Some(Stats { max, median, min }) = feerate_stats(none_coinbase_transactions, calculated_fees) else {
                 return Ok(resp);
             };
 
@@ -582,7 +584,7 @@ impl MiningManager {
         &self,
         consensus: &dyn ConsensusApi,
         block_daa_score: u64,
-        block_transactions: &[Transaction],
+        block_transactions: Arc<Vec<Arc<Transaction>>>,
     ) -> MiningManagerResult<Vec<Arc<Transaction>>> {
         // TODO: should use tx acceptance data to verify that new block txs are actually accepted into virtual state.
         // TODO: avoid returning a result from this function (and the underlying function). Any possible error is a
@@ -914,11 +916,11 @@ impl MiningManagerProxy {
         self,
         consensus: &ConsensusProxy,
         block_daa_score: u64,
-        block_transactions: Arc<Vec<Transaction>>,
+        block_transactions: Arc<Vec<Arc<Transaction>>>,
     ) -> MiningManagerResult<Vec<Arc<Transaction>>> {
         consensus
             .clone()
-            .spawn_blocking(move |c| self.inner.handle_new_block_transactions(c, block_daa_score, &block_transactions))
+            .spawn_blocking(move |c| self.inner.handle_new_block_transactions(c, block_daa_score, block_transactions))
             .await
     }
 
@@ -1039,25 +1041,24 @@ struct Stats {
 /// Returns an `Option<Stats>` containing the maximum, median, and minimum fee
 /// rates if the input vectors are valid. Returns `None` if the vectors are
 /// empty or if the lengths are inconsistent.
-fn feerate_stats(transactions: Vec<Arc<Transaction>>, calculated_fees: Vec<u64>) -> Option<Stats> {
+fn feerate_stats(none_coinbase_transactions: Vec<Arc<Transaction>>, calculated_fees: Vec<u64>) -> Option<Stats> {
     if calculated_fees.is_empty() {
         return None;
     }
-    if transactions.len() != calculated_fees.len() + 1 {
+    if none_coinbase_transactions.len() != calculated_fees.len() + 1 {
         error!(
             "[feerate_stats] block template transactions length ({}) is expected to be one more than `calculated_fees` length ({})",
-            transactions.len(),
+            none_coinbase_transactions.len(),
             calculated_fees.len()
         );
         return None;
     }
-    debug_assert!(transactions[0].is_coinbase());
+    debug_assert!(!none_coinbase_transactions[0].is_coinbase());
     let mut feerates = calculated_fees
         .into_iter()
-        .zip(transactions
+        .zip(none_coinbase_transactions
             .iter()
             // skip coinbase tx
-            .skip(1)
             .map( |tx| tx.mass()))
         .map(|(fee, mass)| fee as f64 / mass as f64)
         .collect_vec();
@@ -1074,24 +1075,32 @@ fn feerate_stats(transactions: Vec<Arc<Transaction>>, calculated_fees: Vec<u64>)
 mod tests {
     use super::*;
     use kaspa_consensus_core::subnets;
-    use std::iter::repeat;
+    use std::iter::{self, repeat};
 
-    fn transactions(length: usize) -> Vec<Transaction> {
+    fn transactions(length: usize) -> Vec<Arc<Transaction>> {
+        if length == 0 {
+            return vec![];
+        };
+
         let tx = || {
             let tx = Transaction::new(0, vec![], vec![], 0, Default::default(), 0, vec![]);
             tx.set_mass(2);
             tx
         };
-        let mut txs = repeat(tx()).take(length).collect_vec();
-        txs[0].subnetwork_id = subnets::SUBNETWORK_ID_COINBASE;
-        txs
+        iter::once({
+            let mut cb_tx = tx();
+            cb_tx.subnetwork_id = subnets::SUBNETWORK_ID_COINBASE;
+            Arc::new(cb_tx)
+        })
+        .chain(repeat(Arc::new(tx())).take(length - 1))
+        .collect_vec()
     }
 
     #[test]
     fn feerate_stats_test() {
         let calculated_fees = vec![100u64, 200, 300, 400];
-        let txs = transactions(calculated_fees.len() + 1);
-        let Stats { max, median, min } = feerate_stats(txs, calculated_fees).unwrap();
+        let none_cb_txs = transactions(calculated_fees.len() + 1)[1..].to_vec();
+        let Stats { max, median, min } = feerate_stats(none_cb_txs, calculated_fees).unwrap();
         assert_eq!(max, 200.0);
         assert_eq!(median, 150.0);
         assert_eq!(min, 50.0);
@@ -1100,14 +1109,14 @@ mod tests {
     #[test]
     fn feerate_stats_empty_test() {
         let calculated_fees = vec![];
-        let txs = transactions(calculated_fees.len() + 1);
-        assert!(feerate_stats(txs, calculated_fees).is_none());
+        let none_cb_txs = transactions(calculated_fees.len() + 1)[1..].to_vec();
+        assert!(feerate_stats(none_cb_txs, calculated_fees).is_none());
     }
 
     #[test]
     fn feerate_stats_inconsistent_test() {
         let calculated_fees = vec![100u64, 200, 300, 400];
-        let txs = transactions(calculated_fees.len());
-        assert!(feerate_stats(txs, calculated_fees).is_none());
+        let none_cb_txs = transactions(calculated_fees.len())[1..].to_vec();
+        assert!(feerate_stats(none_cb_txs, calculated_fees).is_none());
     }
 }

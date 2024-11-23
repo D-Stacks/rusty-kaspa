@@ -744,7 +744,7 @@ impl ConsensusApi for Consensus {
 
     fn calc_transaction_hash_merkle_root(&self, txs: &[Arc<Transaction>], pov_daa_score: u64) -> Hash {
         let storage_mass_activated = self.config.storage_mass_activation.is_active(pov_daa_score);
-        calc_hash_merkle_root(txs.iter().map(|tx| &**tx), storage_mass_activated)
+        calc_hash_merkle_root(txs.iter().map(|tx| tx.as_ref()), storage_mass_activated)
     }
 
     fn validate_pruning_proof(

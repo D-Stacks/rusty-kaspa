@@ -29,7 +29,7 @@ impl BlockBodyProcessor {
     }
 
     fn check_hash_merkle_root(block: &Block, storage_mass_activated: bool) -> BlockProcessResult<()> {
-        let calculated = calc_hash_merkle_root(block.transactions.iter().map(|tx| &**tx), storage_mass_activated);
+        let calculated = calc_hash_merkle_root(block.transactions.iter().map(|tx| tx.as_ref()), storage_mass_activated);
         if calculated != block.header.hash_merkle_root {
             return Err(RuleError::BadMerkleRoot(block.header.hash_merkle_root, calculated));
         }

@@ -1024,7 +1024,7 @@ impl VirtualStateProcessor {
 
         // Hash according to hardfork activation
         let storage_mass_activated = self.storage_mass_activation.is_active(virtual_state.daa_score);
-        let hash_merkle_root = calc_hash_merkle_root(txs.iter().map(|tx| &**tx), storage_mass_activated);
+        let hash_merkle_root = calc_hash_merkle_root(txs.iter().map(|tx| tx.as_ref()), storage_mass_activated);
 
         let accepted_id_merkle_root = kaspa_merkle::calc_merkle_root(virtual_state.accepted_tx_ids.iter().copied());
         let utxo_commitment = virtual_state.multiset.clone().finalize();
@@ -1048,7 +1048,8 @@ impl VirtualStateProcessor {
         let selected_parent_timestamp = self.headers_store.get_timestamp(selected_parent_hash).unwrap();
         let selected_parent_daa_score = self.headers_store.get_daa_score(selected_parent_hash).unwrap();
         Ok(BlockTemplate::new(
-            Block::new(header, txs),
+            header,
+            txs,
             miner_data,
             coinbase.has_red_reward,
             selected_parent_timestamp,

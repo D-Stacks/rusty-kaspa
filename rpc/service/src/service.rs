@@ -374,14 +374,14 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         let block_template = self.mining_manager.clone().get_block_template(&session, miner_data).await?;
 
         // Check coinbase tx payload length
-        if block_template.block.transactions[COINBASE_TRANSACTION_INDEX].payload.len() > self.config.max_coinbase_payload_len {
+        if block_template.coinbase_transaction.payload.len() > self.config.max_coinbase_payload_len {
             return Err(RpcError::CoinbasePayloadLengthAboveMax(self.config.max_coinbase_payload_len));
         }
 
         let is_nearly_synced =
             self.config.is_nearly_synced(block_template.selected_parent_timestamp, block_template.selected_parent_daa_score);
         Ok(GetBlockTemplateResponse {
-            block: block_template.block.into(),
+            block: block_template.into(),
             is_synced: self.has_sufficient_peer_connectivity() && is_nearly_synced,
         })
     }

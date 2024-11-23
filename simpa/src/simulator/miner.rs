@@ -25,17 +25,17 @@ use std::iter::once;
 use std::sync::Arc;
 
 struct OnetimeTxSelector {
-    txs: Option<Vec<Transaction>>,
+    txs: Option<Vec<Arc<Transaction>>>,
 }
 
 impl OnetimeTxSelector {
-    fn new(txs: Vec<Transaction>) -> Self {
+    fn new(txs: Vec<Arc<Transaction>>) -> Self {
         Self { txs: Some(txs) }
     }
 }
 
 impl TemplateTransactionSelector for OnetimeTxSelector {
-    fn select_transactions(&mut self) -> Vec<Transaction> {
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         self.txs.take().unwrap()
     }
 
@@ -119,25 +119,24 @@ impl Miner {
     }
 
     fn build_new_block(&mut self, timestamp: u64) -> Block {
-        
         let txs = self.build_txs();
         let nonce = self.id;
         let session = self.consensus.acquire_session();
-        
+
         let mut block_template = self
             .consensus
             .build_block_template(self.miner_data.clone(), Box::new(OnetimeTxSelector::new(txs)), TemplateBuildMode::Standard)
             .expect("simulation txs are selected in sync with virtual state and are expected to be valid");
         drop(session);
 
-        let new_header = &mut block_template.block.header.unwrap_or_clone();
-        new_header.timestamp = timestamp; // Use simulation time rather than real time
-        new_header.nonce = nonce;
-        new_header.finalize();
-        Block::from_arcs(Arc::new(new_header), block_template.block.transactions)
+        let transactions = block_template.transactions();
+        block_template.header.timestamp = timestamp; // Use simulation time rather than real time
+        block_template.header.nonce = nonce;
+        block_template.header.finalize();
+        Block::from_arcs(Arc::new(block_template.header), Arc::new(transactions))
     }
 
-    fn build_txs(&mut self) -> Vec<Transaction> {
+    fn build_txs(&mut self) -> Vec<Arc<Transaction>> {
         let virtual_read = self.consensus.virtual_stores.read();
         let virtual_state = virtual_read.state.get().unwrap();
         let virtual_utxo_view = &virtual_read.utxo_set;
@@ -160,9 +159,9 @@ impl Miner {
                 signed_tx.tx.set_mass(mass);
                 let mut signed_tx = signed_tx.tx;
                 signed_tx.finalize();
-                signed_tx
+                Arc::new(signed_tx)
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<Arc<_>>>();
 
         for outpoint in txs.iter().flat_map(|t| t.inputs.iter().map(|i| i.previous_outpoint)) {
             self.possible_unspent_outpoints.swap_remove(&outpoint);

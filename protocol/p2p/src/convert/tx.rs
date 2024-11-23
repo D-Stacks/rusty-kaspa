@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{error::ConversionError, option::TryIntoOptionEx};
 use crate::pb as protowire;
 use kaspa_consensus_core::{
@@ -54,6 +56,21 @@ impl From<&TransactionInput> for protowire::TransactionInput {
 impl From<&TransactionOutput> for protowire::TransactionOutput {
     fn from(output: &TransactionOutput) -> Self {
         Self { value: output.value, script_public_key: Some((&output.script_public_key).into()) }
+    }
+}
+
+impl From<&Arc<Transaction>> for protowire::TransactionMessage {
+    fn from(tx: &Arc<Transaction>) -> Self {
+        Self {
+            version: tx.version as u32,
+            inputs: tx.inputs.iter().map(|input| input.into()).collect(),
+            outputs: tx.outputs.iter().map(|output| output.into()).collect(),
+            lock_time: tx.lock_time,
+            subnetwork_id: Some((&tx.subnetwork_id).into()),
+            gas: tx.gas,
+            payload: tx.payload.clone(),
+            mass: tx.mass(),
+        }
     }
 }
 
@@ -147,5 +164,13 @@ impl TryFrom<protowire::TransactionMessage> for Transaction {
         );
         transaction.set_mass(tx.mass);
         Ok(transaction)
+    }
+}
+
+impl TryFrom<protowire::TransactionMessage> for Arc<Transaction> {
+    type Error = ConversionError;
+
+    fn try_from(tx: protowire::TransactionMessage) -> Result<Self, Self::Error> {
+        Ok(Arc::new(tx.try_into()?))
     }
 }

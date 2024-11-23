@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{block::Block, header::Header, subnets::SUBNETWORK_ID_COINBASE, tx::Transaction};
 use kaspa_hashes::{Hash, ZERO_HASH};
 use kaspa_muhash::EMPTY_MUHASH;
@@ -17,8 +19,8 @@ pub struct GenesisBlock {
 }
 
 impl GenesisBlock {
-    pub fn build_genesis_transactions(&self) -> Vec<Transaction> {
-        vec![Transaction::new(0, Vec::new(), Vec::new(), 0, SUBNETWORK_ID_COINBASE, 0, self.coinbase_payload.to_vec())]
+    pub fn build_genesis_transactions(&self) -> Vec<Arc<Transaction>> {
+        vec![Arc::new(Transaction::new(0, Vec::new(), Vec::new(), 0, SUBNETWORK_ID_COINBASE, 0, self.coinbase_payload.to_vec()))]
     }
 }
 
@@ -231,7 +233,7 @@ mod tests {
     fn test_genesis_hashes() {
         [GENESIS, TESTNET_GENESIS, TESTNET11_GENESIS, SIMNET_GENESIS, DEVNET_GENESIS].into_iter().for_each(|genesis| {
             let block: Block = (&genesis).into();
-            assert_hashes_eq(calc_hash_merkle_root(block.transactions.iter(), false), block.header.hash_merkle_root);
+            assert_hashes_eq(calc_hash_merkle_root(block.transactions.iter().map(|tx| &(**tx)), false), block.header.hash_merkle_root);
             assert_hashes_eq(block.hash(), genesis.hash);
         });
     }

@@ -199,7 +199,7 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn calc_transaction_hash_merkle_root(&self, txs: &[Transaction], pov_daa_score: u64) -> Hash {
+    fn calc_transaction_hash_merkle_root(&self, txs: &[Arc<Transaction>], pov_daa_score: u64) -> Hash {
         unimplemented!()
     }
 

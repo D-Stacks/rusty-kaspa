@@ -10,20 +10,20 @@ use kaspa_consensus_core::{
     BlockHashSet,
 };
 use kaspa_hashes::Hash;
-use std::{collections::VecDeque, thread::JoinHandle};
+use std::{collections::VecDeque, sync::Arc, thread::JoinHandle};
 
 struct OnetimeTxSelector {
-    txs: Option<Vec<Transaction>>,
+    txs: Option<Vec<Arc<Transaction>>>,
 }
 
 impl OnetimeTxSelector {
-    fn new(txs: Vec<Transaction>) -> Self {
+    fn new(txs: Vec<Arc<Transaction>>) -> Self {
         Self { txs: Some(txs) }
     }
 }
 
 impl TemplateTransactionSelector for OnetimeTxSelector {
-    fn select_transactions(&mut self) -> Vec<Transaction> {
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         self.txs.take().unwrap()
     }
 
@@ -85,7 +85,7 @@ impl TestContext {
         self.current_tips.clear();
         while let Some(t) = self.current_templates.pop_front() {
             self.current_tips.insert(t.block.header.hash);
-            self.validate_and_insert_block(t.block.to_immutable()).await;
+            self.validate_and_insert_block(t.block).await;
         }
         self
     }
@@ -110,9 +110,11 @@ impl TestContext {
                 TemplateBuildMode::Standard,
             )
             .unwrap();
-        t.block.header.timestamp = timestamp;
-        t.block.header.nonce = nonce;
-        t.block.header.finalize();
+        let mut mutable_block = MutableBlock::from(t.block);
+        mutable_block.header.timestamp = timestamp;
+        mutable_block.header.nonce = nonce;
+        mutable_block.header.finalize();
+        t.block = mutable_block.into();
         t
     }
 

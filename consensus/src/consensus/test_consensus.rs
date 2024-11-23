@@ -146,10 +146,10 @@ impl TestConsensus {
         &self,
         hash: Hash,
         parents: Vec<Hash>,
-        txs: Vec<Transaction>,
+        txs: Vec<Arc<Transaction>>,
     ) -> impl Future<Output = BlockProcessResult<BlockStatus>> {
         let miner_data = MinerData::new(ScriptPublicKey::from_vec(0, vec![]), vec![]);
-        self.validate_and_insert_block(self.build_utxo_valid_block_with_parents(hash, parents, miner_data, txs).to_immutable())
+        self.validate_and_insert_block(self.build_utxo_valid_block_with_parents(hash, parents, miner_data, txs.clone()).to_immutable())
             .virtual_state_task
     }
 
@@ -164,11 +164,10 @@ impl TestConsensus {
         hash: Hash,
         parents: Vec<Hash>,
         miner_data: MinerData,
-        txs: Vec<Transaction>,
+        txs: Vec<Arc<Transaction>>,
     ) -> MutableBlock {
-        let mut template = self.block_builder.build_block_template_with_parents(parents, miner_data, txs).unwrap();
-        template.block.header.hash = hash;
-        template.block
+        let template = self.block_builder.build_block_template_with_parents(parents, miner_data, txs).unwrap();
+        MutableBlock::new((*template.block.header).clone(), template.block.transactions.iter().map(|tx| (**tx).clone()).collect())
     }
 
     pub fn build_block_with_parents_and_transactions(

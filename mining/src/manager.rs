@@ -241,7 +241,7 @@ impl MiningManager {
             ));
             let miner_data: MinerData = MinerData::new(script_public_key, vec![]);
 
-            let BlockTemplate { block: kaspa_consensus_core::block::MutableBlock { transactions, .. }, calculated_fees, .. } =
+            let BlockTemplate { block: kaspa_consensus_core::block::Block { transactions, .. }, calculated_fees, .. } =
                 self.get_block_template(consensus, &miner_data)?;
 
             let Some(Stats { max, median, min }) = feerate_stats(transactions, calculated_fees) else {
@@ -1039,7 +1039,7 @@ struct Stats {
 /// Returns an `Option<Stats>` containing the maximum, median, and minimum fee
 /// rates if the input vectors are valid. Returns `None` if the vectors are
 /// empty or if the lengths are inconsistent.
-fn feerate_stats(transactions: Vec<Transaction>, calculated_fees: Vec<u64>) -> Option<Stats> {
+fn feerate_stats(transactions: Vec<Arc<Transaction>>, calculated_fees: Vec<u64>) -> Option<Stats> {
     if calculated_fees.is_empty() {
         return None;
     }
@@ -1058,7 +1058,7 @@ fn feerate_stats(transactions: Vec<Transaction>, calculated_fees: Vec<u64>) -> O
             .iter()
             // skip coinbase tx
             .skip(1)
-            .map(Transaction::mass))
+            .map( |tx| tx.mass()))
         .map(|(fee, mass)| fee as f64 / mass as f64)
         .collect_vec();
     feerates.sort_unstable_by(f64::total_cmp);

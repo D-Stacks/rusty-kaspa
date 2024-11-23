@@ -1,5 +1,7 @@
 //! Conversion of Transaction related types
 
+use std::sync::Arc;
+
 use crate::{RpcError, RpcResult, RpcTransaction, RpcTransactionInput, RpcTransactionOutput};
 use kaspa_consensus_core::tx::{Transaction, TransactionInput, TransactionOutput};
 
@@ -21,6 +23,12 @@ impl From<&Transaction> for RpcTransaction {
             // TODO: Implement a populating process inspired from kaspad\app\rpc\rpccontext\verbosedata.go
             verbose_data: None,
         }
+    }
+}
+
+impl From<Arc<Transaction>> for RpcTransaction {
+    fn from(item: Arc<Transaction>) -> Self {
+        Self::from(item.as_ref())
     }
 }
 
@@ -72,6 +80,13 @@ impl TryFrom<RpcTransaction> for Transaction {
         );
         transaction.set_mass(item.mass);
         Ok(transaction)
+    }
+}
+
+impl TryFrom<RpcTransaction> for Arc<Transaction> {
+    type Error = RpcError;
+    fn try_from(item: RpcTransaction) -> RpcResult<Self> {
+        Ok(Arc::new(Transaction::try_from(item)?))
     }
 }
 

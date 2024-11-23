@@ -5,7 +5,7 @@ use crate::{
     BlueWorkType,
 };
 use kaspa_hashes::Hash;
-use kaspa_utils::mem_size::MemSizeEstimator;
+use kaspa_utils::{arc::ArcExtensions, mem_size::MemSizeEstimator};
 use std::sync::Arc;
 
 /// A mutable block structure where header and transactions within can still be mutated.
@@ -25,7 +25,19 @@ impl MutableBlock {
     }
 
     pub fn to_immutable(self) -> Block {
-        Block::new(self.header, self.transactions)
+        Block::new(self.header, self.transactions.into_iter().map(Arc::new).collect())
+    }
+}
+
+impl From<Block> for MutableBlock {
+    fn from(block: Block) -> Self {
+        Self { header: block.header.unwrap_or_clone(), transactions: block.transactions.iter().map(|tx| (**tx).clone()).collect() }
+    }
+}
+
+impl From<MutableBlock> for Block {
+    fn from(mutable_block: MutableBlock) -> Self {
+        mutable_block.to_immutable()
     }
 }
 
@@ -35,15 +47,15 @@ impl MutableBlock {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub header: Arc<Header>,
-    pub transactions: Arc<Vec<Transaction>>,
+    pub transactions: Arc<Vec<Arc<Transaction>>>,
 }
 
 impl Block {
-    pub fn new(header: Header, txs: Vec<Transaction>) -> Self {
+    pub fn new(header: Header, txs: Vec<Arc<Transaction>>) -> Self {
         Self { header: Arc::new(header), transactions: Arc::new(txs) }
     }
 
-    pub fn from_arcs(header: Arc<Header>, transactions: Arc<Vec<Transaction>>) -> Self {
+    pub fn from_arcs(header: Arc<Header>, transactions: Arc<Vec<Arc<Transaction>>>) -> Self {
         Self { header, transactions }
     }
 
@@ -79,7 +91,7 @@ impl MemSizeEstimator for Block {
         size_of::<Self>()
             + self.header.estimate_mem_bytes()
             + size_of::<Vec<Transaction>>()
-            + self.transactions.iter().map(Transaction::estimate_mem_bytes).sum::<usize>()
+            + self.transactions.iter().map(|tx| tx.estimate_mem_bytes()).sum::<usize>()
     }
 }
 
@@ -88,7 +100,7 @@ pub trait TemplateTransactionSelector {
     /// Expected to return a batch of transactions which were not previously selected.
     /// The batch will typically contain sufficient transactions to fill the block
     /// mass (along with the previously unrejected txs), or will drain the selector    
-    fn select_transactions(&mut self) -> Vec<Transaction>;
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>>;
 
     /// Should be used to report invalid transactions obtained from the *most recent*
     /// `select_transactions` call. Implementors should use this call to internally
@@ -114,7 +126,7 @@ pub enum TemplateBuildMode {
 /// A block template for miners.
 #[derive(Debug, Clone)]
 pub struct BlockTemplate {
-    pub block: MutableBlock,
+    pub block: Block,
     pub miner_data: MinerData,
     pub coinbase_has_red_reward: bool,
     pub selected_parent_timestamp: u64,
@@ -126,7 +138,7 @@ pub struct BlockTemplate {
 
 impl BlockTemplate {
     pub fn new(
-        block: MutableBlock,
+        block: Block,
         miner_data: MinerData,
         coinbase_has_red_reward: bool,
         selected_parent_timestamp: u64,

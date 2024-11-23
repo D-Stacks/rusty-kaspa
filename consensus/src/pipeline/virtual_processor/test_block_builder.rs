@@ -34,7 +34,7 @@ impl TestBlockBuilder {
         &self,
         parents: Vec<Hash>,
         miner_data: MinerData,
-        txs: Vec<Transaction>,
+        txs: Vec<Arc<Transaction>>,
     ) -> Result<BlockTemplate, RuleError> {
         //
         // In the context of this method "pov virtual" is the virtual block which has `parents` as tips and not the actual virtual

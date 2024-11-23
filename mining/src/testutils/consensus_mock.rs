@@ -4,7 +4,7 @@ use kaspa_consensus_core::{
         args::{TransactionValidationArgs, TransactionValidationBatchArgs},
         ConsensusApi,
     },
-    block::{BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector, VirtualStateApproxId},
+    block::{Block, BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector, VirtualStateApproxId},
     coinbase::MinerData,
     constants::BLOCK_VERSION,
     errors::{
@@ -84,7 +84,7 @@ impl ConsensusApi for ConsensusMock {
         let mut txs = tx_selector.select_transactions();
         let coinbase_manager = CoinbaseManagerMock::new();
         let coinbase = coinbase_manager.expected_coinbase_transaction(miner_data.clone());
-        txs.insert(0, coinbase.tx);
+        txs.insert(0, Arc::new(coinbase.tx));
         let now = unix_now();
         let hash_merkle_root = self.calc_transaction_hash_merkle_root(&txs, 0);
         let header = Header::new_finalized(
@@ -101,7 +101,7 @@ impl ConsensusApi for ConsensusMock {
             0,
             ZERO_HASH,
         );
-        let mutable_block = MutableBlock::new(header, txs);
+        let mutable_block = Block::new(header, txs);
 
         Ok(BlockTemplate::new(mutable_block, miner_data, coinbase.has_red_reward, now, 0, ZERO_HASH, vec![]))
     }
@@ -181,7 +181,7 @@ impl ConsensusApi for ConsensusMock {
         Ok(coinbase_manager.modify_coinbase_payload(payload, miner_data))
     }
 
-    fn calc_transaction_hash_merkle_root(&self, txs: &[Transaction], _pov_daa_score: u64) -> Hash {
-        calc_hash_merkle_root(txs.iter(), false)
+    fn calc_transaction_hash_merkle_root(&self, txs: &[Arc<Transaction>], _pov_daa_score: u64) -> Hash {
+        calc_hash_merkle_root(txs.iter().map(|tx| &**tx), false)
     }
 }

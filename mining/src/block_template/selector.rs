@@ -1,6 +1,6 @@
 use kaspa_core::{time::Stopwatch, trace};
 use rand::Rng;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::model::candidate_tx::CandidateTransaction;
 
@@ -103,7 +103,7 @@ impl RebalancingWeightedTransactionSelector {
     /// select_transactions loops over the candidate transactions
     /// and appends the ones that will be included in the next block into
     /// selected_txs.
-    pub fn select_transactions(&mut self) -> Vec<Transaction> {
+    pub fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         let _sw = Stopwatch::<15>::with_threshold("select_transaction op");
         let mut rng = rand::thread_rng();
 
@@ -195,9 +195,9 @@ impl RebalancingWeightedTransactionSelector {
         self.get_transactions()
     }
 
-    fn get_transactions(&self) -> Vec<Transaction> {
+    fn get_transactions(&self) -> Vec<Arc<Transaction>> {
         // These transactions leave the selector so we clone
-        self.selected_txs.iter().map(|x| self.transactions[*x].tx.as_ref().clone()).collect()
+        self.selected_txs.iter().map(|x| self.transactions[*x].tx.clone()).collect()
     }
 
     fn reset_selection(&mut self) {
@@ -226,7 +226,7 @@ impl RebalancingWeightedTransactionSelector {
 }
 
 impl TemplateTransactionSelector for RebalancingWeightedTransactionSelector {
-    fn select_transactions(&mut self) -> Vec<Transaction> {
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         self.select_transactions()
     }
 

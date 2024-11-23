@@ -233,7 +233,7 @@ impl BlockBodyProcessor {
         Ok(mass)
     }
 
-    fn commit_body(self: &Arc<BlockBodyProcessor>, hash: Hash, parents: &[Hash], transactions: Arc<Vec<Transaction>>) {
+    fn commit_body(self: &Arc<BlockBodyProcessor>, hash: Hash, parents: &[Hash], transactions: Arc<Vec<Arc<Transaction>>>) {
         let mut batch = WriteBatch::default();
 
         // This is an append only store so it requires no lock.

@@ -33,7 +33,7 @@ use kaspa_utils::refs::Refs;
 
 use rayon::prelude::*;
 use smallvec::{smallvec, SmallVec};
-use std::{iter::once, ops::Deref};
+use std::{iter::once, ops::Deref, sync::Arc};
 
 /// A context for processing the UTXO state of a block with respect to its selected parent.
 /// Note this can also be the virtual block.
@@ -217,7 +217,7 @@ impl VirtualStateProcessor {
     /// which passed the validation along with their original index within the containing block
     pub(crate) fn validate_transactions_in_parallel<'a, V: UtxoView + Sync>(
         &self,
-        txs: &'a Vec<Transaction>,
+        txs: &'a Arc<Vec<Arc<Transaction>>>,
         utxo_view: &V,
         pov_daa_score: u64,
         flags: TxValidationFlags,
@@ -237,7 +237,7 @@ impl VirtualStateProcessor {
     /// calculate the muhash in parallel for valid transactions
     pub(crate) fn validate_transactions_with_muhash_in_parallel<'a, V: UtxoView + Sync>(
         &self,
-        txs: &'a Vec<Transaction>,
+        txs: &'a Arc<Vec<Arc<Transaction>>>,
         utxo_view: &V,
         pov_daa_score: u64,
         flags: TxValidationFlags,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use kaspa_consensus_core::{
     block::Block,
     header::Header,
@@ -125,8 +127,13 @@ pub fn generate_random_transaction(rng: &mut SmallRng, input_amount: usize, outp
 }
 
 ///Note: generate_random_transactions is filled with random data, it does not represent consensus-valid  transactions!
-pub fn generate_random_transactions(rng: &mut SmallRng, amount: usize, input_amount: usize, output_amount: usize) -> Vec<Transaction> {
-    Vec::from_iter((0..amount).map(move |_| generate_random_transaction(rng, input_amount, output_amount)))
+pub fn generate_random_transactions(
+    rng: &mut SmallRng,
+    amount: usize,
+    input_amount: usize,
+    output_amount: usize,
+) -> Vec<Arc<Transaction>> {
+    (0..amount).map(move |_| Arc::new(generate_random_transaction(rng, input_amount, output_amount))).collect()
 }
 
 ///Note: generate_random_transactions is filled with random data, it does not represent consensus-valid  transaction input!

@@ -50,7 +50,7 @@ use crate::{
 use kaspa_consensus_core::{
     acceptance_data::AcceptanceData,
     api::args::{TransactionValidationArgs, TransactionValidationBatchArgs},
-    block::{BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector},
+    block::{Block, BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector},
     blockstatus::BlockStatus::{StatusDisqualifiedFromChain, StatusUTXOValid},
     coinbase::MinerData,
     config::{genesis::GenesisBlock, params::ForkActivation},
@@ -83,7 +83,7 @@ use super::errors::{PruningImportError, PruningImportResult};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use itertools::Itertools;
 use kaspa_consensus_core::tx::ValidatedTransaction;
-use kaspa_utils::binary_heap::BinaryHeapExtensions;
+use kaspa_utils::{arc::ArcExtensions, binary_heap::BinaryHeapExtensions};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rand::{seq::SliceRandom, Rng};
 use rayon::{
@@ -879,7 +879,7 @@ impl VirtualStateProcessor {
 
     fn validate_block_template_transactions_in_parallel<V: UtxoView + Sync>(
         &self,
-        txs: &[Transaction],
+        txs: &[Arc<Transaction>],
         virtual_state: &VirtualState,
         utxo_view: &V,
     ) -> Vec<TxResult<u64>> {
@@ -977,7 +977,7 @@ impl VirtualStateProcessor {
 
     pub(crate) fn validate_block_template_transactions(
         &self,
-        txs: &[Transaction],
+        txs: &[Arc<Transaction>],
         virtual_state: &VirtualState,
         utxo_view: &impl UtxoView,
     ) -> Result<(), RuleError> {
@@ -999,7 +999,7 @@ impl VirtualStateProcessor {
         &self,
         virtual_state: Arc<VirtualState>,
         miner_data: MinerData,
-        mut txs: Vec<Transaction>,
+        mut txs: Vec<Arc<Transaction>>,
         calculated_fees: Vec<u64>,
     ) -> Result<BlockTemplate, RuleError> {
         // [`calc_block_parents`] can use deep blocks below the pruning point for this calculation, so we
@@ -1018,13 +1018,13 @@ impl VirtualStateProcessor {
                 &virtual_state.mergeset_non_daa,
             )
             .unwrap();
-        txs.insert(0, coinbase.tx);
+        txs.insert(0, Arc::new(coinbase.tx));
         let version = BLOCK_VERSION;
         let parents_by_level = self.parents_manager.calc_block_parents(pruning_info.pruning_point, &virtual_state.parents);
 
         // Hash according to hardfork activation
         let storage_mass_activated = self.storage_mass_activation.is_active(virtual_state.daa_score);
-        let hash_merkle_root = calc_hash_merkle_root(txs.iter(), storage_mass_activated);
+        let hash_merkle_root = calc_hash_merkle_root(txs.iter().map(|tx| &**tx), storage_mass_activated);
 
         let accepted_id_merkle_root = kaspa_merkle::calc_merkle_root(virtual_state.accepted_tx_ids.iter().copied());
         let utxo_commitment = virtual_state.multiset.clone().finalize();
@@ -1048,7 +1048,7 @@ impl VirtualStateProcessor {
         let selected_parent_timestamp = self.headers_store.get_timestamp(selected_parent_hash).unwrap();
         let selected_parent_daa_score = self.headers_store.get_daa_score(selected_parent_hash).unwrap();
         Ok(BlockTemplate::new(
-            MutableBlock::new(header, txs),
+            Block::new(header, txs),
             miner_data,
             coinbase.has_red_reward,
             selected_parent_timestamp,

@@ -4,7 +4,7 @@ use kaspa_consensus::consensus::Consensus;
 use kaspa_consensus::model::stores::virtual_state::VirtualStateStoreReader;
 use kaspa_consensus::params::Params;
 use kaspa_consensus_core::api::ConsensusApi;
-use kaspa_consensus_core::block::{Block, TemplateBuildMode, TemplateTransactionSelector};
+use kaspa_consensus_core::block::{self, Block, TemplateBuildMode, TemplateTransactionSelector};
 use kaspa_consensus_core::coinbase::MinerData;
 use kaspa_consensus_core::mass::{Kip9Version, MassCalculator};
 use kaspa_consensus_core::sign::sign;
@@ -14,6 +14,7 @@ use kaspa_consensus_core::tx::{
 };
 use kaspa_consensus_core::utxo::utxo_view::UtxoView;
 use kaspa_core::trace;
+use kaspa_utils::arc::ArcExtensions;
 use kaspa_utils::sim::{Environment, Process, Resumption, Suspension};
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -118,18 +119,22 @@ impl Miner {
     }
 
     fn build_new_block(&mut self, timestamp: u64) -> Block {
+        
         let txs = self.build_txs();
         let nonce = self.id;
         let session = self.consensus.acquire_session();
+        
         let mut block_template = self
             .consensus
             .build_block_template(self.miner_data.clone(), Box::new(OnetimeTxSelector::new(txs)), TemplateBuildMode::Standard)
             .expect("simulation txs are selected in sync with virtual state and are expected to be valid");
         drop(session);
-        block_template.block.header.timestamp = timestamp; // Use simulation time rather than real time
-        block_template.block.header.nonce = nonce;
-        block_template.block.header.finalize();
-        block_template.block.to_immutable()
+
+        let new_header = &mut block_template.block.header.unwrap_or_clone();
+        new_header.timestamp = timestamp; // Use simulation time rather than real time
+        new_header.nonce = nonce;
+        new_header.finalize();
+        Block::from_arcs(Arc::new(new_header), block_template.block.transactions)
     }
 
     fn build_txs(&mut self) -> Vec<Transaction> {

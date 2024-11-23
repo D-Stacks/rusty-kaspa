@@ -49,16 +49,16 @@ impl AsRef<[u8]> for BlockTransactionFullAccessKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct BlockBody(Arc<Vec<Transaction>>);
+struct BlockBody(Arc<Vec<Arc<Transaction>>>);
 
 pub trait BlockTransactionsStoreReader {
-    fn get(&self, block_hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError>;
-    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Transaction, StoreError>;
+    fn get(&self, block_hash: Hash) -> Result<Arc<Vec<Arc<Transaction>>>, StoreError>;
+    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Arc<Transaction>, StoreError>;
 }
 
 pub trait BlockTransactionsStore: BlockTransactionsStoreReader {
     // This is append only
-    fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError>;
+    fn insert(&self, hash: Hash, transactions: Arc<Vec<Arc<Transaction>>>) -> Result<(), StoreError>;
     fn delete(&self, hash: Hash) -> Result<(), StoreError>;
 }
 
@@ -83,7 +83,7 @@ impl MemSizeEstimator for BlockBody {
 #[derive(Clone)]
 pub struct DbBlockTransactionsStore {
     db: Arc<DB>,
-    access: CachedDbAccess<BlockTransactionFullAccessKey, Transaction>,
+    access: CachedDbAccess<BlockTransactionFullAccessKey, Arc<Transaction>>,
     cache: Cache<Hash, BlockBody>,
 }
 
@@ -104,7 +104,12 @@ impl DbBlockTransactionsStore {
         Ok(self.cache.contains_key(&hash) || self.access.has_bucket(hash.as_bytes().as_ref())?)
     }
 
-    pub fn insert_batch(&self, batch: &mut WriteBatch, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
+    pub fn insert_batch(
+        &self,
+        batch: &mut WriteBatch,
+        hash: Hash,
+        transactions: Arc<Vec<Arc<Transaction>>>,
+    ) -> Result<(), StoreError> {
         if self.cache.contains_key(&hash) || self.access.has_bucket(hash.as_bytes().as_ref())? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
@@ -127,7 +132,7 @@ impl DbBlockTransactionsStore {
 }
 
 impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
-    fn get(&self, hash: Hash) -> Result<Arc<Vec<Transaction>>, StoreError> {
+    fn get(&self, hash: Hash) -> Result<Arc<Vec<Arc<Transaction>>>, StoreError> {
         self.cache
             .get(&hash)
             .map(|block_transactions| block_transactions.0.clone())
@@ -139,22 +144,22 @@ impl BlockTransactionsStoreReader for DbBlockTransactionsStore {
         }
     }
 
-    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Transaction, StoreError> {
-        if let Some(block_transactions) = self.cache.get(&block_hash) {
-            return Ok(block_transactions.0[index as usize].clone());
+    fn get_at_index(&self, block_hash: Hash, index: TransactionIndexType) -> Result<Arc<Transaction>, StoreError> {
+        Ok(if let Some(block_transactions) = self.cache.get(&block_hash) {
+            block_transactions.0[index as usize].clone()
         } else {
-            self.access.read(BlockTransactionFullAccessKey::new(&block_hash, index))
-        }
+            self.access.read(BlockTransactionFullAccessKey::new(&block_hash, index))?
+        })
     }
 }
 
 impl BlockTransactionsStore for DbBlockTransactionsStore {
-    fn insert(&self, hash: Hash, transactions: Arc<Vec<Transaction>>) -> Result<(), StoreError> {
+    fn insert(&self, hash: Hash, transactions: Arc<Vec<Arc<Transaction>>>) -> Result<(), StoreError> {
         if self.access.has_bucket(hash.as_bytes().as_ref())? {
             return Err(StoreError::HashAlreadyExists(hash));
         }
         self.cache.insert(hash, BlockBody(transactions.clone()));
-        self.access.write_many_without_cache(
+        self.access.write_many(
             DirectDbWriter::new(&self.db),
             &mut transactions
                 .iter()

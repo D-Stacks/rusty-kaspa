@@ -193,7 +193,6 @@ where {
 
         self.db
             .iterator_opt(IteratorMode::Start, read_opts)
-            .into_iter()
             .map(|item| match item {
                 Ok((_, value_bytes)) => match bincode::deserialize::<TData>(value_bytes.as_ref()) {
                     Ok(value) => Ok(value),

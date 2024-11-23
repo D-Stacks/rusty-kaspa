@@ -88,7 +88,7 @@ impl SequenceSelector {
 }
 
 impl TemplateTransactionSelector for SequenceSelector {
-    fn select_transactions(&mut self) -> Vec<Transaction> {
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         // Remove selections from the previous round if any
         for selection in self.selected_vec.drain(..) {
             self.input_sequence.inner.remove(&selection.priority_index);
@@ -106,7 +106,7 @@ impl TemplateTransactionSelector for SequenceSelector {
             }
             self.total_selected_mass += tx.mass;
             self.selected_vec.push(SequenceSelectorSelection { tx_id: tx.tx.id(), mass: tx.mass, priority_index });
-            transactions.push(tx.tx.as_ref().clone())
+            transactions.push(tx.tx.clone())
         }
         transactions
     }
@@ -145,9 +145,9 @@ impl TakeAllSelector {
 }
 
 impl TemplateTransactionSelector for TakeAllSelector {
-    fn select_transactions(&mut self) -> Vec<Transaction> {
+    fn select_transactions(&mut self) -> Vec<Arc<Transaction>> {
         // Drain on the first call so that subsequent calls return nothing
-        self.txs.drain(..).map(|tx| tx.as_ref().clone()).collect()
+        self.txs.drain(..).map(|tx| tx).collect()
     }
 
     fn reject_selection(&mut self, _tx_id: TransactionId) {

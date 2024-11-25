@@ -8,12 +8,7 @@ use async_trait::async_trait;
 use kaspa_consensus_core::api::counters::ProcessingCounters;
 use kaspa_consensus_core::errors::block::RuleError;
 use kaspa_consensus_core::{
-    block::Block,
-    coinbase::MinerData,
-    config::Config,
-    constants::MAX_SOMPI,
-    network::NetworkType,
-    tx::Transaction,
+    block::Block, coinbase::MinerData, config::Config, constants::MAX_SOMPI, network::NetworkType, tx::Transaction,
 };
 use kaspa_consensus_notify::{
     notifier::ConsensusNotifier,

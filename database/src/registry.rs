@@ -36,6 +36,7 @@ pub enum DatabaseStorePrefixes {
     UtxoMultisets = 26,
     VirtualUtxoset = 27,
     VirtualState = 28,
+    TransactionId = 29,
 
     // ---- Decomposed reachability stores ----
     ReachabilityTreeChildren = 30,

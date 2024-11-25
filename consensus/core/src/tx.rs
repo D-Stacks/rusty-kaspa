@@ -227,6 +227,7 @@ impl Transaction {
     }
 
     /// Returns the transaction ID
+    #[inline(always)]
     pub fn id(&self) -> TransactionId {
         self.id
     }

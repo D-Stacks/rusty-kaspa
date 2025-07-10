@@ -476,7 +476,7 @@ impl UtxoProcessor {
                 updated_contexts.insert(utxo_context.clone());
                 //let entries_removed = common_removed.get(&address).unwrap();
 
-                let added_utxos = entries_added.iter().map(|entry| entry.into()).collect::<Vec<_>>();
+                let added_utxos = entries_added.iter().map(|entry| entry.try_into().expect("UtxoEntryReference::try_from(RpcUtxosByAddress) should succeed - perhaps the RpcUtxosByAddress is missing data?")).collect::<Vec<UtxoEntryReference>>();
                 //let removed_utxos = entries_removed.iter().map(|entry| entry.into()).collect::<Vec<_>>();
 
                 utxo_context.update_utxos(added_utxos, current_daa_score).await?;

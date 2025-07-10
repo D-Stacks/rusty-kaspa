@@ -8,7 +8,6 @@ pub mod kind;
 pub mod pskb;
 pub mod variants;
 use kaspa_hashes::Hash;
-use kaspa_rpc_core::RpcResult;
 use kaspa_wallet_pskt::bundle::Bundle;
 pub use kind::*;
 use pskb::{
@@ -701,7 +700,8 @@ pub trait DerivationCapableAccount: Account {
             let utxos = utxos
                 .iter()
                 .map(|utxo| {
-                    let utxo_ref = UtxoEntryReference::from(utxo);
+                    let utxo_ref = UtxoEntryReference::try_from(utxo)
+                        .expect("UtxoEntryReference::try_from(RpcUtxosByAddress) should succeed - perhaps the RpcUtxosByAddress is missing data?");
                     if let Some(address) = utxo_ref.utxo.address.as_ref() {
                         if let Some(address_index) = receive_address_manager.inner().address_to_index_map.get(address) {
                             if last_receive_address_index < *address_index {
@@ -724,12 +724,6 @@ pub trait DerivationCapableAccount: Account {
             if balance > 0 {
                 aggregate_balance += balance;
                 if sweep {
-                    let utxos = utxos
-                        .into_iter()
-                        .map(UtxoEntryReference::try_from)
-                        .collect::<RpcResult<Vec<_>>>()
-                        .expect("expected to convert utxos");
-
                     let settings = GeneratorSettings::try_new_with_iterator(
                         self.wallet().network_id()?,
                         Box::new(utxos.into_iter()),

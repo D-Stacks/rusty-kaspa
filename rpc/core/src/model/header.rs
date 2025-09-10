@@ -420,6 +420,7 @@ pub struct RpcHeaderVerbosity {
     pub include_blue_work: Option<bool>,
     pub include_blue_score: Option<bool>,
     pub include_pruning_point: Option<bool>,
+    pub include_transaction_ids: Option<bool>,
 }
 
 impl Serializer for RpcHeaderVerbosity {
@@ -439,6 +440,7 @@ impl Serializer for RpcHeaderVerbosity {
         store!(Option<bool>, &self.include_blue_work, writer)?;
         store!(Option<bool>, &self.include_blue_score, writer)?;
         store!(Option<bool>, &self.include_pruning_point, writer)?;
+        store!(Option<bool>, &self.include_transaction_ids, writer)?;
 
         Ok(())
     }
@@ -461,6 +463,7 @@ impl Deserializer for RpcHeaderVerbosity {
         let include_blue_work = load!(Option<bool>, reader)?;
         let include_blue_score = load!(Option<bool>, reader)?;
         let include_pruning_point = load!(Option<bool>, reader)?;
+        let include_transaction_ids = load!(Option<bool>, reader)?;
 
         Ok(Self {
             include_hash,
@@ -476,6 +479,7 @@ impl Deserializer for RpcHeaderVerbosity {
             include_blue_work,
             include_blue_score,
             include_pruning_point,
+            include_transaction_ids,
         })
     }
 }

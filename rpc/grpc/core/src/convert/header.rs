@@ -41,6 +41,7 @@ from!(item: &kaspa_rpc_core::RpcHeaderVerbosity, protowire::RpcBlockHeaderVerbos
         include_blue_work: item.include_blue_work,
         include_blue_score: item.include_blue_score,
         include_pruning_point: item.include_pruning_point,
+        include_transaction_ids: item.include_transaction_ids,
     }
 });
 
@@ -100,6 +101,7 @@ try_from!(item: &protowire::RpcBlockHeaderVerbosity, kaspa_rpc_core::RpcHeaderVe
         include_blue_work: item.include_blue_work,
         include_blue_score: item.include_blue_score,
         include_pruning_point: item.include_pruning_point,
+        include_transaction_ids: item.include_transaction_ids,
     }
 });
 

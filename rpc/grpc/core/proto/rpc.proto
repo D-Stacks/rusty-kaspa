@@ -989,10 +989,6 @@ message GetUtxoReturnAddressResponseMessage {
 
 message RpcAcceptanceDataVerbosity {
   optional RpcBlockHeaderVerbosity acceptingChainHeaderVerbosity = 1; // default is null
-  optional RpcMergesetBlockAcceptanceDataVerbosity mergesetBlockAcceptanceDataVerbosity = 20; // default is null
-}
-
-message RpcMergesetBlockAcceptanceDataVerbosity {
   optional RpcBlockHeaderVerbosity mergedHeaderVerbosity = 2; // default is null
   optional RpcTransactionVerbosity acceptedTransactionsVerbosity = 4; // default is null
 }
@@ -1011,6 +1007,7 @@ message RpcBlockHeaderVerbosity {
   optional bool includeBlueWork = 11; // default is false
   optional bool includePruningPoint = 12; // default is false
   optional bool includeBlueScore = 13; // default is false
+  optional bool includeTransactionIds = 14; // default is false
 }
 
 message RpcTransactionVerbosity {
@@ -1078,11 +1075,12 @@ message RpcUtxoEntryVerboseDataVerbosity {
 message RpcAcceptanceData {
   optional RpcBlockHeader acceptingChainHeader = 1;
   repeated RpcMergesetBlockAcceptanceData mergesetBlockAcceptanceData = 20;
+  repeated RpcTransaction acceptedTransactions = 21;
 }
 
 message RpcMergesetBlockAcceptanceData {
   optional RpcBlockHeader mergedHeader = 2;
-  repeated RpcTransaction acceptedTransactions = 3;
+  repeated string transactionIds = 4;
 }
 
 /// GetVirtualChainFromBlockV2RequestMessage requests the virtual selected

@@ -40,8 +40,8 @@ use kaspa_p2p_lib::{
     pb::{InvRelayBlockMessage, kaspad_message::Payload},
 };
 use kaspa_p2p_mining::rule_engine::MiningRuleEngine;
-use kaspa_trusted_relay::FastTrustedRelay;
 use kaspa_perigeemanager::{PerigeeConfig, PerigeeManager};
+use kaspa_trusted_relay::FastTrustedRelay;
 use kaspa_utils::iter::IterExtensions;
 use kaspa_utils::networking::PeerId;
 use parking_lot::{Mutex, RwLock};
@@ -326,6 +326,7 @@ impl Deref for FlowContext {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 impl FlowContext {
     pub fn new(
         consensus_manager: Arc<ConsensusManager>,

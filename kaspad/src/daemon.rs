@@ -816,7 +816,6 @@ Do you confirm? (y/n)";
 
     info!("fast trusted relay: {}", if fast_trusted_relay.is_some() { "enabled" } else { "disabled" });
 
-
     // Ibd running flag, is created here to be potentially shared with the perigee manager
     let is_ibd_running = Arc::new(std::sync::atomic::AtomicBool::default());
     let perigee_manager = perigee_config.map(|perigee_config| Arc::new(PerigeeManager::new(perigee_config, is_ibd_running.clone())));

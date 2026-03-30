@@ -60,6 +60,8 @@ impl HandleFastTrustedRelayFlow {
                 result = self.fast_trusted_relay.recv_block() => result,
             };
 
+            self.ctx.register_hash_for_processing_loop(None, hash).await;
+
             debug!("Received block {} from fast trusted relay", hash);
 
             // We do not sync from fast relay messages, but if in transitional state,
@@ -158,12 +160,14 @@ impl HandleFastTrustedRelayFlow {
 
             debug!("Block {} from fast relay passed validation", hash);
 
+            let registered_peers_for_hash = self.ctx.unregister_hash_from_processing_loop(&hash).await;
+
             if broadcast {
                 self.ctx
                     .hub()
                     .broadcast(
                         make_message!(Payload::InvRelayBlock, InvRelayBlockMessage { hash: Some(hash.into()) }),
-                        None, // Because of fast relay block fragmentation, we don't consider one "particular" peer to have sent us this.
+                        registered_peers_for_hash.as_ref(), // Because of fast relay block fragmentation, we don't consider one "particular" peer to have sent us this.
                     )
                     .await;
             }

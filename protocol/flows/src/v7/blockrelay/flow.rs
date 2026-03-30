@@ -106,13 +106,25 @@ impl HandleRelayInvsFlow {
             let session = self.ctx.consensus().unguarded_session();
             let is_ibd_in_transitional_state = session.async_is_consensus_in_transitional_ibd_state().await;
 
+            let is_new_hash = self.ctx.register_hash_for_processing_loop(Some(self.router.key()), inv.hash).await;
+            if !is_new_hash {
+                if should_signal_perigee(&self.ctx, &inv, self.ctx.is_ibd_running()) {
+                    self.spawn_perigee_timestamp_signal(inv.hash, inv.timestamp.unwrap(), false);
+                }
+                debug!("Received inv of block {} which is already being processed, continuing...", inv.hash);
+                continue;
+            };
+
             match session.async_get_block_status(inv.hash).await {
                 None | Some(BlockStatus::StatusHeaderOnly) => {} // Continue processing this missing inv
                 Some(BlockStatus::StatusInvalid) => {
                     // Report a protocol error
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                     return Err(ProtocolError::OtherOwned(format!("sent inv of an invalid block {}", inv.hash)));
                 }
                 _ => {
+                    // Block is already known, skip to next inv
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                     debug!("Relay block {} already exists, continuing...", inv.hash);
                     if should_signal_perigee(&self.ctx, &inv, self.ctx.is_ibd_running()) {
                         self.spawn_perigee_timestamp_signal(inv.hash, inv.timestamp.unwrap(), false);
@@ -134,17 +146,21 @@ impl HandleRelayInvsFlow {
                     if should_signal_perigee(&self.ctx, &inv, self.ctx.is_ibd_running()) {
                         self.spawn_perigee_timestamp_signal(inv.hash, inv.timestamp.unwrap(), false);
                     }
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                     continue;
                 }
             }
 
             if self.ctx.is_ibd_running() && !self.ctx.should_mine(&session).await {
-                if let Some(ftr) = self.ctx.clone().fast_trusted_relay() {
+                if let Some(ftr) = self.ctx.clone().fast_trusted_relay()
+                    && ftr.is_udp_active().await
+                {
                     ftr.stop_fast_relay().await;
                 }
                 // Note: If the node is considered nearly synced we continue processing relay blocks even though an IBD is in progress.
                 // For instance this means that downloading a side-chain from a delayed node does not interop the normal flow of live blocks.
                 debug!("Got relay block {} while in IBD and the node is out of sync, continuing...", inv.hash);
+                let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                 continue;
             }
 
@@ -160,6 +176,7 @@ impl HandleRelayInvsFlow {
             request_scope.report_obtained();
 
             if block.is_header_only() {
+                let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                 return Err(ProtocolError::OtherOwned(format!("sent header of {} where expected block with body", block.hash())));
             }
 
@@ -176,17 +193,23 @@ impl HandleRelayInvsFlow {
                     "Relay block {} has lower blue work than virtual's merge depth root ({} <= {}), hence we are skipping it",
                     inv.hash, block.header.blue_work, blue_work_threshold
                 );
+                let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                 continue;
             }
             // if in a transitional ibd state, do not wait, sync immediately
             if is_ibd_in_transitional_state {
-                if let Some(ftr) = self.ctx.clone().fast_trusted_relay() {
+                if let Some(ftr) = self.ctx.clone().fast_trusted_relay()
+                    && ftr.is_udp_active().await
+                {
                     ftr.stop_fast_relay().await;
                 }
                 self.try_trigger_ibd(block)?;
+                let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
                 continue;
             }
-            if let Some(ftr) = self.ctx.clone().fast_trusted_relay() {
+            if let Some(ftr) = self.ctx.clone().fast_trusted_relay()
+                && !ftr.is_udp_active().await
+            {
                 ftr.start_fast_relay().await;
             }
 
@@ -206,7 +229,10 @@ impl HandleRelayInvsFlow {
                                 Ok(_) => {}
                                 // We disconnect on invalidness even though this is not a direct relay from this peer, because
                                 // current relay is a descendant of this block (i.e. this peer claims all its ancestors are valid)
-                                Err(rule_error) => return Err(rule_error.into()),
+                                Err(rule_error) => {
+                                    let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
+                                    return Err(rule_error.into());
+                                }
                             }
                         }
 
@@ -218,7 +244,10 @@ impl HandleRelayInvsFlow {
                                     debug!("Unorphaned {} ancestors and retried orphan block {} successfully", n, block.hash())
                                 }
                             },
-                            Err(rule_error) => return Err(rule_error.into()),
+                            Err(rule_error) => {
+                                let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
+                                return Err(rule_error.into());
+                            }
                         }
                         ancestor_batch
                     } else {
@@ -228,8 +257,14 @@ impl HandleRelayInvsFlow {
                         continue;
                     }
                 }
-                Err(rule_error) => return Err(rule_error.into()),
+                Err(rule_error) => {
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
+                    return Err(rule_error.into());
+                }
             };
+
+            // once we unregister the hash at this point, we know the hash will be in the status store, which then hence performs the filtering.
+            let registered_peers_for_hash = self.ctx.unregister_hash_from_processing_loop(&inv.hash).await;
 
             // As a policy, we only relay blocks who stand a chance to enter past(virtual).
             // The only mining rule which permanently excludes a block is the merge depth bound
@@ -245,15 +280,15 @@ impl HandleRelayInvsFlow {
                     .iter()
                     .map(|b| make_message!(Payload::InvRelayBlock, InvRelayBlockMessage { hash: Some(b.hash().into()) }))
                     .collect();
-                // we filter out the current peer to avoid sending it back invs we know it already has
-                self.ctx.hub().broadcast_many(msgs, Some(self.router.key())).await;
+                // we filter out peers that (in the meantime) sent us the original processed hash to avoid sending it back invs we know it already has.
+                self.ctx.hub().broadcast_many(msgs, registered_peers_for_hash.as_ref()).await;
 
-                // we filter out the current peer to avoid sending it back the same invs
+                // we filter out peers that (in the meantime) sent us the original processed hash to avoid sending it back invs we know it already has.
                 self.ctx
                     .hub()
                     .broadcast(
                         make_message!(Payload::InvRelayBlock, InvRelayBlockMessage { hash: Some(inv.hash.into()) }),
-                        Some(self.router.key()),
+                        registered_peers_for_hash.as_ref(),
                     )
                     .await;
             }

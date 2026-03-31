@@ -86,7 +86,7 @@ impl TransportParams {
     // Max expected block sizes, peer counts, consensus variables, Fragmentation configs, number of workers.
 
     pub fn block_cache_capacity(&self) -> usize {
-        ((self.consensus_mergeset_root * 2) as f64 * self.multiplier) as usize
+        self.max_concurrent_blocks()
     }
 
     pub fn coordinator_block_cache_capacity(&self) -> usize {
@@ -134,7 +134,7 @@ impl TransportParams {
     }
 
     pub fn max_concurrent_blocks(&self) -> usize {
-        self.consensus_k * 10
+        self.consensus_k * 2
     }
 }
 

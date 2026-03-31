@@ -800,6 +800,13 @@ impl FlowContext {
         }
     }
 
+    pub async fn ignore_perigee_timestamp(&self, hash: &Hash) {
+        if let Some(ref manager) = self.perigee_manager {
+            let mut manager = manager.lock();
+            manager.ignore_perigee_timestamp(*hash);
+        }
+    }
+
     pub fn perigee_config(&self) -> Option<PerigeeConfig> {
         match self.perigee_manager {
             Some(ref manager) => {

@@ -123,7 +123,8 @@ impl Display for PerigeeConfig {
 
 /// Manages peer selection and scoring.
 pub struct PerigeeManager {
-    verified_blocks: BlockHashSet, // holds blocks that are consensus verified.
+    verified_blocks: BlockHashSet,  // holds blocks that are consensus verified.
+    to_ignore_blocks: BlockHashSet, // holds blocks that should be ignored for peer scoring (in the case of FTR blocks this is useful),
     first_seen: HashMap<Hash, Instant>,
     last_round_leveraged_peers: Vec<PeerKey>,
     round_start: Instant,
@@ -136,6 +137,7 @@ impl PerigeeManager {
     pub fn new(config: PerigeeConfig, is_ibd_running: Arc<AtomicBool>) -> Mutex<Self> {
         Mutex::new(Self {
             verified_blocks: BlockHashSet::new(),
+            to_ignore_blocks: BlockHashSet::new(),
             first_seen: HashMap::new(),
             last_round_leveraged_peers: Vec::new(),
             round_start: Instant::now(),
@@ -145,7 +147,17 @@ impl PerigeeManager {
         })
     }
 
+    pub fn ignore_perigee_timestamp(&mut self, hash: Hash) {
+        // Marks a block as to be ignored for peer scoring.
+        // This is useful for blocks that we do not want to factor into our peer evaluation, such as FTR blocks.
+        self.to_ignore_blocks.insert(hash);
+    }
+
     pub fn insert_perigee_timestamp(&mut self, router: &Arc<Router>, hash: Hash, timestamp: Instant, verify: bool) {
+        if self.to_ignore_blocks.contains(&hash) {
+            // This block is marked to be ignored for peer scoring, so we do not insert a perigee timestamp for it.
+            return;
+        };
         // Inserts and updates the perigee timestamp for the given router
         // and into the local state.
         if router.is_perigee() || (self.config.statistics && router.is_random_graph()) {
@@ -432,6 +444,7 @@ impl PerigeeManager {
         debug!("[{}]: Clearing state for new round", IDENT);
         self.verified_blocks.clear();
         self.first_seen.clear();
+        self.to_ignore_blocks.clear();
     }
 
     fn get_excused_peers(&self, perigee_peers: &[Peer]) -> Vec<PeerKey> {

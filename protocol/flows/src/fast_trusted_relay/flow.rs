@@ -138,9 +138,19 @@ impl HandleFastTrustedRelayFlow {
                 continue;
             }
 
-            // Consider: This might be bad practice, but technically if we consider all fast relay peers in the trusted relay "trusted"
-            // we could consider adding blocks with no consensus verification (only state advancements), to further speed up the synchronization of fast relay nodes.
-            // at least this could reduce the latency for block templating.
+            let registered_peers_for_hash = self.ctx.unregister_hash_from_processing_loop(&hash).await;
+
+            if broadcast {
+                self.ctx
+                    .hub()
+                    .broadcast(
+                        make_message!(Payload::InvRelayBlock, InvRelayBlockMessage { hash: Some(hash.into()) }),
+                        registered_peers_for_hash.as_ref(), // Because of fast relay block fragmentation, we don't consider one "particular" peer to have sent us this.
+                    )
+                    .await;
+            }
+
+
             let BlockValidationFutures { block_task, virtual_state_task } = session.validate_and_insert_block(block.clone());
 
             let validated_block = match block_task.await {
@@ -159,18 +169,6 @@ impl HandleFastTrustedRelayFlow {
             };
 
             debug!("Block {} from fast relay passed validation", hash);
-
-            let registered_peers_for_hash = self.ctx.unregister_hash_from_processing_loop(&hash).await;
-
-            if broadcast {
-                self.ctx
-                    .hub()
-                    .broadcast(
-                        make_message!(Payload::InvRelayBlock, InvRelayBlockMessage { hash: Some(hash.into()) }),
-                        registered_peers_for_hash.as_ref(), // Because of fast relay block fragmentation, we don't consider one "particular" peer to have sent us this.
-                    )
-                    .await;
-            }
 
             let ctx = self.ctx.clone();
             tokio::spawn(async move {

@@ -176,7 +176,7 @@ impl HandleFastTrustedRelayFlow {
             tokio::spawn(async move {
                 ctx.on_new_block(&session, BlockProcessingBatch::default(), validated_block, virtual_state_task).await;
                 ctx.log_block_event(BlockLogEvent::TrustedRelay(hash));
-                if ctx.is_perigee_active() && ctx.is_ibd_running() {
+                if ctx.is_perigee_active() && !ctx.is_ibd_running() {
                     ctx.ignore_perigee_timestamp(&hash).await;
                 }
             });

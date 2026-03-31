@@ -558,7 +558,7 @@ impl PerigeeManager {
     fn block_threshold_reached(&self) -> bool {
         // Checks whether the amount of verified blocks this round is within the expected bounds to consider leveraging.
         // If this is not the case, the node is likely experiencing network issues, and we rather skip leveraging this round.
-        let verified_count = self.verified_blocks.len();
+        let verified_count = self.verified_blocks.len() + self.to_ignore_blocks.len();
         let expected_count = self.config.expected_blocks_per_round;
         let lower_bound = (expected_count as f64 * (1.0 - BLOCKS_VERIFIED_FAULT_TOLERANCE)) as usize;
         let upper_bound = (expected_count as f64 * (1.0 + BLOCKS_VERIFIED_FAULT_TOLERANCE)) as usize;

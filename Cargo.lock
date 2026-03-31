@@ -3080,6 +3080,7 @@ dependencies = [
  "log",
  "parking_lot",
  "rand 0.8.5",
+ "ringmap",
  "thiserror 1.0.64",
  "tokio",
  "tokio-stream",

@@ -12,11 +12,14 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use kaspa_addressmanager::AddressManager;
 use kaspa_connectionmanager::ConnectionManager;
-use kaspa_consensus_core::api::{BlockValidationFuture, BlockValidationFutures};
 use kaspa_consensus_core::block::Block;
 use kaspa_consensus_core::config::Config;
 use kaspa_consensus_core::errors::block::RuleError;
 use kaspa_consensus_core::tx::{Transaction, TransactionId};
+use kaspa_consensus_core::{
+    BlockHasher,
+    api::{BlockValidationFuture, BlockValidationFutures},
+};
 use kaspa_consensus_notify::{
     notification::{Notification, PruningPointUtxoSetOverrideNotification},
     root::ConsensusNotificationRoot,
@@ -45,6 +48,7 @@ use kaspa_trusted_relay::FastTrustedRelay;
 use kaspa_utils::networking::PeerId;
 use kaspa_utils::{iter::IterExtensions, networking::IpAddress};
 use parking_lot::{Mutex, RwLock};
+use ringmap::RingMap;
 use std::time::Instant;
 use std::{collections::hash_map::Entry, fmt::Display};
 use std::{
@@ -240,6 +244,7 @@ pub struct FlowContextInner {
     orphans_pool: AsyncRwLock<OrphanBlocksPool>,
     shared_block_requests: Arc<Mutex<HashMap<Hash, RequestScopeMetadata>>>,
     block_inv_processing_metadata: Arc<Mutex<BlockInvProcessingMetadata>>,
+    ftr_blocks: Arc<Mutex<RingMap<Hash, Block, BlockHasher>>>,
     transactions_spread: AsyncRwLock<TransactionsSpread>,
     shared_transaction_requests: Arc<Mutex<HashMap<TransactionId, RequestScopeMetadata>>>,
     is_ibd_running: Arc<AtomicBool>,
@@ -392,6 +397,10 @@ impl FlowContext {
                 orphans_pool: AsyncRwLock::new(OrphanBlocksPool::new(max_orphans)),
                 shared_block_requests: Arc::new(Mutex::new(HashMap::new())),
                 block_inv_processing_metadata: Arc::new(Mutex::new(BlockInvProcessingMetadata::default())),
+                ftr_blocks: Arc::new(Mutex::new(RingMap::<Hash, Block, BlockHasher>::with_capacity_and_hasher(
+                    config.ghostdag_k() as usize,
+                    BlockHasher::default(),
+                ))),
                 transactions_spread: AsyncRwLock::new(TransactionsSpread::new(hub.clone())),
                 shared_transaction_requests: Arc::new(Mutex::new(HashMap::new())),
                 is_ibd_running,
@@ -805,6 +814,18 @@ impl FlowContext {
             let mut manager = manager.lock();
             manager.ignore_perigee_timestamp(*hash);
         }
+    }
+
+    pub async fn insert_block_to_ftr_cache(&self, hash: Hash, block: Block) {
+        self.ftr_blocks.lock().insert(hash, block);
+        if self.ftr_blocks.lock().len() > self.config.ghostdag_k() as usize {
+            // We keep a small cache of recently requested blocks for the fast trusted relay flow. This is to avoid having to fetch them from the consensus manager multiple times in case they are requested multiple times in a short time window, which can happen for popular blocks on high-bps networks. However, we want to keep this cache small to avoid memory bloat, hence we clear it when it exceeds a certain size.
+            let _ = self.ftr_blocks.lock().pop_front();
+        }
+    }
+
+    pub async fn get_block_from_ftr_cache(&self, hash: &Hash) -> Option<Block> {
+        self.ftr_blocks.lock().get(hash).cloned()
     }
 
     pub fn perigee_config(&self) -> Option<PerigeeConfig> {

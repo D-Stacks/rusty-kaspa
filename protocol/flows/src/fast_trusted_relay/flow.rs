@@ -141,6 +141,8 @@ impl HandleFastTrustedRelayFlow {
             let registered_peers_for_hash = self.ctx.unregister_hash_from_processing_loop(&hash).await;
 
             if broadcast {
+                let _ = self.ctx.insert_block_to_ftr_cache(hash, block.clone()).await;
+
                 self.ctx
                     .hub()
                     .broadcast(
@@ -149,7 +151,6 @@ impl HandleFastTrustedRelayFlow {
                     )
                     .await;
             }
-
 
             let BlockValidationFutures { block_task, virtual_state_task } = session.validate_and_insert_block(block.clone());
 

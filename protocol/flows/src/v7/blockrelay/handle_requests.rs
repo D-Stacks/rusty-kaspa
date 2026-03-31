@@ -45,9 +45,14 @@ impl HandleRelayBlockRequests {
             let session = self.ctx.consensus().unguarded_session();
 
             for hash in hashes {
-                let block = session.async_get_block(hash).await?;
-                self.router.enqueue(make_response!(Payload::Block, (self.header_format, &block).into(), request_id)).await?;
-                debug!("relayed block with hash {} to peer {}", hash, self.router);
+                if let Some(block) = self.ctx.get_block_from_ftr_cache(&hash).await {
+                    debug!("Relaying block {} from FTR cache to peer {}", hash, self.router);
+                    self.router.enqueue(make_response!(Payload::Block, (self.header_format, &block).into(), request_id)).await?;
+                } else {
+                    debug!("Relaying block {} from consensus manager to peer {}", hash, self.router);
+                    let block = session.async_get_block(hash).await?;
+                    self.router.enqueue(make_response!(Payload::Block, (self.header_format, &block).into(), request_id)).await?;
+                }
             }
         }
     }

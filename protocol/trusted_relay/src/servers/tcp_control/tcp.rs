@@ -56,7 +56,7 @@ impl TcpServer {
         info!("TCP server listening on {}", local_addr);
 
         // Perform immediate connection attempts to all outgoing peers on startup
-        self.attempt_reconnections().await;
+        self.attempt_reconnections();
 
         let shutdown_listener = self.shutdown_listen.clone();
         loop {
@@ -95,14 +95,16 @@ impl TcpServer {
                     },
                 // reconnection attempts
                 _ = tokio::time::sleep(Duration::from_secs(30)) => {
-                    self.attempt_reconnections().await;
+                    self.attempt_reconnections();
                 },
             }
         }
     }
 
     /// Attempt to connect to all outgoing peers that are not already connected.
-    async fn attempt_reconnections(&self) {
+    /// Each attempt is spawned as an independent task so the accept loop is
+    /// never blocked while a handshake is in flight.
+    fn attempt_reconnections(&self) {
         info!("Fast Trusted Relay: checking for peers to connect...");
         // this is a dynamically created list of currently connected peers,
         // we may use this to filter reconnection attempts.
@@ -117,20 +119,18 @@ impl TcpServer {
             }
             if !peer_info_list.iter().any(|p| &p.address().ip() == a) {
                 attempted += 1;
-                info!("Fast Trusted Relay: attempting connection to peer {} (direction: {:?})", a, direction);
-                match tcp_connect(
-                    SocketAddr::from((*a, DEFAULT_TCP_PORT)),
-                    self.authenticator.clone(),
-                    *direction,
-                    0,
-                    self.hub_event_sender.clone(),
-                    self.directory.allowlist(),
-                )
-                .await
-                {
-                    Ok(_) => info!("Fast Trusted Relay: connection to peer {} succeeded", a),
-                    Err(e) => info!("Fast Trusted Relay: connection to peer {} failed: {}", a, e),
-                }
+                let remote_addr = SocketAddr::from((*a, DEFAULT_TCP_PORT));
+                let authenticator = self.authenticator.clone();
+                let direction = *direction;
+                let hub_tx = self.hub_event_sender.clone();
+                let allowlist = self.directory.allowlist();
+                info!("Fast Trusted Relay: attempting connection to peer {} (direction: {:?})", remote_addr.ip(), direction);
+                tokio::spawn(async move {
+                    match tcp_connect(remote_addr, authenticator, direction, 0, hub_tx, allowlist).await {
+                        Ok(_) => info!("Fast Trusted Relay: connection to peer {} succeeded", remote_addr.ip()),
+                        Err(e) => info!("Fast Trusted Relay: connection to peer {} failed: {}", remote_addr.ip(), e),
+                    }
+                });
             }
         }
 

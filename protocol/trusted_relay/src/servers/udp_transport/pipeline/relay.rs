@@ -47,7 +47,12 @@ fn run(worker_idx: usize, receiver: RelayReceiver, peer_info_list: PeerInfoList)
                 if let Err(e) = socket.send(&raw_packet) {
                     if e.kind() == std::io::ErrorKind::WouldBlock {
                         // OS send buffer is momentarily full; relay is best-effort so drop silently.
-                        trace!("{}-{}: OS send buffer full for {}, dropping fragment (best-effort)", WORKER_NAME, worker_idx, peer.udp_target());
+                        trace!(
+                            "{}-{}: OS send buffer full for {}, dropping fragment (best-effort)",
+                            WORKER_NAME,
+                            worker_idx,
+                            peer.udp_target()
+                        );
                     } else {
                         warn!("{}-{}: failed to send to {}: {}", WORKER_NAME, worker_idx, peer.udp_target(), e);
                     }

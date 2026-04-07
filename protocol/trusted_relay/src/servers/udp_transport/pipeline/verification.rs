@@ -185,11 +185,7 @@ fn run(
                         crossbeam_channel::TrySendError::Full(_) => {
                             warn!(
                                 "{}-{}: reassembly channel full, dropping {}:{} from {}",
-                                WORKER_NAME,
-                                worker_idx,
-                                fragment_hash,
-                                fragment_index,
-                                src,
+                                WORKER_NAME, worker_idx, fragment_hash, fragment_index, src,
                             );
                             // Do NOT drain the channel — draining destroys all buffered work and
                             // causes immediate refill, creating a fill→drain→fill loop.

@@ -184,16 +184,16 @@ fn run(
                     match e {
                         crossbeam_channel::TrySendError::Full(_) => {
                             warn!(
-                                "{}-{}: reassembly channel full, dropping {}:{} from {}, and draining reassembly channel {} to make room",
+                                "{}-{}: reassembly channel full, dropping {}:{} from {}",
                                 WORKER_NAME,
                                 worker_idx,
                                 fragment_hash,
                                 fragment_index,
                                 src,
-                                config.get_hash_bucket(fragment_hash, reassembly_receivers.len())
                             );
-                            // drain cannel to make space (best-effort)
-                            reassembly_receivers[config.get_hash_bucket(fragment_hash, reassembly_receivers.len())].try_iter();
+                            // Do NOT drain the channel — draining destroys all buffered work and
+                            // causes immediate refill, creating a fill→drain→fill loop.
+                            // The channel consumer will self-recover at its natural rate.
                         }
                         crossbeam_channel::TrySendError::Disconnected(_) => {
                             debug!("{}-{}: fragment channel disconnected, shutting down", WORKER_NAME, worker_idx);
@@ -207,11 +207,12 @@ fn run(
                     match e {
                         crossbeam_channel::TrySendError::Full(_) => {
                             warn!(
-                                "{}-{}: forwarder channel full, dropping {}:{} from {}, and draining forward channel to make room - consider increasing channel capacities",
+                                "{}-{}: forwarder channel full, dropping {}:{} from {}",
                                 WORKER_NAME, worker_idx, fragment_hash, fragment_index, src,
                             );
-                            // drain channel to make space
-                            relay_receiver.try_iter();
+                            // Do NOT drain the channel — draining destroys all buffered work and
+                            // causes immediate refill, creating a fill→drain→fill loop.
+                            // The relay worker will self-recover at its natural rate.
                         }
                         crossbeam_channel::TrySendError::Disconnected(_) => {
                             debug!("{}-{}: forwarder channel disconnected, shutting down", WORKER_NAME, worker_idx);

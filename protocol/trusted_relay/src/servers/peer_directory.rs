@@ -19,7 +19,9 @@ pub fn create_connected_socket(target: SocketAddr) -> io::Result<UdpSocket> {
 
     // Set large send buffer to match the shared receive socket
     socket.set_send_buffer_size(32 * 1024 * 1024).ok();
-    socket.set_nonblocking(false)?;
+    // Non-blocking so that a full OS send buffer never stalls the relay thread.
+    // A WouldBlock error on send is treated as a best-effort drop in the relay worker.
+    socket.set_nonblocking(true)?;
 
     // Connect to the peer address - this makes send() work without specifying destination
     socket.connect(&target.into())?;

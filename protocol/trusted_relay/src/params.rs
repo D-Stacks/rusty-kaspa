@@ -151,7 +151,7 @@ impl Default for TransportParams {
             default_buffer_size: 2048,
             num_of_collectors: 1,
             num_of_verifiers: 1,
-            num_of_forwarders: 3,
+            num_of_forwarders: 1,
             num_of_broadcasters: 1,
             num_of_coordinators: 1,
             num_of_decoders_per_coordinators: 2,

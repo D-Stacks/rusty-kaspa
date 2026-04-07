@@ -15,9 +15,9 @@ use crate::params::{FragmentationConfig, TransportParams};
 use crate::servers::auth::{AuthToken, TokenAuthenticator};
 use crate::servers::peer_directory::{Allowlist, PeerDirectory};
 use crate::servers::udp_transport::pipeline::reassembly::reassembler::{
-    ReassemblerFragmentMessage, ReassemblerFragmentReceiver, ReassemblerFragmentSender,
+    ReassemblerFragmentMessage, ReassemblerFragmentSender,
 };
-use crate::servers::udp_transport::pipeline::relay::{RelayMessage, RelayReceiver, RelaySender};
+use crate::servers::udp_transport::pipeline::relay::{RelayMessage, RelaySender};
 
 const WORKER_NAME: &str = "verification-worker";
 
@@ -82,12 +82,6 @@ fn run(
     receiver: CrossbeamReceiver<VerificationMessage>,
     reassembly_senders: Vec<ReassemblerFragmentSender>,
     relay_sender: RelaySender,
-
-    // we hold receivers so we can drain them when the channel is full.
-    // this is to prioritize making space for newer fragment / forwarding jobs.
-    // the receivers on the other side are blocking, so they cannot realize and act upon full channel capacity.
-    reassembly_receivers: Vec<ReassemblerFragmentReceiver>,
-    relay_receiver: RelayReceiver, // for graceful shutdown when forwarder disconnects
 
     config: FragmentationConfig,
     allowlist: Allowlist,
@@ -250,9 +244,7 @@ pub fn spawn_verifier_thread(
     authenticator: Arc<TokenAuthenticator>,
     receiver: VerificationReceiver,
     reassembly_senders: Vec<ReassemblerFragmentSender>,
-    reassembly_receivers: Vec<ReassemblerFragmentReceiver>,
     forwarder_senders: RelaySender,
-    forwarder_receivers: RelayReceiver,
     config: FragmentationConfig,
     _transport: TransportParams,
     recent_fragments: RingMap<Hash, FixedBitSet>,
@@ -268,8 +260,6 @@ pub fn spawn_verifier_thread(
                 receiver,
                 reassembly_senders,
                 forwarder_senders,
-                reassembly_receivers,
-                forwarder_receivers,
                 config,
                 directory.allowlist(),
             );

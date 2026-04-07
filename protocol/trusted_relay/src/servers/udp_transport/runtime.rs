@@ -26,7 +26,7 @@ use crate::servers::udp_transport::pipeline::reassembly::reassembler::{
 };
 use crate::servers::udp_transport::pipeline::relay::RelayMessage;
 use crate::servers::udp_transport::pipeline::verification::VerificationMessage;
-use crate::servers::udp_transport::pipeline::{collector, reassembly, verification};
+use crate::servers::udp_transport::pipeline::{collector, reassembly, relay, verification};
 
 struct TransportRuntimeHandles {
     broadcast_handles: Vec<JoinHandle<()>>,
@@ -210,9 +210,7 @@ impl TransportRuntimeInner {
                 authenticator.clone(),
                 receiver.clone(),
                 reassembly_sender_channels.clone(),
-                reassembly_receiver_channels.clone(),
                 forwarder_sender.clone(),
-                forwarder_receiver.clone(),
                 config,
                 params,
                 recent_shards_cache.pop().unwrap(),
@@ -253,6 +251,15 @@ impl TransportRuntimeInner {
                 authenticator.clone(),
                 config,
                 verification_sender_channels.clone(),
+            ));
+        }
+
+        // spawn relay (forwarder) workers
+        for i in 0..params.num_of_forwarders {
+            handles.lock().unwrap().forwarder_handles.push(relay::spawn_relay_thread(
+                i,
+                forwarder_receiver.clone(),
+                directory.clone(),
             ));
         }
 

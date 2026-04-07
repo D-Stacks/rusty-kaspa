@@ -94,18 +94,16 @@ impl TransportParams {
     }
 
     pub fn verification_channel_capacity(&self) -> usize {
-        // Express as item count: number of fragment-sized UDP packets that fit in 32 MiB.
-        // Each fragment on the wire is: MAC (32 bytes) + FragmentHeader (36 bytes) + payload.
-        // Previously this returned BUFFER_SIZE_32MB (33,554,432) as an *item count*, which
-        // caused crossbeam to pre-allocate ~2 GB for this channel alone.
-        let per_fragment_wire_size = self.payload_size + 68; // MAC(32) + FragmentHeader(36)
-        (BUFFER_SIZE_32MB / per_fragment_wire_size) / self.num_of_verifiers.max(1)
+        // Buffer max_concurrent_blocks worth of fragments, split across verifiers.
+        // Consistent with coordinator_receive_channel_capacity: one channel slot per fragment.
+        ((self.max_concurrent_blocks() * self.fragments_per_block() / self.num_of_verifiers.max(1)) as f64 * self.multiplier) as usize
     }
 
     pub fn forwarder_channel_capacity(&self) -> usize {
-        // Same wire-size calculation as verification; one item ≈ one UDP fragment.
-        let per_fragment_wire_size = self.payload_size + 68;
-        BUFFER_SIZE_32MB / per_fragment_wire_size
+        // The relay worker fans out to all outbound peers internally, so this channel carries
+        // exactly one item per validated fragment (not multiplied by peer count).  Size it to
+        // absorb all fragments from max_concurrent_blocks in-flight blocks without dropping.
+        ((self.max_concurrent_blocks() * self.fragments_per_block()) as f64 * self.multiplier) as usize
     }
 
     pub fn broadcast_channel_capacity(&self) -> usize {

@@ -94,15 +94,24 @@ impl TransportParams {
     }
 
     pub fn verification_channel_capacity(&self) -> usize {
-        self.receive_buffer_size() / self.num_of_verifiers
+        // Express as item count: number of fragment-sized UDP packets that fit in 32 MiB.
+        // Each fragment on the wire is: MAC (32 bytes) + FragmentHeader (36 bytes) + payload.
+        // Previously this returned BUFFER_SIZE_32MB (33,554,432) as an *item count*, which
+        // caused crossbeam to pre-allocate ~2 GB for this channel alone.
+        let per_fragment_wire_size = self.payload_size + 68; // MAC(32) + FragmentHeader(36)
+        (BUFFER_SIZE_32MB / per_fragment_wire_size) / self.num_of_verifiers.max(1)
     }
 
     pub fn forwarder_channel_capacity(&self) -> usize {
-        self.send_buffer_size()
+        // Same wire-size calculation as verification; one item ≈ one UDP fragment.
+        let per_fragment_wire_size = self.payload_size + 68;
+        BUFFER_SIZE_32MB / per_fragment_wire_size
     }
 
     pub fn broadcast_channel_capacity(&self) -> usize {
-        self.send_buffer_size()
+        // One item per block (Arc<FtrBlock> + Hash).  Buffer at most max_concurrent_blocks
+        // outstanding broadcast requests; this is a block-granularity queue, not a byte budget.
+        self.max_concurrent_blocks()
     }
 
     pub fn coordinator_receive_channel_capacity(&self) -> usize {
@@ -151,7 +160,10 @@ impl Default for TransportParams {
             multiplier: 1.0,
             consensus_bps: 10,
             consensus_mergeset_root: 1200,
-            consensus_k: 256,
+            // 124 is the correct GHOSTDAG K for mainnet 10 BPS (see Bps::<10>::ghostdag_k()).
+            // Production callers MUST supply the value derived from the live consensus config
+            // (config.ghostdag_k() as usize) rather than relying on this default.
+            consensus_k: 124,
             k: 16,
             m: 4,
             payload_size: 1200,

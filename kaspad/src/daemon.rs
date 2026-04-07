@@ -244,10 +244,11 @@ pub fn create_core(args: Args, fd_total_budget: i32) -> (Arc<Core>, Arc<RpcCoreS
 /// Construct an optional FastTrustedRelay instance based on command-line
 /// arguments. Returns `None` if no incoming/outgoing peers were supplied.
 ///
-/// This helper normalizes the peer addresses using the supplied
-/// `config` (for default ports) and starts the control runtime before
-/// returning.
-pub fn build_fast_trusted_relay(args: &Args) -> Option<FastTrustedRelay> {
+/// `consensus_k` must be the GHOSTDAG K value from the live consensus configuration
+/// (i.e. `config.ghostdag_k() as usize`).  Channel and cache sizes inside the relay
+/// pipeline are proportional to K, so supplying the wrong value leads to significant
+/// over- or under-allocation.
+pub fn build_fast_trusted_relay(args: &Args, consensus_k: usize) -> Option<FastTrustedRelay> {
     if args.trusted_relay_incoming.is_empty() && args.trusted_relay_outgoing.is_empty() {
         return None;
     }
@@ -268,8 +269,12 @@ pub fn build_fast_trusted_relay(args: &Args) -> Option<FastTrustedRelay> {
     let payload = args.udp_payload_size.unwrap_or(1200);
     let frag_cfg = FragmentationConfig::new(k, m, payload);
 
-    let transport =
-        TransportParams { num_of_incoming_peers: incoming.len(), num_of_outgoing_peers: outgoing.len(), ..TransportParams::default() };
+    let transport = TransportParams {
+        num_of_incoming_peers: incoming.len(),
+        num_of_outgoing_peers: outgoing.len(),
+        consensus_k,
+        ..TransportParams::default()
+    };
 
     // listen address for TCP control service; use port 0 so tests and
     // multiple nodes can run concurrently without port conflicts.
@@ -812,7 +817,7 @@ Do you confirm? (y/n)";
     ));
 
     // construct fast-trusted-relay if requested by user
-    let fast_trusted_relay = build_fast_trusted_relay(args);
+    let fast_trusted_relay = build_fast_trusted_relay(args, config.ghostdag_k() as usize);
 
     info!("fast trusted relay: {}", if fast_trusted_relay.is_some() { "enabled" } else { "disabled" });
 

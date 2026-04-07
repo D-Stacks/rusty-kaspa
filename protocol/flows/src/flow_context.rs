@@ -817,10 +817,13 @@ impl FlowContext {
     }
 
     pub async fn insert_block_to_ftr_cache(&self, hash: Hash, block: Block) {
-        self.ftr_blocks.lock().insert(hash, block);
-        if self.ftr_blocks.lock().len() > self.config.ghostdag_k() as usize {
-            // We keep a small cache of recently requested blocks for the fast trusted relay flow. This is to avoid having to fetch them from the consensus manager multiple times in case they are requested multiple times in a short time window, which can happen for popular blocks on high-bps networks. However, we want to keep this cache small to avoid memory bloat, hence we clear it when it exceeds a certain size.
-            let _ = self.ftr_blocks.lock().pop_front();
+        let mut cache = self.ftr_blocks.lock();
+        cache.insert(hash, block);
+        // We keep a small cache of recently received FTR blocks to avoid re-fetching them from
+        // consensus on repeated relay requests.  Use a single lock scope so that the length
+        // check and pop are atomic with respect to concurrent insertions.
+        while cache.len() > self.config.ghostdag_k() as usize {
+            let _ = cache.pop_front();
         }
     }
 

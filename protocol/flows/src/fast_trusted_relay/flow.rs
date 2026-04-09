@@ -15,6 +15,7 @@ use kaspa_p2p_lib::{
 use kaspa_trusted_relay::FastTrustedRelay;
 use kaspa_utils::triggers::Listener;
 use std::sync::Arc;
+use std::time::Duration;
 
 // TODO: implement more intricate orphan handling.
 
@@ -48,6 +49,32 @@ impl HandleFastTrustedRelayFlow {
             let session = self.ctx.consensus().unguarded_session();
             let is_ibd_in_transitional_state = session.async_is_consensus_in_transitional_ibd_state().await;
 
+            // If the relay was stopped (due to IBD or external stop from the v7 relay flow),
+            // check if conditions now allow restarting before we attempt to receive blocks.
+            // Without this, recv_block() would block forever on a stopped relay, since the
+            // restart code below (line ~120) is only reachable AFTER receiving a block.
+            if !self.fast_trusted_relay.is_udp_active().await {
+                let should_stay_stopped =
+                    is_ibd_in_transitional_state || (self.ctx.is_ibd_running() && !self.ctx.should_mine(&session).await);
+
+                if should_stay_stopped {
+                    // IBD still running; wait briefly and re-check before blocking on recv_block()
+                    tokio::select! {
+                        biased;
+                        _ = self.shutdown_listener.clone() => {
+                            info!("{} flow received shutdown signal, exiting gracefully", self.name());
+                            return Ok(());
+                        }
+                        _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                            continue;
+                        }
+                    }
+                } else {
+                    info!("Restarting fast trusted relay UDP transport after IBD completed");
+                    self.fast_trusted_relay.start_fast_relay().await;
+                }
+            }
+
             debug!("Waiting to receive block from fast trusted relay...");
 
             // Use select! to handle graceful shutdown
@@ -67,6 +94,7 @@ impl HandleFastTrustedRelayFlow {
             // We do not sync from fast relay messages, but if in transitional state,
             // toggle the fast relay off.
             if is_ibd_in_transitional_state {
+                let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                 if self.fast_trusted_relay.is_udp_active().await {
                     self.fast_trusted_relay.stop_fast_relay().await;
                 }
@@ -76,11 +104,13 @@ impl HandleFastTrustedRelayFlow {
             match session.async_get_block_status(hash).await {
                 None | Some(BlockStatus::StatusHeaderOnly) => {} // Continue processing this missing inv
                 Some(BlockStatus::StatusInvalid) => {
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     // Report a protocol error
                     warn!("Fast Trusted Relay sent inv of an invalid block {}", hash);
                 }
                 _ => {
                     // Block is already known, skip to next inv
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     debug!("Relay block {} already exists in consensus, skipping", hash);
                     continue;
                 }
@@ -89,10 +119,12 @@ impl HandleFastTrustedRelayFlow {
             match self.ctx.get_orphan_roots_if_known(&session, hash).await {
                 OrphanOutput::Unknown => {} // Keep processing this inv
                 OrphanOutput::NoRoots(_) => {
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     info!("Block {} is already in orphan pool with no missing roots, skipping", hash);
                     continue;
                 }
                 OrphanOutput::Roots(roots) => {
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     // This is a change to the standard relay, Since by its very nature the fast relay is only push based, we cannot enqueue,
                     // hence we just add it to the orphan pool, and let it resolve via std relay flows and logic.
                     info!("Block {} has {} missing parent roots, adding to orphan pool", hash, roots.len());
@@ -102,6 +134,7 @@ impl HandleFastTrustedRelayFlow {
             }
 
             if self.ctx.is_ibd_running() && !self.ctx.should_mine(&session).await {
+                let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                 // we toggle out fast relay off, since we consider it out of sync
                 if self.fast_trusted_relay.is_udp_active().await {
                     self.fast_trusted_relay.stop_fast_relay().await;
@@ -119,6 +152,7 @@ impl HandleFastTrustedRelayFlow {
             // now we start working with consensus blocks
             let block = Block::from(ftr_block);
             if block.is_header_only() {
+                let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                 // TODO: check if this should be unexpected an a warn message.
                 info!("Received header-only block {} from fast relay, skipping", hash);
                 continue;
@@ -131,6 +165,7 @@ impl HandleFastTrustedRelayFlow {
             let broadcast = block.header.blue_work > blue_work_threshold;
 
             if !broadcast {
+                let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                 warn!(
                     "Fast Relay block {} has lower blue work than virtual's merge depth root ({} <= {}), hence we are skipping it",
                     hash, block.header.blue_work, blue_work_threshold
@@ -160,9 +195,14 @@ impl HandleFastTrustedRelayFlow {
                     debug!("Block {} is missing parents: {:?}", hash, missing_parents);
                     // This is a change to the standard relay, the fast relay will not handle orphans and simply add to the orphan pool and continue.
                     self.ctx.add_orphan(&session, block).await;
+                    // Unregister so the standard relay can process this block's roots when
+                    // it receives the inv from a peer (otherwise the hash stays "in processing"
+                    // and the v7 relay skips the inv entirely, preventing orphan root resolution).
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     continue;
                 }
                 Err(rule_error) => {
+                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
                     // We don't issue protocol errors in the fast trusted relay since we consider all peers to be trusted, but we do log unexpected validation errors.
                     warn!("Fast Relay Block {} failed validation, this is unexpected: {}", hash, rule_error);
                     continue;

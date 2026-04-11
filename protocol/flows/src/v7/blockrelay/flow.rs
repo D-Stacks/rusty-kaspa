@@ -8,14 +8,19 @@ use kaspa_consensusmanager::{BlockProcessingBatch, ConsensusProxy};
 use kaspa_core::debug;
 use kaspa_hashes::Hash;
 use kaspa_p2p_lib::{
-    IncomingRoute, Router, SharedIncomingRoute,
+    IncomingRoute, PeerKey, Router, SharedIncomingRoute,
     common::ProtocolError,
     convert::header::{HeaderFormat, Versioned},
     dequeue_with_timeout, dequeue_with_timestamp, make_message, make_request,
     pb::{InvRelayBlockMessage, RequestBlockLocatorMessage, RequestRelayBlocksMessage, kaspad_message::Payload},
 };
 use kaspa_utils::channel::{JobSender, JobTrySendError as TrySendError};
-use std::{collections::VecDeque, sync::Arc, time::Instant};
+use parking_lot::Mutex;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+    time::Instant,
+};
 
 pub struct RelayInvMessage {
     hash: Hash,
@@ -35,11 +40,17 @@ pub struct RelayInvMessage {
 pub struct TwoWayIncomingRoute {
     incoming_route: SharedIncomingRoute,
     indirect_invs: VecDeque<RelayInvMessage>,
+    ftr_orphan_invs: Arc<Mutex<HashMap<PeerKey, VecDeque<Hash>>>>,
+    peer_key: PeerKey,
 }
 
 impl TwoWayIncomingRoute {
-    pub fn new(incoming_route: SharedIncomingRoute) -> Self {
-        Self { incoming_route, indirect_invs: VecDeque::new() }
+    pub fn new(
+        incoming_route: SharedIncomingRoute,
+        ftr_orphan_invs: Arc<Mutex<HashMap<PeerKey, VecDeque<Hash>>>>,
+        peer_key: PeerKey,
+    ) -> Self {
+        Self { incoming_route, indirect_invs: VecDeque::new(), ftr_orphan_invs, peer_key }
     }
 
     pub fn enqueue_indirect_invs<I: IntoIterator<Item = Hash>>(&mut self, iter: I, known_within_range: bool) {
@@ -54,12 +65,24 @@ impl TwoWayIncomingRoute {
 
     pub async fn dequeue(&mut self) -> Result<RelayInvMessage, ProtocolError> {
         if let Some(inv) = self.indirect_invs.pop_front() {
-            Ok(inv)
-        } else {
-            let (msg, ts) = dequeue_with_timestamp!(self.incoming_route, Payload::InvRelayBlock)?;
-            let inv = msg.try_into()?;
-            Ok(RelayInvMessage { hash: inv, is_orphan_root: false, known_within_range: false, timestamp: Some(ts) })
+            return Ok(inv);
         }
+        // Check for FTR orphan invs targeted at this peer (the peer sent an inv for
+        // this hash, confirming it has the block and can provide orphan roots)
+        {
+            let mut guard = self.ftr_orphan_invs.lock();
+            if let Some(queue) = guard.get_mut(&self.peer_key) {
+                if let Some(hash) = queue.pop_front() {
+                    if queue.is_empty() {
+                        guard.remove(&self.peer_key);
+                    }
+                    return Ok(RelayInvMessage { hash, is_orphan_root: true, known_within_range: false, timestamp: None });
+                }
+            }
+        }
+        let (msg, ts) = dequeue_with_timestamp!(self.incoming_route, Payload::InvRelayBlock)?;
+        let inv = msg.try_into()?;
+        Ok(RelayInvMessage { hash: inv, is_orphan_root: false, known_within_range: false, timestamp: Some(ts) })
     }
 }
 
@@ -96,7 +119,16 @@ impl HandleRelayInvsFlow {
         ibd_sender: JobSender<Block>,
         header_format: HeaderFormat,
     ) -> Self {
-        Self { ctx, router, invs_route: TwoWayIncomingRoute::new(invs_route), msg_route, ibd_sender, header_format }
+        let ftr_orphan_invs = ctx.ftr_orphan_invs();
+        let peer_key = router.key();
+        Self {
+            ctx,
+            router,
+            invs_route: TwoWayIncomingRoute::new(invs_route, ftr_orphan_invs, peer_key),
+            msg_route,
+            ibd_sender,
+            header_format,
+        }
     }
 
     async fn start_impl(&mut self) -> Result<(), ProtocolError> {

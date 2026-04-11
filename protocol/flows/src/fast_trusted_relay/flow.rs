@@ -124,11 +124,12 @@ impl HandleFastTrustedRelayFlow {
                     continue;
                 }
                 OrphanOutput::Roots(roots) => {
-                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
-                    // This is a change to the standard relay, Since by its very nature the fast relay is only push based, we cannot enqueue,
-                    // hence we just add it to the orphan pool, and let it resolve via std relay flows and logic.
-                    info!("Block {} has {} missing parent roots, adding to orphan pool", hash, roots.len());
-                    self.ctx.add_orphan(&session, ftr_block.into()).await;
+                    info!("Block {} has {} missing parent roots, handing off to v7 relay for resolution", hash, roots.len());
+                    let block: Block = ftr_block.into();
+                    self.ctx.add_orphan(&session, block).await;
+                    if let Some(peers) = self.ctx.unregister_hash_from_processing_loop(&hash).await {
+                        self.ctx.enqueue_ftr_orphan_invs(hash, &peers);
+                    }
                     continue;
                 }
             }
@@ -193,12 +194,12 @@ impl HandleFastTrustedRelayFlow {
                 Ok(_) => block,
                 Err(RuleError::MissingParents(missing_parents)) => {
                     debug!("Block {} is missing parents: {:?}", hash, missing_parents);
-                    // This is a change to the standard relay, the fast relay will not handle orphans and simply add to the orphan pool and continue.
+                    // Add to orphan pool and hand off to v7 relay flows whose peers registered
+                    // for this hash (sent an inv), so they can request the missing roots safely.
                     self.ctx.add_orphan(&session, block).await;
-                    // Unregister so the standard relay can process this block's roots when
-                    // it receives the inv from a peer (otherwise the hash stays "in processing"
-                    // and the v7 relay skips the inv entirely, preventing orphan root resolution).
-                    let _ = self.ctx.unregister_hash_from_processing_loop(&hash).await;
+                    if let Some(peers) = self.ctx.unregister_hash_from_processing_loop(&hash).await {
+                        self.ctx.enqueue_ftr_orphan_invs(hash, &peers);
+                    }
                     continue;
                 }
                 Err(rule_error) => {

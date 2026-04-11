@@ -52,7 +52,7 @@ use ringmap::RingMap;
 use std::time::Instant;
 use std::{collections::hash_map::Entry, fmt::Display};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, Ipv4Addr},
 };
 use std::{
@@ -270,6 +270,9 @@ pub struct FlowContextInner {
 
     // perigee manager
     pub perigee_manager: Option<Arc<Mutex<PerigeeManager>>>,
+
+    // Per-peer queues of FTR orphan inv hashes for v7 relay flows to process
+    ftr_orphan_invs: Arc<Mutex<HashMap<PeerKey, VecDeque<Hash>>>>,
 }
 
 #[derive(Clone)]
@@ -419,6 +422,7 @@ impl FlowContext {
                 config,
                 mining_rule_engine,
                 perigee_manager,
+                ftr_orphan_invs: Arc::new(Mutex::new(HashMap::new())),
             }),
         }
     }
@@ -467,6 +471,30 @@ impl FlowContext {
 
     pub fn fast_trusted_relay(self) -> Option<FastTrustedRelay> {
         self.fast_trusted_relay.clone()
+    }
+
+    pub fn ftr_orphan_invs(&self) -> Arc<Mutex<HashMap<PeerKey, VecDeque<Hash>>>> {
+        self.ftr_orphan_invs.clone()
+    }
+
+    pub fn enqueue_ftr_orphan_invs(&self, hash: Hash, peers: &HashSet<PeerKey>) {
+        let mut guard = self.ftr_orphan_invs.lock();
+        for &peer in peers {
+            guard.entry(peer).or_default().push_back(hash);
+        }
+    }
+
+    pub fn dequeue_ftr_orphan_inv(&self, peer: &PeerKey) -> Option<Hash> {
+        let mut guard = self.ftr_orphan_invs.lock();
+        if let Some(queue) = guard.get_mut(peer) {
+            let hash = queue.pop_front();
+            if queue.is_empty() {
+                guard.remove(peer);
+            }
+            hash
+        } else {
+            None
+        }
     }
 
     /// Shuts down the fast trusted relay if it exists.

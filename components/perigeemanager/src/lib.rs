@@ -1,5 +1,5 @@
 use std::{
-    cmp::{Ordering, min},
+    cmp::Ordering,
     collections::{HashMap, HashSet, hash_map::Entry},
     fmt::Display,
     net::SocketAddr,
@@ -9,7 +9,7 @@ use std::{
 
 use itertools::Itertools;
 use kaspa_consensus_core::{BlockHashSet, Hash, HashMapCustomHasher};
-use kaspa_core::{debug, info, trace};
+use kaspa_core::{debug, info};
 use kaspa_p2p_lib::{Peer, PeerKey, Router};
 use parking_lot::Mutex;
 use rand::{Rng, seq::IteratorRandom, thread_rng};
@@ -24,43 +24,57 @@ use rand::{Rng, seq::IteratorRandom, thread_rng};
 const BLOCKS_VERIFIED_FAULT_TOLERANCE: f64 = 0.175;
 const IDENT: &str = "PerigeeManager";
 
-/// Holds the score for a peer.
-#[derive(Debug)]
-pub struct PeerScore {
-    p90: u64,
-    p95: u64,
-    p97_5: u64,
+// The fraction of blocks at a given rank level that must be covered by selected peers
+// before advancing to the next rank level during leverage selection.
+const RANK_COVERAGE_THRESHOLD: f64 = 0.95;
+
+/// Holds a rank-based score for a peer.
+/// `rank_counts[i]` = number of blocks where this peer achieved rank `i+1`.
+/// Comparison is lexicographic on rank_counts (more rank-1 wins = better, then rank-2, etc.).
+#[derive(Debug, Clone)]
+pub struct RankScore {
+    rank_counts: Vec<usize>,
 }
 
-impl PeerScore {
-    const MAX: PeerScore = PeerScore { p90: u64::MAX, p95: u64::MAX, p97_5: u64::MAX };
+impl RankScore {
+    const EMPTY: RankScore = RankScore { rank_counts: Vec::new() };
 
-    #[inline(always)]
-    fn new(p90: u64, p95: u64, p97_5: u64) -> Self {
-        PeerScore { p90, p95, p97_5 }
+    fn new(rank_counts: Vec<usize>) -> Self {
+        RankScore { rank_counts }
     }
 }
 
-impl PartialEq for PeerScore {
-    #[inline(always)]
+impl PartialEq for RankScore {
     fn eq(&self, other: &Self) -> bool {
-        (self.p90, self.p95, self.p97_5) == (other.p90, other.p95, other.p97_5)
+        self.rank_counts == other.rank_counts
     }
 }
 
-impl Eq for PeerScore {}
+impl Eq for RankScore {}
 
-impl PartialOrd for PeerScore {
-    #[inline(always)]
+impl PartialOrd for RankScore {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for PeerScore {
-    #[inline(always)]
+impl Ord for RankScore {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.p90, self.p95, self.p97_5).cmp(&(other.p90, other.p95, other.p97_5))
+        // Higher counts at lower rank indices = better.
+        // Compare lexicographically in *reverse* (descending) so more rank-1 wins → Greater (i.e., "better").
+        // We want: peer with more rank-1 wins to be "less" in ordering (selected first),
+        // so we reverse: other's counts compared to self's counts.
+        let max_len = self.rank_counts.len().max(other.rank_counts.len());
+        for i in 0..max_len {
+            let s = if i < self.rank_counts.len() { self.rank_counts[i] } else { 0 };
+            let o = if i < other.rank_counts.len() { other.rank_counts[i] } else { 0 };
+            // More wins at this rank = better = should sort first (Less)
+            match o.cmp(&s) {
+                Ordering::Equal => continue,
+                ord => return ord,
+            }
+        }
+        Ordering::Equal
     }
 }
 
@@ -278,115 +292,109 @@ impl PerigeeManager {
     }
 
     fn leverage(&self, peer_table: &mut HashMap<PeerKey, Vec<u64>>) -> Vec<PeerKey> {
-        // This is a greedy algorithm, and does not guarantee a globally optimal set of peers.
+        // Rank-based greedy leverage algorithm.
+        // For each block, peers are ranked by delay. Selection proceeds rank-by-rank:
+        // at each rank level, pick the peer with the most wins at that rank.
+        // Once selected peers collectively cover ≥95% of blocks at the current rank, advance to the next rank.
+        // Fill remaining slots randomly if ranks are exhausted.
 
         // Sanity check
         assert!(peer_table.len() >= self.config.leverage_target, "Potentially entering an endless loop");
 
-        // We use this Vec to maintain track and ordering of selected peers
-        let mut selected_peers: Vec<Vec<PeerKey>> = Vec::new();
-        let mut num_peers_selected = 0;
-        let mut remaining_table;
+        let num_blocks = peer_table.values().next().map(|v| v.len()).unwrap_or(0);
+        let num_peers = peer_table.len();
 
-        // Counts the outer loop only
-        let mut i = 0;
+        // Build the rank table from delays
+        let rank_table = Self::build_rank_table(peer_table);
 
-        // Outer loop: (re)starts the building of an optimal set of peers from scratch, based on a joint subset scoring mechanism.
-        // Note: This potential repetition is not defined in the original Perigee paper, but even with extensive tie-breaking,
-        // and with large numbers of perigee peers (i.e., a leverage target > 16), building a single optimal set of peers quickly runs out of peers to select.
-        // As such, to ensure we utilize the full leveraging space, we re-run this outer loop
-        // to build additional independent complementary sets of peers, thereby reducing reliance on a single such set of peers.
-        'outer: while num_peers_selected < self.config.leverage_target {
+        // Find the maximum rank (= num_peers in the worst case)
+        let max_rank = num_peers;
+
+        let mut selected_peers: Vec<PeerKey> = Vec::with_capacity(self.config.leverage_target);
+        let mut candidates: HashSet<PeerKey> = peer_table.keys().copied().collect();
+        let mut current_rank: usize = 1;
+
+        // Track which blocks are "covered" at the current rank level by selected peers
+        let coverage_target = (num_blocks as f64 * RANK_COVERAGE_THRESHOLD).ceil() as usize;
+
+        // For coverage tracking: blocks where at least one selected peer has current_rank
+        let mut covered_blocks: HashSet<usize> = HashSet::new();
+
+        while selected_peers.len() < self.config.leverage_target && current_rank <= max_rank {
             debug!(
-                "[{}]: Starting new outer loop iteration for leveraging peers, currently selected {} peers",
-                IDENT, num_peers_selected
+                "[{}]: Leverage rank {} — selected {}/{}, candidates remaining: {}",
+                IDENT,
+                current_rank,
+                selected_peers.len(),
+                self.config.leverage_target,
+                candidates.len()
             );
 
-            selected_peers.push(Vec::new());
+            if candidates.is_empty() {
+                break;
+            }
 
-            // First, we create a new empty selected peer table for this iteration
-            let mut selected_table = HashMap::new();
+            let (best_peer, best_count) = Self::get_top_ranked_peer(&rank_table, &candidates, current_rank);
 
-            // We redefine the remaining table for this iteration as a clone of the original peer table
-            // Note: If we knew that we would not be re-entering this outer loop, we could avoid this clone.
-            remaining_table = peer_table.clone();
+            if best_count == 0 || best_peer.is_none() {
+                // No candidate has any blocks at this rank; advance to next rank
+                debug!("[{}]: No candidates with rank {} blocks, advancing to rank {}", IDENT, current_rank, current_rank + 1);
+                current_rank += 1;
+                covered_blocks.clear();
+                continue;
+            }
 
-            // Start with the last best score as max
-            let mut last_score = PeerScore::MAX;
+            let peer = best_peer.unwrap();
+            selected_peers.push(peer);
+            candidates.remove(&peer);
+            peer_table.remove(&peer);
 
-            // Inner loop: This loop selects peers one by one and rates them based on contributions to advancing the current set's joint score,
-            // it does this until we reach the leverage target, the available peers are exhausted, or until a local optimum is reached.
-            'inner: while num_peers_selected < self.config.leverage_target {
-                trace!(
-                    "[{}]: New inner loop iteration for leveraging peers, currently selected {} peers",
+            // Update coverage: mark blocks where this peer has current_rank
+            if let Some(ranks) = rank_table.get(&peer) {
+                for (block_idx, &r) in ranks.iter().enumerate() {
+                    if r == current_rank {
+                        covered_blocks.insert(block_idx);
+                    }
+                }
+            }
+
+            debug!(
+                "[{}]: Selected peer {:?} with {} rank-{} blocks. Coverage: {}/{}",
+                IDENT,
+                peer,
+                best_count,
+                current_rank,
+                covered_blocks.len(),
+                num_blocks
+            );
+
+            // Check if we've covered enough blocks at this rank level
+            if covered_blocks.len() >= coverage_target {
+                debug!(
+                    "[{}]: Rank {} coverage reached ({:.1}%), advancing to rank {}",
                     IDENT,
-                    selected_peers.get(i).map(|current_set| current_set.len()).unwrap_or(0)
+                    current_rank,
+                    covered_blocks.len() as f64 / num_blocks as f64 * 100.0,
+                    current_rank + 1
                 );
-
-                // Get the top ranked peer from the remaining table
-                let (top_ranked, top_ranked_score) = match self.get_top_ranked_peer(&remaining_table) {
-                    (Some(peer), score) => (peer, score),
-                    _ => {
-                        break 'outer; // no more peers to select from
-                    }
-                };
-
-                if top_ranked_score == last_score {
-                    // Break condition: local optimum reached.
-                    if top_ranked_score == PeerScore::MAX {
-                        // All remaining peers are unrankable; we cannot proceed further.
-                        break 'outer;
-                    } else {
-                        // We have reached a local optimum;
-                        if num_peers_selected < self.config.leverage_target {
-                            // Build additional sets of leveraged peers
-                            break 'inner;
-                        } else {
-                            break 'outer;
-                        }
-                    }
-                }
-
-                selected_table.insert(top_ranked, remaining_table.remove(&top_ranked).unwrap());
-                selected_peers[i].push(top_ranked);
-                num_peers_selected += 1;
-
-                if num_peers_selected == self.config.leverage_target {
-                    // Reached our target
-                    break 'outer;
-                } else {
-                    // Transform the remaining table accounting also for the newly selected peer
-                    self.transform_peer_table(&mut selected_table, &mut remaining_table);
-                }
-                last_score = top_ranked_score;
+                current_rank += 1;
+                covered_blocks.clear();
             }
-
-            // Remove already selected peers from the global peer table
-            for already_selected in selected_peers[i].iter() {
-                peer_table.remove(already_selected);
-            }
-
-            i += 1;
         }
 
-        for already_selected in selected_peers[i].iter() {
-            peer_table.remove(already_selected);
-        }
-
-        if num_peers_selected < self.config.leverage_target {
-            // choose randomly from remaining peers to fill the gap
-            let to_choose = self.config.leverage_target - num_peers_selected;
+        if selected_peers.len() < self.config.leverage_target {
+            // Fill remaining slots randomly from remaining candidates
+            let to_choose = self.config.leverage_target - selected_peers.len();
             debug!("[{}]: Leveraging did not reach intended target, randomly selecting {} remaining peers", IDENT, to_choose);
             let random_keys: Vec<PeerKey> =
                 peer_table.keys().choose_multiple(&mut thread_rng(), to_choose).into_iter().copied().collect();
-
             for pk in random_keys {
-                selected_peers[i].push(pk);
+                selected_peers.push(pk);
                 peer_table.remove(&pk);
             }
         }
 
-        selected_peers.into_iter().flatten().collect()
+        selected_peers
     }
 
     fn excuse(&self, peer_table: &mut HashMap<PeerKey, Vec<u64>>, perigee_peers: &[Peer]) {
@@ -460,79 +468,99 @@ impl PerigeeManager {
             .collect()
     }
 
-    fn rate_peer(&self, values: &[u64]) -> PeerScore {
-        // Rates a peer based on its transformed delay values
+    fn build_rank_table(peer_table: &HashMap<PeerKey, Vec<u64>>) -> HashMap<PeerKey, Vec<usize>> {
+        // Builds a per-block rank table from the delay table.
+        // For each block (column), peers are ranked 1..N by delay (ascending).
+        // Ties share the same rank (standard competition ranking: 1,1,3 not 1,1,2).
+        // Peers with u64::MAX delay get worst rank for that block.
 
-        if values.is_empty() {
-            return PeerScore::MAX;
+        if peer_table.is_empty() {
+            return HashMap::new();
         }
 
-        // Sort values for percentile calculations
-        let sorted_values = {
-            let mut sv = values.to_owned();
-            sv.sort_unstable();
-            sv
-        };
+        let peer_keys: Vec<PeerKey> = peer_table.keys().copied().collect();
+        let num_blocks = peer_table.values().next().map(|v| v.len()).unwrap_or(0);
+        let num_peers = peer_keys.len();
 
-        let len = sorted_values.len();
+        // Initialize rank table
+        let mut rank_table: HashMap<PeerKey, Vec<usize>> = peer_keys.iter().map(|pk| (*pk, Vec::with_capacity(num_blocks))).collect();
 
-        // This is defined as the scoring mechanism in the corresponding original perigee paper.
-        // It favors good connectivity to the bulk of the network while still considering tail-end delays.
-        let p90 = sorted_values[((0.90 * len as f64) as usize).min(len - 1)];
+        #[allow(clippy::needless_range_loop)] // j indexes into per-peer delay vectors across multiple peers
+        for j in 0..num_blocks {
+            // Collect (peer_key, delay) for this block
+            let mut block_delays: Vec<(PeerKey, u64)> = peer_keys.iter().map(|pk| (*pk, peer_table[pk][j])).collect();
 
-        // This is a deviation from the paper;
-        // We rate beyond the p90 to tie-break
-        // Testing has shown that full coverage of the p90 range often only requires ~4-6 perigee peers.
-        // This leaves remaining perigee peers without contribution to latency reduction.
-        // As such, we rate these even deeper into the tail-end delays to try to increase coverage of outlier blocks.
-        let p95 = sorted_values[((0.95 * len as f64) as usize).min(len - 1)];
-        let p97_5 = sorted_values[((0.975 * len as f64) as usize).min(len - 1)];
-        // Beyond p97_5 might be too sensitive to noise.
+            // Sort by delay ascending
+            block_delays.sort_by_key(|&(_, delay)| delay);
 
-        PeerScore::new(p90, p95, p97_5)
+            // Assign competition ranks
+            let mut ranks: HashMap<PeerKey, usize> = HashMap::with_capacity(num_peers);
+            let mut rank = 1;
+            let mut i = 0;
+            while i < block_delays.len() {
+                let current_delay = block_delays[i].1;
+                let group_start = i;
+                // Find all peers with the same delay (tie group)
+                while i < block_delays.len() && block_delays[i].1 == current_delay {
+                    ranks.insert(block_delays[i].0, rank);
+                    i += 1;
+                }
+                // Next distinct delay gets rank = group_start + group_size + 1
+                rank = group_start + (i - group_start) + 1;
+            }
+
+            // Push ranks into the rank table
+            for pk in &peer_keys {
+                rank_table.get_mut(pk).unwrap().push(ranks[pk]);
+            }
+        }
+
+        rank_table
     }
 
-    fn get_top_ranked_peer(&self, peer_table: &HashMap<PeerKey, Vec<u64>>) -> (Option<PeerKey>, PeerScore) {
-        // Finds the peer with the best score in the given peer table
-        let mut best_peer: Option<PeerKey> = None;
-        let mut best_score = PeerScore::MAX;
-        let mut tied_count = 0;
+    fn score_peer_from_ranks(ranks: &[usize], max_rank: usize) -> RankScore {
+        // Counts occurrences of each rank value, producing the rank-count distribution.
+        if ranks.is_empty() {
+            return RankScore::EMPTY;
+        }
+        let mut counts = vec![0usize; max_rank];
+        for &r in ranks {
+            if r >= 1 && r <= max_rank {
+                counts[r - 1] += 1;
+            }
+        }
+        RankScore::new(counts)
+    }
 
-        for (peer, delays) in peer_table.iter() {
-            let score = self.rate_peer(delays);
-            if score < best_score {
-                best_score = score;
-                best_peer = Some(*peer);
-            } else if score == best_score {
-                tied_count += 1;
-                // Randomly replace with probability 1/tied_count
-                // This ensures we don't choose peers based on iteration / HashMap order
-                if thread_rng().gen_ratio(1, tied_count) {
-                    best_peer = Some(*peer);
+    fn get_top_ranked_peer(
+        rank_table: &HashMap<PeerKey, Vec<usize>>,
+        candidates: &HashSet<PeerKey>,
+        current_rank: usize,
+    ) -> (Option<PeerKey>, usize) {
+        // Finds the candidate peer with the most blocks at `current_rank`.
+        // Returns (best_peer, best_count). Random tie-breaking among equals.
+        let mut best_peer: Option<PeerKey> = None;
+        let mut best_count: usize = 0;
+        let mut tied_count: u32 = 0;
+
+        for pk in candidates.iter() {
+            if let Some(ranks) = rank_table.get(pk) {
+                let count = ranks.iter().filter(|&&r| r == current_rank).count();
+                if count > best_count {
+                    best_count = count;
+                    best_peer = Some(*pk);
+                    tied_count = 1;
+                } else if count == best_count && count > 0 {
+                    tied_count += 1;
+                    if thread_rng().gen_ratio(1, tied_count) {
+                        best_peer = Some(*pk);
+                    }
                 }
             }
         }
 
-        debug!(
-            "[{}]: Top ranked peer from current peer table is {:?} with score p90: {}, p95: {}, p97.5: {}",
-            IDENT, best_peer, best_score.p90, best_score.p95, best_score.p97_5,
-        );
-        (best_peer, best_score)
-    }
-
-    fn transform_peer_table(&self, selected_peers: &mut HashMap<PeerKey, Vec<u64>>, candidates: &mut HashMap<PeerKey, Vec<u64>>) {
-        // Transforms the candidate peer table to min(selected peers' delay scores, candidate delay scores)
-        // for each delay score. This is one of the key components of the Perigee algorithm for joint subset selection.
-
-        debug!("[{}]: Transforming peer table", IDENT);
-
-        for j in 0..self.verified_blocks.len() {
-            let selected_min_j = selected_peers.values().map(|vec| vec[j]).min().unwrap();
-            for candidate in candidates.values_mut() {
-                // We transform the delay of candidate at position j to min(candidate_delay_score[j], min(selected_peers_delay_score_at_pos[j])).
-                candidate[j] = min(candidate[j], selected_min_j);
-            }
-        }
+        debug!("[{}]: Top ranked peer at rank {} is {:?} with {} blocks", IDENT, current_rank, best_peer, best_count,);
+        (best_peer, best_count)
     }
 
     fn should_leverage(&self, is_ibd_running: bool, amount_of_contributing_perigee_peers: usize) -> bool {
@@ -613,7 +641,6 @@ impl PerigeeManager {
     }
 
     pub fn log_statistics(&self, peer_by_address: &HashMap<SocketAddr, Peer>) {
-        // Note: this function has been artificially compressed for code-sparsity, as it is not mission critical, but is rather verbose.
         let (perigee_ts, rg_ts): (Vec<_>, Vec<_>) =
             peer_by_address.values().filter(|p| p.is_perigee() || p.is_random_graph()).partition_map(|p| {
                 if p.is_perigee() {
@@ -671,6 +698,22 @@ impl PerigeeManager {
         let pct = |p, t| if t == 0 { 0.0 } else { p as f64 / t as f64 * 100.0 };
         let imp = |p: f64, r: f64| if r == 0.0 { 0.0 } else { (r - p) / r * 100.0 };
 
+        // Build rank distribution for leveraged peers
+        let (mut peer_table, _) = self.build_table(peer_by_address);
+        let rank_table = Self::build_rank_table(&peer_table);
+        let num_peers = peer_table.len();
+        let mut rank_summary = String::new();
+        for pk in self.last_round_leveraged_peers.iter() {
+            if let Some(ranks) = rank_table.get(pk) {
+                let score = Self::score_peer_from_ranks(ranks, num_peers);
+                let top3: Vec<String> =
+                    score.rank_counts.iter().take(3).enumerate().map(|(i, c)| format!("R{}={}", i + 1, c)).collect();
+                rank_summary.push_str(&format!("\n        {:?}: {}", pk, top3.join(", ")));
+            }
+        }
+        // Clean up peer_table to avoid unused warning
+        peer_table.clear();
+
         info!(
             "[{}]\n\
      ════════════════════════════════════════════════════════════════════════════ \n\
@@ -695,6 +738,8 @@ impl PerigeeManager {
       P90                          │ {:9} │ {:12} │ {:7} ({:5.1}%) \n\
       P95                          │ {:9} │ {:12} │                 \n\
       P99                          │ {:9} │ {:12} │                 \n\
+     ════════════════════════════════════════════════════════════════════════════ \n\
+      LEVERAGED PEER RANKS (top 3){}                                              \n\
      ════════════════════════════════════════════════════════════════════════════ ",
             IDENT,
             self.round_counter,
@@ -735,7 +780,8 @@ impl PerigeeManager {
             p95,
             r95,
             p99,
-            r99
+            r99,
+            rank_summary,
         );
     }
 }
@@ -893,12 +939,66 @@ mod tests {
     }
 
     #[test]
-    fn test_peer_rating() {
-        let score = (0..1000).collect::<Vec<u64>>();
-        let manager = PerigeeManager::new(generate_config(), Arc::new(std::sync::atomic::AtomicBool::new(false)));
-        let peer_score = manager.lock().rate_peer(&score);
-        let expected_peer_score = PeerScore::new(900, 950, 975);
-        assert_eq!(peer_score, expected_peer_score);
+    fn test_rank_table_and_scoring() {
+        // Test build_rank_table with known delays and ties
+        // 3 peers, 4 blocks:
+        //   Block 0: peer A=10, peer B=20, peer C=10  → ranks: A=1, C=1, B=3
+        //   Block 1: peer A=50, peer B=30, peer C=40  → ranks: B=1, C=2, A=3
+        //   Block 2: peer A=5,  peer B=5,  peer C=5   → ranks: all=1 (three-way tie)
+        //   Block 3: peer A=MAX,peer B=10, peer C=20  → ranks: B=1, C=2, A=3 (MAX = worst)
+        use kaspa_utils::networking::IpAddress;
+
+        let pk_a = PeerKey::new(PeerId::new(Uuid::from_u128(100)), IpAddress::from(Ipv4Addr::new(10, 0, 0, 1)), 16111);
+        let pk_b = PeerKey::new(PeerId::new(Uuid::from_u128(101)), IpAddress::from(Ipv4Addr::new(10, 0, 0, 2)), 16111);
+        let pk_c = PeerKey::new(PeerId::new(Uuid::from_u128(102)), IpAddress::from(Ipv4Addr::new(10, 0, 0, 3)), 16111);
+
+        let mut peer_table: HashMap<PeerKey, Vec<u64>> = HashMap::new();
+        peer_table.insert(pk_a, vec![10, 50, 5, u64::MAX]);
+        peer_table.insert(pk_b, vec![20, 30, 5, 10]);
+        peer_table.insert(pk_c, vec![10, 40, 5, 20]);
+
+        let rank_table = PerigeeManager::build_rank_table(&peer_table);
+
+        // Verify ranks for peer A: [1, 3, 1, 3]
+        assert_eq!(rank_table[&pk_a], vec![1, 3, 1, 3]);
+        // Verify ranks for peer B: [3, 1, 1, 1]
+        assert_eq!(rank_table[&pk_b], vec![3, 1, 1, 1]);
+        // Verify ranks for peer C: [1, 2, 1, 2]
+        assert_eq!(rank_table[&pk_c], vec![1, 2, 1, 2]);
+
+        // Test scoring from ranks (max_rank = 3)
+        let score_a = PerigeeManager::score_peer_from_ranks(&rank_table[&pk_a], 3);
+        let score_b = PerigeeManager::score_peer_from_ranks(&rank_table[&pk_b], 3);
+        let score_c = PerigeeManager::score_peer_from_ranks(&rank_table[&pk_c], 3);
+
+        // A: rank1=2, rank2=0, rank3=2
+        assert_eq!(score_a.rank_counts, vec![2, 0, 2]);
+        // B: rank1=3, rank2=0, rank3=1
+        assert_eq!(score_b.rank_counts, vec![3, 0, 1]);
+        // C: rank1=2, rank2=2, rank3=0
+        assert_eq!(score_c.rank_counts, vec![2, 2, 0]);
+
+        // Comparison: B best (3 rank-1 wins), then C (2 rank-1 but 2 rank-2), then A (2 rank-1 but 2 rank-3)
+        assert!(score_b < score_c, "B should be better than C (more rank-1 wins)");
+        assert!(score_c < score_a, "C should be better than A (more rank-2 wins)");
+    }
+
+    #[test]
+    fn test_rank_score_ordering() {
+        // More rank-1 wins = better (Less in ordering)
+        let s1 = RankScore::new(vec![10, 5, 2]);
+        let s2 = RankScore::new(vec![8, 7, 2]);
+        assert!(s1 < s2, "More rank-1 wins should be better");
+
+        // Equal rank-1, more rank-2 = better
+        let s3 = RankScore::new(vec![10, 5, 2]);
+        let s4 = RankScore::new(vec![10, 3, 4]);
+        assert!(s3 < s4, "Equal rank-1, more rank-2 should be better");
+
+        // Empty = worst
+        let empty = RankScore::EMPTY;
+        let some = RankScore::new(vec![1, 0, 0]);
+        assert!(some < empty, "Any score should be better than empty");
     }
 
     #[test]
@@ -928,13 +1028,16 @@ mod tests {
             routers.push(router);
         }
 
-        // Insert blocks using a deterministic delay pattern via bucketing ts
+        // Insert blocks using a deterministic delay pattern:
+        // Peers 0..leverage_target get distinct low delays (each peer gets a unique rank per block)
+        // Peers leverage_target..peer_count get very high delays (always worst ranks)
         let leverage_target = manager.lock().config.leverage_target;
         for block_idx in 0..blocks_per_router {
             let block_hash = generate_unique_block_hash();
             let base_ts = now + std::time::Duration::from_millis((block_idx as u64) * 10_000);
             for (i, router) in routers.iter().enumerate() {
                 let ts = if i < leverage_target {
+                    // Each peer gets a unique delay bucket: peer 0 → 0-9ms, peer 1 → 10-19ms, etc.
                     let bucket_start = (i as u64) * 10;
                     let delay = bucket_start + (block_idx as u64 % 10);
                     base_ts + std::time::Duration::from_millis(delay)
@@ -986,5 +1089,87 @@ mod tests {
         // Ensure state is cleared.
         assert!(manager.lock().verified_blocks.is_empty(), "Verified blocks should be cleared after starting new round");
         assert!(manager.lock().first_seen.is_empty(), "First seen timestamps should be cleared after starting new round");
+    }
+
+    #[test]
+    fn test_variable_mining_share() {
+        // Scenario: Peer 0 only reports 30% of blocks but is rank-1 on all of them (fastest).
+        // Peer 1 reports 100% of blocks but is always rank-2 (second fastest).
+        // Peers 2-7 report 100% of blocks with very high delays.
+        // Expectation: Peer 0 should still be selected (rank-1 on its blocks), along with peer 1.
+        kaspa_core::log::try_init_logger("debug");
+
+        let is_ibd_running = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut config = generate_config(); // 8 peers, leverage=4
+        let now = Instant::now() - std::time::Duration::from_secs(3600);
+        let peer_count = config.perigee_outbound_target;
+        let blocks_per_router = 300;
+        config.expected_blocks_per_round = blocks_per_router as u64;
+        let manager = PerigeeManager::new(config, is_ibd_running);
+        let mut routers = Vec::new();
+        for _ in 0..peer_count {
+            routers.push(generate_unique_router(now));
+        }
+
+        let leverage_target = manager.lock().config.leverage_target;
+
+        for block_idx in 0..blocks_per_router {
+            let block_hash = generate_unique_block_hash();
+            let base_ts = now + std::time::Duration::from_millis((block_idx as u64) * 10_000);
+
+            for (i, router) in routers.iter().enumerate() {
+                if i == 0 {
+                    // Peer 0: only reports 30% of blocks, but fastest (delay=1ms) when it does
+                    if block_idx < (blocks_per_router * 30 / 100) {
+                        let ts = base_ts + std::time::Duration::from_millis(1);
+                        manager.lock().insert_perigee_timestamp(router, block_hash, ts, true);
+                    } else {
+                        // Peer 0 does NOT report this block — it will get u64::MAX → worst rank
+                        // But still need to insert for other peers to have data, so insert via other peers only
+                    }
+                } else if i == 1 {
+                    // Peer 1: reports all blocks, second fastest (delay=5ms)
+                    let ts = base_ts + std::time::Duration::from_millis(5);
+                    manager.lock().insert_perigee_timestamp(router, block_hash, ts, true);
+                } else {
+                    // Peers 2-7: all blocks, very slow (delay=100,000ms+)
+                    let ts = base_ts + std::time::Duration::from_millis(100_000 + (i as u64) * 10);
+                    manager.lock().insert_perigee_timestamp(router, block_hash, ts, true);
+                }
+            }
+        }
+
+        // Build peers
+        let mut peer_by_addr = HashMap::new();
+        for router in &routers {
+            let peer = Peer::from((&**router, true));
+            peer_by_addr.insert(peer.net_address(), peer);
+        }
+
+        let (leveraged, evicted, has_leveraged_changed) = manager.lock().evaluate_round(&peer_by_addr);
+        debug!("Variable share test - Leveraged: {:?}", leveraged);
+        debug!("Variable share test - Evicted: {:?}", evicted);
+
+        assert!(has_leveraged_changed, "Should have leveraged");
+        assert_eq!(leveraged.len(), leverage_target);
+
+        // Peer 0 (30% miner) and Peer 1 (100% coverage, rank-2) should both be selected
+        let peer0_key = routers[0].key();
+        let peer1_key = routers[1].key();
+        assert!(leveraged.contains(&peer0_key), "Peer 0 (30% coverage, rank-1 on reported blocks) should be leveraged");
+        assert!(leveraged.contains(&peer1_key), "Peer 1 (100% coverage, rank-2) should be leveraged");
+
+        // Peer 0 should be selected first (it has rank-1 on 30% of blocks, no one else is consistently rank-1)
+        // Actually peer 1 has rank-1 on 70% of blocks where peer 0 didn't report (peer 1 is fastest there)
+        // So at rank-1 level: peer 1 has ~210 rank-1 blocks, peer 0 has ~90 rank-1 blocks
+        // Peer 1 should be selected first at rank-1, then peer 0 should still be selected
+        // (either still at rank-1 if 95% not yet covered, or at rank-2)
+        assert!(
+            leveraged.iter().position(|p| p == &peer1_key).unwrap() < leveraged.iter().position(|p| p == &peer0_key).unwrap(),
+            "Peer 1 (more rank-1 blocks) should be selected before peer 0"
+        );
+
+        // No leveraged peer should be evicted
+        assert!(leveraged.iter().all(|p| !evicted.contains(p)), "No leveraged peer should be evicted");
     }
 }

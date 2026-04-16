@@ -26,7 +26,7 @@ const IDENT: &str = "PerigeeManager";
 
 // The fraction of blocks at a given rank level that must be covered by selected peers
 // before advancing to the next rank level during leverage selection.
-const RANK_COVERAGE_THRESHOLD: f64 = 0.95;
+const RANK_COVERAGE_THRESHOLD: f64 = 1.0;
 
 /// Holds a rank-based score for a peer.
 /// `rank_counts[i]` = number of blocks where this peer achieved rank `i+1`.

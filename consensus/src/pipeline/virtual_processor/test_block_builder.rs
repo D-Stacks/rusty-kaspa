@@ -45,13 +45,22 @@ impl TestBlockBuilder {
         let finality_point = ORIGIN; // No real finality point since we are not actually building virtual here
         let sink = virtual_state.coloring_ghostdag_data.selected_parent;
         let mut accumulated_diff = virtual_state.utxo_diff.clone().to_reversed();
+        let dk_active = self.dagknight_activation.is_active(virtual_state.daa_score);
         // Same sink search as resolve_virtual: DK v2 writes pruning samples for the
         // coloring selected parent. GHOSTDAG v1 can pick a different sink, then DK
         // coloring SP has no PruningSamples row and expected_header_pruning_point panics.
-        let (pov_sink, virtual_parent_candidates) = if self.dagknight_activation.is_active(virtual_state.daa_score) {
-            self.sink_search_algorithm_v2(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point)
+        let (pov_sink, virtual_parent_candidates) = if dk_active {
+            self.sink_search_algorithm_v2(
+                &virtual_read,
+                &mut accumulated_diff,
+                sink,
+                parents,
+                finality_point,
+                pruning_point,
+                dk_active,
+            )
         } else {
-            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point)
+            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point, dk_active)
         };
         let (pov_virtual_parents, pov_virtual_topology_ghostdag_data, pov_virtual_coloring_ghostdag_data) =
             self.pick_virtual_parents(pov_sink, virtual_parent_candidates, pruning_point, false);

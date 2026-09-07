@@ -354,8 +354,12 @@ impl VirtualStateProcessor {
             )
         };
 
-        let (virtual_parents, virtual_topology_ghostdag_data, virtual_coloring_ghostdag_data) =
-            self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point, dk_active);
+        let (virtual_parents, virtual_topology_ghostdag_data, virtual_coloring_ghostdag_data) = if dk_active {
+            // TODO [DK], no need to re-run this here, we can return this data directly from ssav2.
+            self.pick_virtual_parents_v2(new_sink, virtual_parent_candidates, pruning_point, dk_active)
+        } else {
+            self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point, dk_active)
+        };
 
         assert_eq!(virtual_coloring_ghostdag_data.selected_parent, new_sink);
 

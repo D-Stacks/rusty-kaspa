@@ -340,25 +340,16 @@ impl VirtualStateProcessor {
                 pre_filtered_tips,
                 finality_point,
                 pruning_point,
-                dk_active,
             )
         } else {
-            self.sink_search_algorithm(
-                &virtual_read,
-                &mut accumulated_diff,
-                prev_sink,
-                tips.clone(),
-                finality_point,
-                pruning_point,
-                dk_active,
-            )
+            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, prev_sink, tips.clone(), finality_point, pruning_point)
         };
 
         let (virtual_parents, virtual_topology_ghostdag_data, virtual_coloring_ghostdag_data) = if dk_active {
             // TODO [DK], no need to re-run this here, we can return this data directly from ssav2.
-            self.pick_virtual_parents_v2(new_sink, virtual_parent_candidates, pruning_point, dk_active)
+            self.pick_virtual_parents_v2(new_sink, virtual_parent_candidates, pruning_point)
         } else {
-            self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point, dk_active)
+            self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point)
         };
 
         assert_eq!(virtual_coloring_ghostdag_data.selected_parent, new_sink);
@@ -1051,7 +1042,6 @@ impl VirtualStateProcessor {
         tips: Vec<Hash>,
         finality_point: Hash,
         pruning_point: Hash,
-        dk_active: bool,
     ) -> (Hash, VecDeque<Hash>) {
         // TODO (relaxed): additional tests
 
@@ -1120,11 +1110,7 @@ impl VirtualStateProcessor {
         tips: Vec<Hash>,
         finality_point: Hash,
         pruning_point: Hash,
-        dk_active: bool,
     ) -> (Hash, VecDeque<Hash>) {
-        // TODO [post-DK cleanp-up]: remove this assertion
-        assert!(dk_active, "Dagknight must be active in `sink_search_algorithm_v2`");
-
         // TODO (relaxed): additional tests
 
         let mut tip_set = tips.into_iter().collect::<BlockHashSet>();
@@ -1156,7 +1142,7 @@ impl VirtualStateProcessor {
 
                 // v2 is only invoked when DAGKnight is active
                 let (parents, _, _) =
-                    self.pick_virtual_parents_v2(inner_candidate, conflict_ordered_parents.clone().into(), pruning_point, dk_active);
+                    self.pick_virtual_parents_v2(inner_candidate, conflict_ordered_parents.clone().into(), pruning_point);
 
                 let mut parents_no_sp = BlockHashSet::from(parents.iter().copied().collect());
                 let cg_hashset = BlockHashSet::from(conflict_ordered_parents.iter().copied().collect());
@@ -1229,7 +1215,6 @@ impl VirtualStateProcessor {
         selected_parent: Hash,
         mut candidates: VecDeque<Hash>,
         pruning_point: Hash,
-        dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
         // TODO (relaxed): additional tests
 
@@ -1273,7 +1258,7 @@ impl VirtualStateProcessor {
             if mergeset_size >= mergeset_size_limit || virtual_parents.len() >= max_block_parents {
                 break;
             }
-            match self.mergeset_increase(&virtual_parents, candidate, mergeset_size_limit - mergeset_size, dk_active) {
+            match self.mergeset_increase(&virtual_parents, candidate, mergeset_size_limit - mergeset_size) {
                 MergesetIncreaseResult::Accepted { increase_size } => {
                     mergeset_size += increase_size;
                     virtual_parents.push(candidate);
@@ -1291,7 +1276,7 @@ impl VirtualStateProcessor {
         }
         assert!(mergeset_size <= mergeset_size_limit);
         assert!(virtual_parents.len() <= max_block_parents);
-        self.remove_bounded_merge_breaking_parents(virtual_parents, pruning_point, dk_active)
+        self.remove_bounded_merge_breaking_parents(virtual_parents, pruning_point)
     }
 
     /// Picks the virtual parents according to virtual parent selection pruning constrains.
@@ -1305,11 +1290,7 @@ impl VirtualStateProcessor {
         selected_parent: Hash,
         mut candidates: VecDeque<Hash>,
         pruning_point: Hash,
-        dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
-        // TODO [post-DK cleanp-up] remove this assertion
-        assert!(dk_active, "Dagknight must be active in `pick_virtual_parents_v2`");
-
         // TODO (relaxed): additional tests
 
         // Mergeset increasing might traverse DAG areas which are below the finality point and which theoretically
@@ -1352,7 +1333,7 @@ impl VirtualStateProcessor {
             if mergeset_size >= mergeset_size_limit || virtual_parents.len() >= max_block_parents {
                 break;
             }
-            match self.mergeset_increase_v2(&virtual_parents, candidate, mergeset_size_limit - mergeset_size, dk_active) {
+            match self.mergeset_increase_v2(&virtual_parents, candidate, mergeset_size_limit - mergeset_size) {
                 MergesetIncreaseResult::Accepted { increase_size } => {
                     mergeset_size += increase_size;
                     virtual_parents.push(candidate);
@@ -1370,11 +1351,11 @@ impl VirtualStateProcessor {
         }
         assert!(mergeset_size <= mergeset_size_limit);
         assert!(virtual_parents.len() <= max_block_parents);
-        self.remove_bounded_merge_breaking_parents_v2(virtual_parents, pruning_point, dk_active)
+        self.remove_bounded_merge_breaking_parents_v2(virtual_parents, pruning_point)
     }
 
     /// TODO [post-DK cleanp-up] remove this function.
-    fn mergeset_increase(&self, selected_parents: &[Hash], candidate: Hash, budget: u64, dk_active: bool) -> MergesetIncreaseResult {
+    fn mergeset_increase(&self, selected_parents: &[Hash], candidate: Hash, budget: u64) -> MergesetIncreaseResult {
         /*
         Algo:
             Traverse past(candidate) \setminus past(selected_parents) and make
@@ -1406,21 +1387,12 @@ impl VirtualStateProcessor {
     }
 
     /// TODO [post-DK cleanp-up] consider removing the `_v2` suffix.
-    fn mergeset_increase_v2(
-        &self,
-        selected_parents: &[Hash],
-        candidate: Hash,
-        budget: u64,
-        dk_active: bool,
-    ) -> MergesetIncreaseResult {
+    fn mergeset_increase_v2(&self, selected_parents: &[Hash], candidate: Hash, budget: u64) -> MergesetIncreaseResult {
         /*
         Algo:
             Traverse past(candidate) \setminus past(selected_parents) and make
             sure the increase in mergeset size is within the available budget
         */
-
-        // TODO [post-DK cleanp-up]: remove this assertion.
-        assert!(dk_active, "Dagknight must be active in `mergeset_increase_v2`");
 
         let candidate_parents = self.relations_service.get_parents(candidate).unwrap();
         let mut queue: VecDeque<_> = candidate_parents.iter().copied().collect();
@@ -1451,7 +1423,6 @@ impl VirtualStateProcessor {
         &self,
         mut virtual_parents: Vec<Hash>,
         current_pruning_point: Hash,
-        dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
         let mut topology_ghostdag_data = self.topology_ghostdag_manager.ghostdag(&virtual_parents);
         let mut coloring_ghostdag_data = self.coloring_ghostdag_manager.ghostdag(&virtual_parents);
@@ -1493,11 +1464,7 @@ impl VirtualStateProcessor {
         &self,
         mut virtual_parents: Vec<Hash>,
         current_pruning_point: Hash,
-        dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
-        // TODO [post-DK cleanp-up]: remove this assertion
-        assert!(dk_active, "Dagknight must be active in `remove_bounded_merge_breaking_parents_v2`");
-
         let mut topology_ghostdag_data = self.topology_ghostdag_manager.ghostdag(&virtual_parents);
         let mut coloring_ghostdag_data = {
             let DagknightData { selected_parent: dk_sp, .. } = self.dagknight_executor.dagknight(&virtual_parents);

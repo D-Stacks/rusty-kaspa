@@ -50,20 +50,15 @@ impl TestBlockBuilder {
         // coloring selected parent. GHOSTDAG v1 can pick a different sink, then DK
         // coloring SP has no PruningSamples row and expected_header_pruning_point panics.
         let (pov_sink, virtual_parent_candidates) = if dk_active {
-            self.sink_search_algorithm_v2(
-                &virtual_read,
-                &mut accumulated_diff,
-                sink,
-                parents,
-                finality_point,
-                pruning_point,
-                dk_active,
-            )
+            self.sink_search_algorithm_v2(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point)
         } else {
-            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point, dk_active)
+            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point)
         };
-        let (pov_virtual_parents, pov_virtual_topology_ghostdag_data, pov_virtual_coloring_ghostdag_data) =
-            self.pick_virtual_parents(pov_sink, virtual_parent_candidates, pruning_point, false);
+        let (pov_virtual_parents, pov_virtual_topology_ghostdag_data, pov_virtual_coloring_ghostdag_data) = if dk_active {
+            self.pick_virtual_parents_v2(pov_sink, virtual_parent_candidates, pruning_point)
+        } else {
+            self.pick_virtual_parents(pov_sink, virtual_parent_candidates, pruning_point)
+        };
         let pov_sink_multiset = self.utxo_multisets_store.get(pov_sink).unwrap();
         let pov_virtual_state = self.calculate_virtual_state(
             &virtual_read,

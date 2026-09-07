@@ -1053,8 +1053,6 @@ impl VirtualStateProcessor {
         pruning_point: Hash,
         dk_active: bool,
     ) -> (Hash, VecDeque<Hash>) {
-        assert!(!dk_active, "Dagknight must not be active in `sink_search_algorithm`");
-
         // TODO (relaxed): additional tests
 
         let mut heap = tips
@@ -1233,8 +1231,6 @@ impl VirtualStateProcessor {
         pruning_point: Hash,
         dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
-        assert!(!dk_active, "Dagknight must not be active in `pick_virtual_parents`");
-
         // TODO (relaxed): additional tests
 
         // Mergeset increasing might traverse DAG areas which are below the finality point and which theoretically
@@ -1385,8 +1381,6 @@ impl VirtualStateProcessor {
             sure the increase in mergeset size is within the available budget
         */
 
-        assert!(!dk_active, "Dagknight must not be active in `mergeset_increase`");
-
         let candidate_parents = self.relations_service.get_parents(candidate).unwrap();
         let mut queue: VecDeque<_> = candidate_parents.iter().copied().collect();
         let mut visited: BlockHashSet = queue.iter().copied().collect();
@@ -1459,8 +1453,6 @@ impl VirtualStateProcessor {
         current_pruning_point: Hash,
         dk_active: bool,
     ) -> (Vec<Hash>, GhostdagData, GhostdagData) {
-        assert!(!dk_active, "Dagknight must not be active in `remove_bounded_merge_breaking_parents`");
-
         let mut topology_ghostdag_data = self.topology_ghostdag_manager.ghostdag(&virtual_parents);
         let mut coloring_ghostdag_data = self.coloring_ghostdag_manager.ghostdag(&virtual_parents);
         let merge_depth_root = self.depth_manager.calc_merge_depth_root(&coloring_ghostdag_data, current_pruning_point);

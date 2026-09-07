@@ -1352,7 +1352,7 @@ impl VirtualStateProcessor {
             if mergeset_size >= mergeset_size_limit || virtual_parents.len() >= max_block_parents {
                 break;
             }
-            match self.mergeset_increase(&virtual_parents, candidate, mergeset_size_limit - mergeset_size, dk_active) {
+            match self.mergeset_increase_v2(&virtual_parents, candidate, mergeset_size_limit - mergeset_size, dk_active) {
                 MergesetIncreaseResult::Accepted { increase_size } => {
                     mergeset_size += increase_size;
                     virtual_parents.push(candidate);
@@ -1370,7 +1370,7 @@ impl VirtualStateProcessor {
         }
         assert!(mergeset_size <= mergeset_size_limit);
         assert!(virtual_parents.len() <= max_block_parents);
-        self.remove_bounded_merge_breaking_parents(virtual_parents, pruning_point, dk_active)
+        self.remove_bounded_merge_breaking_parents_v2(virtual_parents, pruning_point, dk_active)
     }
 
     /// TODO [post-DK cleanp-up] remove this function.

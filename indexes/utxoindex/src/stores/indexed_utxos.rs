@@ -536,7 +536,7 @@ mod tests {
             .get_utxos_from_script_public_keys_by_daa_score_page(
                 Vec::<ScriptPublicKey>::from_iter([script.clone()]),
                 0..=u64::MAX,
-                cursor1.map(|c| c.clone()),
+                cursor1.cloned(),
                 Some(2),
             )
             .unwrap();

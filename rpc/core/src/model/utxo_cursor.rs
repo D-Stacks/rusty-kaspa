@@ -2,7 +2,6 @@ use crate::{RpcAddress, RpcError, RpcTransactionOutpoint};
 use borsh::{BorshDeserialize, BorshSerialize};
 use kaspa_addresses::Prefix;
 use kaspa_consensus_core::tx::TransactionOutpoint;
-use kaspa_consensus_wasm::error::Error::AddressError;
 use kaspa_index_core::indexed_utxos::UtxoPageCursor;
 use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script};
 use serde::{Deserialize, Serialize};

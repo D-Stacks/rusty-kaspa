@@ -24,8 +24,8 @@ use kaspa_consensus_core::{Hash, network::NetworkId};
 use kaspa_core::debug;
 use kaspa_notify::subscription::Command;
 use kaspa_rpc_core::{
-    RpcContextualPeerAddress, RpcDataVerbosityLevel, RpcError, RpcExtraData, RpcGetUtxosByAddressesCursor, RpcHash, RpcIpAddress,
-    RpcNetworkType, RpcPeerAddress, RpcResult, SubmitBlockRejectReason, SubmitBlockReport,
+    RpcContextualPeerAddress, RpcDataVerbosityLevel, RpcError, RpcExtraData, RpcHash, RpcIpAddress, RpcNetworkType, RpcPeerAddress,
+    RpcResult, SubmitBlockRejectReason, SubmitBlockReport,
 };
 use kaspa_utils::hex::*;
 use std::{str::FromStr, sync::Arc};

@@ -1,7 +1,6 @@
 use crate::model::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use kaspa_consensus_core::api::stats::BlockCount;
-use kaspa_consensus_core::tx::TransactionIndexType;
 use kaspa_core::debug;
 use kaspa_notify::subscription::{Command, context::SubscriptionContext, single::UtxosChangedSubscription};
 use kaspa_utils::hex::ToHex;

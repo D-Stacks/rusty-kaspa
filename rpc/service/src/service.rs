@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use kaspa_consensus_core::api::counters::ProcessingCounters;
 use kaspa_consensus_core::daa_score_timestamp::DaaScoreTimestamp;
 use kaspa_consensus_core::errors::block::RuleError;
-use kaspa_consensus_core::tx::{TransactionOutpoint, TransactionQueryResult, TransactionType};
+use kaspa_consensus_core::tx::{TransactionQueryResult, TransactionType};
 use kaspa_consensus_core::utxo::utxo_inquirer::UtxoInquirerError;
 use kaspa_consensus_core::{
     block::Block,

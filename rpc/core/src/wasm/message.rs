@@ -1297,10 +1297,7 @@ declare! {
         addresses : Address[] | string[];
         fromDaaScore? : bigint;
         toDaaScore? : bigint;
-        startAddress? : Address | string;
-        startDaaScore? : bigint;
-        startOutpointHash? : HexString;
-        startOutpointIndex? : bigint;
+        cursor? : IRpcGetUtxosByAddressesCursor;
         limit? : bigint;
     }
     "#,
@@ -1320,10 +1317,7 @@ declare! {
      */
     export interface IGetUtxosByAddressesV2Response {
         entries : UtxoEntryReference[];
-        nextAddress? : Address | string;
-        nextDaaScore? : bigint;
-        nextOutpointHash? : HexString;
-        nextOutpointIndex? : bigint;
+        nextCursor? : IRpcGetUtxosByAddressesCursor;
     }
     "#,
 }

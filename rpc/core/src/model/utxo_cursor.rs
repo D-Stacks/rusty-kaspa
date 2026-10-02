@@ -62,3 +62,23 @@ impl From<RpcGetUtxosByAddressesCursor> for UtxoPageCursor {
         }
     }
 }
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "wasm32-sdk")] {
+        use wasm_bindgen::prelude::*;
+
+        #[wasm_bindgen(typescript_custom_section)]
+        const TS_RPC_GET_UTXOS_BY_ADDRESSES_CURSOR: &'static str = r#"
+            /**
+             * Cursor for paginating through UTXOs by address.
+             *
+             * @category Node RPC
+             */
+            export interface IRpcGetUtxosByAddressesCursor {
+                startAddress : Address | string;
+                startDaaScore : bigint;
+                startOutpoint? : ITransactionOutpoint;
+            }
+        "#;
+    }
+}

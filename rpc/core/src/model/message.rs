@@ -1517,7 +1517,7 @@ pub struct GetUtxosByAddressesV2Request {
     pub to_daa_score: Option<u64>,
     // Cursor start position; None starts from the beginning.
     pub cursor: Option<RpcGetUtxosByAddressesCursor>,
-    /// Soft cap on entries; None means no limit, and a page may exceed this to finish the current script public key + DAA-score group.
+    // Maximum number of entries to return; None defaults to 1k entries. >5k entries requires `--unsaferpc` flag on a default node.
     pub limit: Option<usize>,
 }
 

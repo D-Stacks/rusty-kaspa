@@ -28,7 +28,7 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey>;
 
     /// Retrieve ordered UTXOs for multiple script public keys with cursor pagination.
-    fn get_utxos_by_script_public_keys_by_daa_score_page(
+    fn get_utxos_from_script_public_keys_by_daa_score_page(
         &self,
         script_public_keys: Vec<ScriptPublicKey>,
         daa_score_range: RangeInclusive<u64>,
@@ -83,7 +83,7 @@ impl UtxoIndexProxy {
         spawn_blocking(move || self.inner.read().get_utxos_by_script_public_keys(script_public_keys)).await.unwrap()
     }
 
-    pub async fn get_utxos_by_script_public_keys_by_daa_score_page(
+    pub async fn get_utxos_from_script_public_keys_by_daa_score_page(
         self,
         script_public_keys: Vec<ScriptPublicKey>,
         daa_score_range: RangeInclusive<u64>,
@@ -91,7 +91,7 @@ impl UtxoIndexProxy {
         limit: Option<usize>,
     ) -> UtxoIndexResult<OrderedUtxoEntriesPage> {
         spawn_blocking(move || {
-            self.inner.read().get_utxos_by_script_public_keys_by_daa_score_page(script_public_keys, daa_score_range, cursor, limit)
+            self.inner.read().get_utxos_from_script_public_keys_by_daa_score_page(script_public_keys, daa_score_range, cursor, limit)
         })
         .await
         .unwrap()

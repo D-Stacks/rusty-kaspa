@@ -81,7 +81,7 @@ impl Store {
         self.utxos_by_script_public_key_store.get_utxos_from_script_public_keys(script_public_keys)
     }
 
-    pub fn get_utxos_by_script_public_keys_by_daa_score_page(
+    pub fn get_utxos_from_script_public_keys_by_daa_score_page(
         &self,
         script_public_keys: Vec<ScriptPublicKey>,
         daa_score_range: RangeInclusive<u64>,

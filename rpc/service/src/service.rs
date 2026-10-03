@@ -292,7 +292,7 @@ impl RpcCoreService {
         self.utxoindex
             .clone()
             .unwrap()
-            .get_utxos_by_script_public_keys_by_daa_score_page(
+            .get_utxos_from_script_public_keys_by_daa_score_page(
                 addresses.map(pay_to_address_script).collect(),
                 daa_score_range,
                 cursor,

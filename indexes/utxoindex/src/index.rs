@@ -73,7 +73,7 @@ impl UtxoIndexApi for UtxoIndex {
         self.store.get_utxos_by_script_public_keys(script_public_keys)
     }
 
-    fn get_utxos_by_script_public_keys_by_daa_score_page(
+    fn get_utxos_from_script_public_keys_by_daa_score_page(
         &self,
         script_public_keys: Vec<ScriptPublicKey>,
         daa_score_range: RangeInclusive<u64>,
@@ -81,7 +81,7 @@ impl UtxoIndexApi for UtxoIndex {
         limit: Option<usize>,
     ) -> UtxoIndexResult<OrderedUtxoEntriesPage> {
         trace!("[{0}] retrieving utxos by daa-score range for {1} script public keys (paged)", IDENT, script_public_keys.len());
-        self.store.get_utxos_by_script_public_keys_by_daa_score_page(script_public_keys, daa_score_range, cursor, limit)
+        self.store.get_utxos_from_script_public_keys_by_daa_score_page(script_public_keys, daa_score_range, cursor, limit)
     }
 
     /// Retrieve utxos by script public keys from the utxoindex db.

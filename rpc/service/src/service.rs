@@ -833,7 +833,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
     async fn get_utxos_by_addresses_v2_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        request: GetUtxosByAddressesV2Request,
+        mut request: GetUtxosByAddressesV2Request,
     ) -> RpcResult<GetUtxosByAddressesV2Response> {
         if !self.config.utxoindex {
             return Err(RpcError::NoUtxoIndex);
@@ -858,22 +858,35 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             return Err(RpcError::InvalidGetUtxosByAddressesV2Request("limit must be greater than zero".to_string()));
         }
 
-        if request.cursor.as_ref().is_some_and(|c| c.start_address != request.addresses[0]) {
-            return Err(RpcError::InvalidGetUtxosByAddressesV2Request(
-                "cursor start address must match the first address in the request's address list".to_string(),
-            ));
-        }
+        // Some checks and preparations for the cursor and DAA score range.
+        let (from_daa_score, to_daa_score) = if let Some(ref mut cursor) = request.cursor {
+            let request_first_address = request.addresses[0].clone();
+            if cursor.start_address.is_none() {
+                // point the start address of the cursor to the first address in the request if it is not already set.
+                cursor.start_address = Some(request_first_address.clone());
+            } else if cursor.start_address != Some(request_first_address.clone()) {
+                // if set manually, it must match the first address in the request's address list.
+                return Err(RpcError::InvalidGetUtxosByAddressesV2Request(
+                    "cursor start address must match the first address in the request's address list".to_string(),
+                ));
+            };
 
-        let from_daa_score = request.from_daa_score.unwrap_or(0);
-        let to_daa_score = request.to_daa_score.unwrap_or(u64::MAX);
+            // make sure cursor's start DAA score is within the specified DAA score range.
+            let from_daa_score = request.from_daa_score.unwrap_or(0);
+            let to_daa_score = request.to_daa_score.unwrap_or(u64::MAX);
 
-        // a start defined outside of the specified range is invalid.
-        if request.cursor.as_ref().is_some_and(|c| c.start_daa_score < from_daa_score || c.start_daa_score > to_daa_score) {
-            return Err(RpcError::InvalidGetUtxosByAddressesV2Request(format!(
-                "cursor.daa_score {} must be within from_daa_score and to_daa_score",
-                request.cursor.as_ref().map(|c| c.start_daa_score).unwrap_or(0)
-            )));
-        }
+            if cursor.start_daa_score < from_daa_score || cursor.start_daa_score > to_daa_score {
+                return Err(RpcError::InvalidGetUtxosByAddressesV2Request(format!(
+                    "cursor.daa_score {} must be within from_daa_score and to_daa_score",
+                    cursor.start_daa_score
+                )));
+            }
+            // return the DAA score range for further processing.
+            (from_daa_score, to_daa_score)
+        } else {
+            // return the DAA score range for further processing.
+            (request.from_daa_score.unwrap_or(0), request.to_daa_score.unwrap_or(u64::MAX))
+        };
 
         let session = self.consensus_manager.consensus().unguarded_session();
         // do not retrieve utxos while in unstable ibd state.
@@ -885,7 +898,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             .get_ordered_utxo_set_by_script_public_key_page(
                 request.addresses.iter(),
                 from_daa_score..=to_daa_score,
-                request.cursor.map(|r| r.into()),
+                request.cursor.map(|r| r.try_into()).transpose()?,
                 Some(limit),
             )
             .await?;

@@ -327,7 +327,7 @@ impl Rpc {
 
                 if args.len() < 8 {
                     return Err(Error::custom(
-                        "Usage: rpc get-utxos-by-addresses-v2 <addr...> <from_daa_score|None> <to_daa_score|None> <start_address|None> <start_daa_score|None> <start_outpoint_transaction_id|None> <start_outpoint_index|None> <limit|None>",
+                        "Usage: rpc get-utxos-by-addresses-v2 <addr...> <from_daa_score|None> <to_daa_score|None> <start_address|None(defaults-to-first-address)> <start_daa_score|None> <start_outpoint_transaction_id|None> <start_outpoint_index|None> <limit|None>",
                     ));
                 }
 
@@ -365,13 +365,9 @@ impl Rpc {
                     && start_daa_score.is_none()
                 {
                     None
-                } else if start_outpoint_index.is_some()
-                    && start_outpoint_transaction_id.is_some()
-                    && start_address.is_some()
-                    && start_daa_score.is_some()
-                {
+                } else if start_outpoint_index.is_some() && start_outpoint_transaction_id.is_some() && start_daa_score.is_some() {
                     Some(RpcGetUtxosByAddressesCursor::new(
-                        start_address.ok_or(RpcError::General("no start address specified".to_string()))?,
+                        start_address,
                         start_daa_score.ok_or(RpcError::General("no start_daa_score specified for cursor".to_string()))?,
                         Some(RpcTransactionOutpoint {
                             transaction_id: start_outpoint_transaction_id
@@ -381,7 +377,9 @@ impl Rpc {
                         }),
                     ))
                 } else {
-                    return Err(Error::custom("incomplete cursor parameters".to_string()));
+                    return Err(Error::custom(
+                        "incomplete cursor parameters; start_address may be None, but start_daa_score and start_outpoint must be provided together".to_string(),
+                    ));
                 };
 
                 let addresses = args.iter().map(|s| Address::try_from(s.as_str())).collect::<std::result::Result<Vec<_>, _>>()?;

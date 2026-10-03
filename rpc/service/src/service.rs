@@ -858,6 +858,12 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             return Err(RpcError::InvalidGetUtxosByAddressesV2Request("limit must be greater than zero".to_string()));
         }
 
+        if request.cursor.as_ref().is_some_and(|c| c.start_address != request.addresses[0]) {
+            return Err(RpcError::InvalidGetUtxosByAddressesV2Request(
+                "cursor start address must match the first address in the request's address list".to_string(),
+            ));
+        }
+
         let from_daa_score = request.from_daa_score.unwrap_or(0);
         let to_daa_score = request.to_daa_score.unwrap_or(u64::MAX);
 

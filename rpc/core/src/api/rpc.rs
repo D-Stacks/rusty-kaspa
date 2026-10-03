@@ -17,7 +17,9 @@ pub const MAX_SAFE_WINDOW_SIZE: u32 = 10_000;
 
 // constants pertaining to the get_utxos_by_addresses_v2 RPC method
 pub const MAX_SAFE_GET_UTXOS_BY_ADDRESSES_V2_PAGE_SIZE: usize = 5_000;
-pub const MAX_SAFE_GET_UTXOS_BY_ADDRESSES_V2_ADDRESS_COUNT: usize = 1_000;
+// same as [`MAX_SAFE_GET_UTXOS_BY_ADDRESSES_V2_PAGE_SIZE`], setting this higher has little practical effect,
+// if we assume each address has a least one utxo
+pub const MAX_SAFE_GET_UTXOS_BY_ADDRESSES_V2_ADDRESS_COUNT: usize = 5_000;
 pub const DEFAULT_GET_UTXOS_BY_ADDRESSES_V2_LIMIT: usize = 1_000;
 
 /// Client RPC Api

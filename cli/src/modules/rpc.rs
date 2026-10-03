@@ -325,9 +325,9 @@ impl Rpc {
             RpcApiOps::GetUtxosByAddressesV2 => {
                 let mut args = argv;
 
-                if args.len() < 6 {
+                if args.len() < 8 {
                     return Err(Error::custom(
-                        "Usage: rpc get-utxos-by-addresses-v2 <addr...> <from_daa_score|None> <to_daa_score|None> <start_address|None> <start_daa_score|None> <limit|None> (limit is a soft cap at the script public key + DAA boundary)",
+                        "Usage: rpc get-utxos-by-addresses-v2 <addr...> <from_daa_score|None> <to_daa_score|None> <start_address|None> <start_daa_score|None> <start_outpoint_transaction_id|None> <start_outpoint_index|None> <limit|None>",
                     ));
                 }
 
@@ -335,13 +335,29 @@ impl Rpc {
                     if value.eq_ignore_ascii_case("none") { Ok(None) } else { Ok(Some(value.parse::<usize>()?)) }
                 };
 
+                let parse_optional_u32 = |value: String| -> Result<Option<u32>> {
+                    if value.eq_ignore_ascii_case("none") { Ok(None) } else { Ok(Some(value.parse::<u32>()?)) }
+                };
+
+                let parse_optional_u64 = |value: String| -> Result<Option<u64>> {
+                    if value.eq_ignore_ascii_case("none") { Ok(None) } else { Ok(Some(value.parse::<u64>()?)) }
+                };
+
+                let parse_optional_rpc_hash = |value: String| -> Result<Option<RpcHash>> {
+                    if value.eq_ignore_ascii_case("none") { Ok(None) } else { Ok(Some(RpcHash::from_hex(value.as_str())?)) }
+                };
+
+                let parse_optional_address = |value: String| -> Result<Option<Address>> {
+                    if value.eq_ignore_ascii_case("none") { Ok(None) } else { Ok(Some(Address::try_from(value.as_str())?)) }
+                };
+
                 let limit = parse_optional_usize(args.pop().unwrap())?;
-                let start_outpoint_index = args.pop().and_then(|arg| arg.parse::<u32>().ok());
-                let start_outpoint_transaction_id = args.pop().and_then(|arg| RpcHash::from_hex(arg.as_str()).ok());
-                let start_daa_score = args.pop().and_then(|arg| arg.parse::<u64>().ok());
-                let start_address = args.pop().and_then(|arg| Address::try_from(arg.as_str()).ok());
-                let to_daa_score = args.pop().and_then(|arg| arg.parse::<u64>().ok());
-                let from_daa_score = args.pop().and_then(|arg| arg.parse::<u64>().ok());
+                let start_outpoint_index = parse_optional_u32(args.pop().unwrap())?;
+                let start_outpoint_transaction_id = parse_optional_rpc_hash(args.pop().unwrap())?;
+                let start_daa_score = parse_optional_u64(args.pop().unwrap())?;
+                let start_address = parse_optional_address(args.pop().unwrap())?;
+                let to_daa_score = parse_optional_u64(args.pop().unwrap())?;
+                let from_daa_score = parse_optional_u64(args.pop().unwrap())?;
 
                 let cursor = if start_outpoint_index.is_none()
                     && start_outpoint_transaction_id.is_none()
@@ -349,7 +365,11 @@ impl Rpc {
                     && start_daa_score.is_none()
                 {
                     None
-                } else {
+                } else if start_outpoint_index.is_some()
+                    && start_outpoint_transaction_id.is_some()
+                    && start_address.is_some()
+                    && start_daa_score.is_some()
+                {
                     Some(RpcGetUtxosByAddressesCursor::new(
                         start_address.ok_or(RpcError::General("no start address specified".to_string()))?,
                         start_daa_score.ok_or(RpcError::General("no start_daa_score specified for cursor".to_string()))?,
@@ -360,11 +380,9 @@ impl Rpc {
                                 .ok_or(RpcError::General("no start_outpoint_index specified for cursor".to_string()))?,
                         }),
                     ))
+                } else {
+                    return Err(Error::custom("incomplete cursor parameters".to_string()));
                 };
-
-                if args.is_empty() {
-                    return Err(Error::custom("Please specify at least one address"));
-                }
 
                 let addresses = args.iter().map(|s| Address::try_from(s.as_str())).collect::<std::result::Result<Vec<_>, _>>()?;
                 let result = rpc

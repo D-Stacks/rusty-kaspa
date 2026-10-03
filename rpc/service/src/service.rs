@@ -839,11 +839,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             return Err(RpcError::NoUtxoIndex);
         }
 
-        // because the address list and limit is potentially unbounded, we require unsafe_rpc to be enabled for this call
-        if !self.config.unsafe_rpc {
-            return Err(RpcError::UnavailableInSafeMode);
-        }
-
         // We define an empty address set as an invalid request, as the user should be aware proactively that this is an empty query. This is also a safety measure to prevent accidental unbounded queries, as the user may not be aware that this is an empty query.
         // TODO: Potentially we could redefine this case to get all utxos in the DAA range, but this is somewhat of an engineering effort to implement.
         if request.addresses.is_empty() {

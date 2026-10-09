@@ -305,17 +305,20 @@ impl UtxoSetByScriptPublicKeyStoreReader for DbUtxoSetByScriptPublicKeyStore {
         let extended_limit = limit.map(|l| l.saturating_add(1)).unwrap_or(usize::MAX);
 
         let mut number_of_entries: usize = 0;
-        let mut entries = self
+        let rows = self
             .access
             .multi_range_seek_iterator(key_ranges)
             .take(extended_limit)
             .map(|res| {
-                let (key, value) = res.unwrap();
+                let (key, value) = res?;
                 let db_key = UtxoEntryDbKey(Arc::new(key.to_vec()));
                 let (script_public_key, utxo_key_suffix_record) = db_key.extract_data();
                 number_of_entries += 1;
-                (script_public_key, utxo_key_suffix_record, value)
+                Ok((script_public_key, utxo_key_suffix_record, value))
             })
+            .collect::<UtxoIndexResult<Vec<_>>>()?;
+        let mut entries = rows
+            .into_iter()
             .chunk_by(|(spk, _, _)| spk.clone())
             .into_iter()
             .map(|(spk, chunk)| (spk, chunk.map(|(_, key_data, value)| (key_data, value)).collect::<Vec<_>>()))

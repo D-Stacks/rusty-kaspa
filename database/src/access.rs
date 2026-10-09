@@ -1,4 +1,8 @@
-use crate::{cache::CachePolicy, db::DB, errors::StoreError};
+use crate::{
+    cache::CachePolicy,
+    db::DB,
+    errors::{StoreError, StoreResult},
+};
 
 use super::prelude::{Cache, DbKey, DbWriter};
 use kaspa_utils::mem_size::MemSizeEstimator;
@@ -485,7 +489,7 @@ where
     pub fn multi_range_seek_iterator<'a>(
         &'a self,
         mut seek_ranges: impl Iterator<Item = RangeInclusive<TKey>> + 'a,
-    ) -> impl Iterator<Item = KeyDataResult<TData>> + 'a
+    ) -> impl Iterator<Item = StoreResult<(Box<[u8]>, TData)>> + 'a
     where
         TKey: Clone + AsRef<[u8]>,
         TData: DeserializeOwned,
@@ -500,23 +504,35 @@ where
         });
 
         std::iter::from_fn(move || {
-            while db_iterator.valid() && current_seek_range.is_some() {
+            loop {
+                let Some(range) = current_seek_range.as_ref() else { return None };
+                if !db_iterator.valid() {
+                    if let Err(err) = db_iterator.status() {
+                        current_seek_range = None;
+                        return Some(Err(err.into()));
+                    }
+                    current_seek_range = seek_ranges.next().inspect(|next_range| {
+                        db_iterator.seek(DbKey::new(&self.prefix, next_range.start().clone()).as_ref());
+                    });
+                    continue;
+                }
+
                 let key_bytes: Box<[u8]> = db_iterator.key().unwrap()[self.prefix.len()..].into();
-                if key_bytes.as_ref() > current_seek_range.as_ref().unwrap().end().as_ref() {
+                if key_bytes.as_ref() > range.end().as_ref() {
                     current_seek_range = seek_ranges.next().inspect(|next_range| {
                         db_iterator.seek(DbKey::new(&self.prefix, next_range.start().clone()).as_ref());
                     });
                     continue;
                 }
                 let value_bytes = db_iterator.value().unwrap();
-                let res = match bincode::deserialize::<TData>(value_bytes) {
-                    Ok(value) => Some(Ok((key_bytes, value))),
-                    Err(err) => Some(Err(err.into())),
-                };
+                let res = bincode::deserialize::<TData>(value_bytes).map(|value| (key_bytes, value)).map_err(StoreError::from);
                 db_iterator.next();
-                return res;
+                if let Err(err) = db_iterator.status() {
+                    current_seek_range = None;
+                    return Some(Err(err.into()));
+                }
+                return Some(res);
             }
-            None
         })
     }
 
@@ -843,5 +859,16 @@ mod tests {
 
         let values: Vec<u64> = results.iter().map(|(_, v)| *v).collect();
         assert_eq!(values, vec![2, 4, 6]);
+    }
+
+    #[test]
+    fn test_multi_range_iterator_advances_after_invalid_seek() {
+        let (_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        let access = CachedDbAccess::<Vec<u8>, u64>::new(db.clone(), CachePolicy::Count(10), vec![5]);
+        access.write_many(DirectDbWriter::new(&db), &mut (0u64..3).map(|i| (range_key(i), i))).unwrap();
+
+        let ranges = [range_key(10)..=range_key(11), range_key(1)..=range_key(2)];
+        let values: Vec<_> = access.multi_range_seek_iterator(ranges.into_iter()).map(|r| r.unwrap().1).collect();
+        assert_eq!(values, vec![1, 2]);
     }
 }

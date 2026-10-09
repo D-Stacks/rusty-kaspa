@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use workflow_serializer::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RpcGetUtxosByAddressesCursor {
     pub start_address: Option<RpcAddress>,
     pub start_daa_score: u64,

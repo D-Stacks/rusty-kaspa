@@ -20,6 +20,9 @@ use workflow_wasm::convert::*;
 use workflow_wasm::extensions::*;
 use workflow_wasm::serde::to_value;
 
+#[cfg(test)]
+mod tests;
+
 macro_rules! try_from {
     ($name:ident : $from_type:ty, $to_type:ty, $body:block) => {
         impl TryFrom<$from_type> for $to_type {
@@ -1304,7 +1307,17 @@ declare! {
 }
 
 try_from! ( args: IGetUtxosByAddressesV2Request, GetUtxosByAddressesV2Request, {
-    Ok(from_value(args.into())?)
+    let js_value = JsValue::from(args);
+    if js_value.is_array() {
+        let addresses = Vec::<Address>::try_from(AddressOrStringArrayT::from(js_value))?;
+        Ok(GetUtxosByAddressesV2Request::new(addresses, None, None, None, None))
+    } else {
+        let object = Object::from(js_value);
+        let addresses = Vec::<Address>::try_from(AddressOrStringArrayT::from(object.get_value("addresses")?))?;
+        let normalized = Object::assign(&Object::new(), &object);
+        normalized.set("addresses", &to_value(&addresses)?)?;
+        Ok(from_value(normalized.into())?)
+    }
 });
 
 declare! {
@@ -1323,7 +1336,14 @@ declare! {
 }
 
 try_from! ( args: GetUtxosByAddressesV2Response, IGetUtxosByAddressesV2Response, {
-    Ok(to_value(&args)?.into())
+    let GetUtxosByAddressesV2Response { entries, next_cursor } = args;
+    let entries = js_sys::Array::from_iter(entries.into_iter().map(UtxoEntryReference::from).map(JsValue::from));
+    let response = IGetUtxosByAddressesV2Response::default();
+    response.set("entries", entries.as_ref())?;
+    if let Some(cursor) = next_cursor {
+        response.set("nextCursor", &to_value(&cursor)?)?;
+    }
+    Ok(response)
 });
 
 // ---

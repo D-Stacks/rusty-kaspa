@@ -299,7 +299,10 @@ impl RpcCoreService {
                 limit,
             )
             .await
-            .map_err(|e| RpcError::InvalidGetUtxosByAddressesV2Request(e.to_string()))
+            .map_err(|e| match e {
+                UtxoIndexError::StoreAccessError(err) => RpcError::General(err.to_string()),
+                other => RpcError::InvalidGetUtxosByAddressesV2Request(other.to_string()),
+            })
     }
 
     fn extract_tx_query(&self, filter_transaction_pool: bool, include_orphan_pool: bool) -> RpcResult<TransactionQuery> {
